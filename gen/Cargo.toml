@@ -1,0 +1,10 @@
+[package]
+name = "gen"
+version = "0.1.0"
+authors = ["Cedric Liegeois <ofmooseandmen@yahoo.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+jord = { path = "..", version = "0.1.0" }

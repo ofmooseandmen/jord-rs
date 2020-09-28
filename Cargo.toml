@@ -1,0 +1,28 @@
+[package]
+name = "jord"
+version = "0.1.0"
+authors = ["Cedric Liegeois"]
+license = "BSD3"
+readme = "README.md"
+repository = "https://github.com/ofmooseandmen/jord-rs"
+documentation = "TODO"
+homepage = "https://crates.io/crates/jord"
+description = """
+Geographical Position Calculations
+"""
+keywords = ["TODO"]
+categories = ["algorithms", "TODO"]
+autobenches = true
+edition = "2018"
+include = ["src/", "LICENSE", "README.md", "ChangeLog.md"]
+
+[lib]
+name = "jord"
+path = "src/lib.rs"
+
+[badges]
+ci = { repository = "ofmooseandmen/jord-rs" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "doc_cfg"]
