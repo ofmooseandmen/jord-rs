@@ -4,11 +4,11 @@ use std::io::Write;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-use jord::{Ellipsoid, Length, Measure, Sphere, Surface};
+use jord::{Ellipsoid, Length, Sphere, Surface};
 
 fn gen_surfaces(es: Vec<(String, Box<dyn Surface>)>, f: &str) -> std::io::Result<()> {
     let mut file = File::create(f)?;
-    file.write("use crate::{Ellipsoid, Sphere, Length};\n".as_bytes())?;
+    file.write("use crate::{Ellipsoid, Length, Sphere};\n".as_bytes())?;
     file.write("\n".as_bytes())?;
     for e in es {
         let s;
@@ -28,7 +28,7 @@ fn gen_sphere(n: String, e: Box<dyn Surface>) -> String {
 
 ",
         n.to_uppercase(),
-        e.mean_radius().to_resolution(),
+        e.mean_radius().micrometres(),
     )
 }
 
@@ -45,12 +45,12 @@ pub const {}: Sphere = Sphere::new(Length::from_micrometres({}));
 
 ",
         n.to_uppercase(),
-        e.equatorial_radius().to_resolution(),
-        e.polar_radius().to_resolution(),
+        e.equatorial_radius().micrometres(),
+        e.polar_radius().micrometres(),
         e.eccentricity(),
         e.flattening(),
         n.to_uppercase() + "_SPHERE",
-        e.mean_radius().to_resolution(),
+        e.mean_radius().micrometres(),
     )
 }
 

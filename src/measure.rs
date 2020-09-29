@@ -1,8 +1,16 @@
+// Copyright: (c) 2020 Cedric Liegeois
+// License: BSD3
+
+/// Trait implemented by all measurable quantities with a fixed resolution.
 pub trait Measure {
-    fn to_unit(self) -> f64;
-    fn from_unit(amount: f64) -> Self;
-    fn to_resolution(self) -> i64;
-    fn from_resolution(amount: i64) -> Self;
+    /// Creates a new quantity from the given amount expressed in the default unit.
+    fn from_default_unit(amount: f64) -> Self;
+    /// Creates a new quantity from the given amount expressed in the resolution unit.    
+    fn from_resolution_unit(amount: i64) -> Self;
+    /// Returns this quantity in the default unit.
+    fn as_default_unit(self) -> f64;
+    /// Returns this quantity in the resolution unit.
+    fn as_resolution_unit(self) -> i64;
 }
 
 #[macro_export]
@@ -13,7 +21,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn add(self, rhs: Self) -> Self {
-                Self::from_resolution(self.to_resolution() + rhs.to_resolution())
+                Self::from_resolution_unit(self.as_resolution_unit() + rhs.as_resolution_unit())
             }
         }
 
@@ -21,7 +29,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn sub(self, rhs: Self) -> Self {
-                Self::from_resolution(self.to_resolution() - rhs.to_resolution())
+                Self::from_resolution_unit(self.as_resolution_unit() - rhs.as_resolution_unit())
             }
         }
 
@@ -29,7 +37,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn neg(self) -> Self {
-                Self::from_resolution(self.to_resolution().neg())
+                Self::from_resolution_unit(self.as_resolution_unit().neg())
             }
         }
 
@@ -37,7 +45,7 @@ macro_rules! impl_measure {
             type Output = f64;
 
             fn div(self, rhs: Self) -> f64 {
-                self.to_unit() / rhs.to_unit()
+                self.as_default_unit() / rhs.as_default_unit()
             }
         }
 
@@ -45,7 +53,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn div(self, rhs: f64) -> Self {
-                Self::from_unit(self.to_unit() / rhs)
+                Self::from_default_unit(self.as_default_unit() / rhs)
             }
         }
 
@@ -53,7 +61,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn mul(self, rhs: f64) -> Self {
-                Self::from_unit(self.to_unit() * rhs)
+                Self::from_default_unit(self.as_default_unit() * rhs)
             }
         }
 

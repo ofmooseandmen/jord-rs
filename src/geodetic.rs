@@ -94,7 +94,7 @@ pub struct LatLongPos<M: Model> {
     model: M,
 }
 
-// FIXME: wrap lat/long & parse
+// FIXME: wrap lat/long, parse & antipode
 impl<M: Model> LatLongPos<M> {
     pub fn new(latitude: Angle, longitude: Angle, model: M) -> Result<Self, PosError> {
         let latd = latitude.as_decimal_degrees();
@@ -159,8 +159,6 @@ impl<M: Model> LatLongPos<M> {
     pub fn model(&self) -> M {
         self.model
     }
-
-    // FIXME: antipode
 }
 
 impl LatLongPos<S84Model> {

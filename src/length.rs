@@ -39,6 +39,10 @@ impl Length {
         Length::from_metres(nm * Length::NM_TO_M)
     }
 
+    pub fn micrometres(self) -> i64 {
+        self.micrometres
+    }
+
     pub fn as_metres(self) -> f64 {
         (self.micrometres as f64) / Length::M_TO_UM
     }
@@ -60,22 +64,22 @@ impl Length {
 }
 
 impl Measure for Length {
-    fn to_unit(self) -> f64 {
-        self.as_metres()
-    }
-
-    fn from_unit(amount: f64) -> Self {
+    fn from_default_unit(amount: f64) -> Self {
         Length::from_metres(amount)
     }
 
-    fn to_resolution(self) -> i64 {
-        self.micrometres
-    }
-
-    fn from_resolution(amount: i64) -> Self {
+    fn from_resolution_unit(amount: i64) -> Self {
         Length {
             micrometres: amount,
         }
+    }
+
+    fn as_default_unit(self) -> f64 {
+        self.as_metres()
+    }
+
+    fn as_resolution_unit(self) -> i64 {
+        self.micrometres
     }
 }
 
