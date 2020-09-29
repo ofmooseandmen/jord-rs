@@ -1,139 +1,110 @@
-use crate::positioning::{F64Positioning, FixedPositioning, F64, FIXED};
-use crate::{FixedAngle, FixedLength, LatLongPos, NvectorPos, Spherical};
+use crate::internal::{LL, NV};
+use crate::{Angle, LatLongPos, Length, NvectorPos, Spherical};
 
 impl<S: Spherical> LatLongPos<S> {
-    pub fn destination(&self, bearing: FixedAngle, distance: FixedLength) -> Self {
+    pub fn destination(&self, bearing: Angle, distance: Length) -> Self {
         let nv0: NvectorPos<S> = (*self).into();
-        let nv1 = internal::destination(nv0, bearing, distance, FIXED);
+        let nv1 = internal::destination(nv0, bearing.as_radians(), distance.as_metres(), LL);
         nv1.into()
     }
 
-    pub fn distance_to(&self, other: Self) -> FixedLength {
+    pub fn distance_to(&self, other: Self) -> Length {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::distance::<S, FixedAngle, FixedLength, FixedPositioning>(nv1, nv2, FIXED)
+        Length::from_metres(internal::distance_metres(nv1, nv2, LL))
     }
 
-    pub fn final_bearing_to(&self, other: Self) -> Option<FixedAngle> {
+    pub fn final_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::final_bearing(nv1, nv2, FIXED)
+        internal::final_bearing_radians(nv1, nv2, LL).map(|b| Angle::from_radians(b))
     }
 
-    pub fn initial_bearing_to(&self, other: Self) -> Option<FixedAngle> {
+    pub fn initial_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::initial_bearing(nv1, nv2, FIXED)
+        internal::initial_bearing_radians(nv1, nv2, LL).map(|b| Angle::from_radians(b))
     }
 }
 
 impl<S: Spherical> NvectorPos<S> {
     pub fn destination(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
-        internal::destination(*self, bearing_degrees, distance_metres, F64)
+        internal::destination(*self, bearing_degrees.to_radians(), distance_metres, NV)
     }
 
     pub fn distance_metres_to(&self, other: Self) -> f64 {
-        internal::distance::<S, f64, f64, F64Positioning>(*self, other, F64)
+        internal::distance_metres(*self, other, NV)
     }
 
     pub fn final_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::final_bearing(*self, other, F64)
+        internal::final_bearing_radians(*self, other, NV).map(|b| b.to_degrees())
     }
 
     pub fn initial_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::initial_bearing(*self, other, F64)
+        internal::initial_bearing_radians(*self, other, NV).map(|b| b.to_degrees())
     }
 }
 
 mod internal {
 
-    use crate::positioning::Positioning;
-    use crate::{Angle, Length, NvectorPos, Spherical, Vec3};
+    use crate::internal::modulo;
+    use crate::internal::Rounding;
+    use crate::{NvectorPos, Spherical, Surface, Vec3};
+    use std::f64::consts::PI;
 
-    pub fn destination<M: Spherical, A, L, P>(
-        p0: NvectorPos<M>,
-        bearing: A,
-        distance: L,
-        positioning: P,
-    ) -> NvectorPos<M>
-    where
-        A: Angle<Length = L>,
-        L: Length,
-        P: Positioning<Length = L>,
-    {
-        if distance.is_zero() {
+    pub fn destination<S: Spherical, R: Rounding>(
+        p0: NvectorPos<S>,
+        bearing_radians: f64,
+        distance_metres: f64,
+        rounding: R,
+    ) -> NvectorPos<S> {
+        if distance_metres == 0.0 {
             p0
         } else {
             let v0 = p0.nvector();
             // east direction vector at p0
-            let np = positioning.north_pole(p0.model());
+            let np = rounding
+                .round_pos(NvectorPos::north_pole(p0.model()))
+                .nvector();
             let ed = np.cross(v0).unit();
             // north direction vector at p0
             let nd = v0.cross(ed);
             // central angle
-            let r = positioning.earth_radius(p0);
-            let ca: A = A::central(distance, r);
+            let r = p0.model().surface().mean_radius().as_metres();
+            let ca = rounding.round_radians(distance_metres / r);
             // unit vector in the direction of the azimuth
-            let de = nd * bearing.cos() + ed * bearing.sin();
+            let de = nd * bearing_radians.cos() + ed * bearing_radians.sin();
             let nv = v0 * ca.cos() + de * ca.sin();
-            positioning.at_resolution(nv, p0.model())
+            rounding.round_pos(NvectorPos::new(nv, p0.model()))
         }
     }
 
-    pub fn distance<M: Spherical, A, L, P>(
-        p1: NvectorPos<M>,
-        p2: NvectorPos<M>,
-        positioning: P,
-    ) -> L
-    where
-        A: Angle<Length = L>,
-        L: Length,
-        P: Positioning<Length = L>,
-    {
-        let a: A = signed_angle_between(p1.nvector(), p2.nvector(), None);
-        a.arc_length(positioning.earth_radius(p1))
+    pub fn distance_metres<S: Spherical, R: Rounding>(
+        p1: NvectorPos<S>,
+        p2: NvectorPos<S>,
+        rounding: R,
+    ) -> f64 {
+        let a = rounding.round_radians(signed_radians_between(p1.nvector(), p2.nvector(), None));
+        a * p1.model().surface().mean_radius().as_metres()
     }
 
-    pub fn signed_angle_between<A, L>(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> A
-    where
-        A: Angle<Length = L>,
-    {
-        let sign = match vn {
-            Some(n) => n.dot(v1.cross(v2)).signum(),
-            None => 1.0,
-        };
-        let sin_o = sign * v1.cross(v2).norm();
-        let cos_o = v1.dot(v2);
-        A::atan2(sin_o, cos_o)
-    }
-
-    pub fn final_bearing<M: Spherical, A, L, P>(
-        p1: NvectorPos<M>,
-        p2: NvectorPos<M>,
-        positioning: P,
-    ) -> Option<A>
-    where
-        A: Angle<Length = L>,
-        L: Length,
-        P: Positioning<Length = L>,
-    {
-        let ib: Option<A> = initial_bearing(p2, p1, positioning);
+    pub fn final_bearing_radians<S: Spherical, R: Rounding>(
+        p1: NvectorPos<S>,
+        p2: NvectorPos<S>,
+        rounding: R,
+    ) -> Option<f64> {
+        let ib: Option<f64> = initial_bearing_radians(p2, p1, rounding);
         match ib {
             None => None,
-            Some(b) => Some(b.normalise(A::half_circle())),
+            Some(b) => Some(normalise_radians(b, PI)),
         }
     }
 
-    pub fn initial_bearing<M: Spherical, A, L, P>(
-        p1: NvectorPos<M>,
-        p2: NvectorPos<M>,
-        positioning: P,
-    ) -> Option<A>
-    where
-        A: Angle<Length = L>,
-        L: Length,
-        P: Positioning<Length = L>,
-    {
+    pub fn initial_bearing_radians<S: Spherical, R: Rounding>(
+        p1: NvectorPos<S>,
+        p2: NvectorPos<S>,
+        rounding: R,
+    ) -> Option<f64> {
         let v1 = p1.nvector();
         let v2 = p2.nvector();
         if v1 == v2 {
@@ -142,10 +113,27 @@ mod internal {
             // great circle through p1 & p2
             let gc1 = v1.cross(v2);
             // great circle through p1 & north pole
-            let gc2 = v1.cross(positioning.north_pole(p1.model()));
-            let a: A = signed_angle_between(gc1, gc2, Some(v1));
-            Some(a.normalise(A::full_circle()))
+            let np = rounding
+                .round_pos(NvectorPos::north_pole(p1.model()))
+                .nvector();
+            let gc2 = v1.cross(np);
+            let a = signed_radians_between(gc1, gc2, Some(v1));
+            Some(normalise_radians(a, 2.0 * PI))
         }
+    }
+
+    fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
+        let sign = match vn {
+            Some(n) => n.dot(v1.cross(v2)).signum(),
+            None => 1.0,
+        };
+        let sin_o = sign * v1.cross(v2).norm();
+        let cos_o = v1.dot(v2);
+        sin_o.atan2(cos_o)
+    }
+
+    fn normalise_radians(a: f64, b: f64) -> f64 {
+        modulo(a + b, 2.0 * PI)
     }
 }
 
@@ -154,17 +142,14 @@ mod fixed_tests {
 
     mod destination_test {
 
-        use crate::{FixedAngle, FixedLength, LatLongPos};
+        use crate::{Angle, LatLongPos, Length};
 
         #[test]
         fn returns_p0_if_distance_is_0() {
             let p0 = LatLongPos::s84(53.320556, -1.729722).unwrap();
             assert_eq!(
                 p0,
-                p0.destination(
-                    FixedAngle::from_decimal_degrees(96.0217),
-                    FixedLength::zero()
-                )
+                p0.destination(Angle::from_decimal_degrees(96.0217), Length::zero())
             );
         }
 
@@ -175,8 +160,8 @@ mod fixed_tests {
             assert_eq!(
                 p1,
                 p0.destination(
-                    FixedAngle::from_decimal_degrees(96.0217),
-                    FixedLength::from_metres(124800.0)
+                    Angle::from_decimal_degrees(96.0217),
+                    Length::from_metres(124800.0)
                 )
             );
         }
@@ -185,25 +170,25 @@ mod fixed_tests {
     mod distance_tests {
 
         use crate::models::S84;
-        use crate::{FixedLength, LatLongPos};
+        use crate::{LatLongPos, Length};
 
         #[test]
         fn returns_0_equal_positions() {
             let p = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            assert_eq!(FixedLength::zero(), p.distance_to(p));
+            assert_eq!(Length::zero(), p.distance_to(p));
         }
 
         #[test]
         fn returns_distance_between_2_positions() {
             let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
-            assert_eq!(FixedLength::from_metres(968854.878007), p1.distance_to(p2));
+            assert_eq!(Length::from_metres(968854.878007), p1.distance_to(p2));
         }
 
         #[test]
         fn handles_singularity_at_poles() {
             assert_eq!(
-                FixedLength::from_kilometres(20015.114352233),
+                Length::from_kilometres(20015.114352233),
                 LatLongPos::north_pole(S84).distance_to(LatLongPos::south_pole(S84))
             );
         }
@@ -212,13 +197,13 @@ mod fixed_tests {
         fn handles_discontinuity_at_date_line() {
             let p1 = LatLongPos::s84(50.066389, -179.999722).unwrap();
             let p2 = LatLongPos::s84(50.066389, 179.999722).unwrap();
-            assert_eq!(FixedLength::from_metres(39.685092), p1.distance_to(p2));
+            assert_eq!(Length::from_metres(39.685092), p1.distance_to(p2));
         }
     }
 
     mod final_bearing_tests {
 
-        use crate::{Angle, FixedAngle, LatLongPos};
+        use crate::{Angle, LatLongPos};
 
         #[test]
         fn returns_none_equal_positions() {
@@ -234,7 +219,7 @@ mod fixed_tests {
         fn returns_0_iso_longitude_going_north() {
             let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             let p2 = LatLongPos::s84(58.643889, -5.714722).unwrap();
-            assert_eq!(Some(FixedAngle::zero()), p1.final_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.final_bearing_to(p2));
         }
 
         #[test]
@@ -242,7 +227,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(58.643889, -5.714722).unwrap();
             let p2 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(180.0)),
+                Some(Angle::from_decimal_degrees(180.0)),
                 p1.final_bearing_to(p2)
             );
         }
@@ -252,7 +237,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(0.0, 0.0).unwrap();
             let p2 = LatLongPos::s84(0.0, 1.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(90.0)),
+                Some(Angle::from_decimal_degrees(90.0)),
                 p1.final_bearing_to(p2)
             );
         }
@@ -262,7 +247,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(0.0, 1.0).unwrap();
             let p2 = LatLongPos::s84(0.0, 0.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(270.0)),
+                Some(Angle::from_decimal_degrees(270.0)),
                 p1.final_bearing_to(p2)
             );
         }
@@ -272,17 +257,17 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(11.27520031611111)),
+                Some(Angle::from_decimal_degrees(11.27520031611111)),
                 p1.final_bearing_to(p2)
             );
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(189.1198173275)),
+                Some(Angle::from_decimal_degrees(189.1198173275)),
                 p2.final_bearing_to(p1)
             );
             let p3 = LatLongPos::s84(-53.994722, -25.9875).unwrap();
             let p4 = LatLongPos::s84(54.0, 154.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(125.68508662305555)),
+                Some(Angle::from_decimal_degrees(125.68508662305555)),
                 p3.final_bearing_to(p4)
             );
         }
@@ -291,7 +276,7 @@ mod fixed_tests {
     mod initial_bearing_tests {
 
         use crate::models::S84;
-        use crate::{Angle, FixedAngle, LatLongPos};
+        use crate::{Angle, LatLongPos};
 
         #[test]
         fn returns_none_equal_positions() {
@@ -307,7 +292,7 @@ mod fixed_tests {
         fn returns_0_iso_longitude_going_north() {
             let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             let p2 = LatLongPos::s84(58.643889, -5.714722).unwrap();
-            assert_eq!(Some(FixedAngle::zero()), p1.initial_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
@@ -315,7 +300,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(58.643889, -5.714722).unwrap();
             let p2 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(180.0)),
+                Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -325,7 +310,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(0.0, 0.0).unwrap();
             let p2 = LatLongPos::s84(0.0, 1.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(90.0)),
+                Some(Angle::from_decimal_degrees(90.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -335,7 +320,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(0.0, 1.0).unwrap();
             let p2 = LatLongPos::s84(0.0, 0.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(270.0)),
+                Some(Angle::from_decimal_degrees(270.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -344,7 +329,7 @@ mod fixed_tests {
         fn returns_0_at_prime_meridian_going_north() {
             let p1 = LatLongPos::s84(50.0, 0.0).unwrap();
             let p2 = LatLongPos::s84(58.0, 0.0).unwrap();
-            assert_eq!(Some(FixedAngle::zero()), p1.initial_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
@@ -352,7 +337,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(58.0, 0.0).unwrap();
             let p2 = LatLongPos::s84(50.0, 0.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(180.0)),
+                Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -361,7 +346,7 @@ mod fixed_tests {
         fn returns_0_at_date_line_going_north() {
             let p1 = LatLongPos::s84(50.0, 180.0).unwrap();
             let p2 = LatLongPos::s84(58.0, 180.0).unwrap();
-            assert_eq!(Some(FixedAngle::zero()), p1.initial_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
@@ -369,7 +354,7 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(58.0, 180.0).unwrap();
             let p2 = LatLongPos::s84(50.0, 180.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(180.0)),
+                Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -378,14 +363,14 @@ mod fixed_tests {
         fn returns_0_south_to_north_pole() {
             let p1 = LatLongPos::south_pole(S84);
             let p2 = LatLongPos::north_pole(S84);
-            assert_eq!(Some(FixedAngle::zero()), p1.initial_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
         fn returns_0_north_to_south_pole() {
             let p1 = LatLongPos::north_pole(S84);
             let p2 = LatLongPos::south_pole(S84);
-            assert_eq!(Some(FixedAngle::zero()), p1.initial_bearing_to(p2));
+            assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
@@ -393,7 +378,7 @@ mod fixed_tests {
             let p1 = LatLongPos::south_pole(S84);
             let p2 = LatLongPos::s84(50.0, 180.0).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(180.0)),
+                Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
             );
         }
@@ -403,11 +388,11 @@ mod fixed_tests {
             let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
             let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(9.1198173275)),
+                Some(Angle::from_decimal_degrees(9.1198173275)),
                 p1.initial_bearing_to(p2)
             );
             assert_eq!(
-                Some(FixedAngle::from_decimal_degrees(191.27520031611112)),
+                Some(Angle::from_decimal_degrees(191.27520031611112)),
                 p2.initial_bearing_to(p1)
             );
         }

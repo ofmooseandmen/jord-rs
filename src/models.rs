@@ -16,7 +16,7 @@ impl Model for S84Model {
         LongitudeRange::L180
     }
     fn surface(&self) -> Sphere {
-        wgs84_sphere()
+        WGS84_SPHERE
     }
 }
 

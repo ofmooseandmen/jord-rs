@@ -6,17 +6,15 @@ mod measure;
 pub use crate::measure::Measure;
 
 pub mod angle;
-pub use crate::angle::{Angle, FixedAngle};
+pub use crate::angle::Angle;
 
 pub mod great_circle;
 
 pub mod geodetic;
-pub use crate::geodetic::{
-    nvector_from_lat_long, nvector_to_lat_long, LatLongPos, NvectorPos, PosError,
-};
+pub use crate::geodetic::{LatLongPos, NvectorPos, PosError};
 
 pub mod length;
-pub use crate::length::{FixedLength, Length};
+pub use crate::length::Length;
 
 pub mod math3d;
 pub use crate::math3d::Mat33;
@@ -38,4 +36,4 @@ pub use crate::surface::{Ellipsoid, Sphere, Surface};
 
 pub mod surfaces;
 
-mod positioning;
+mod internal;
