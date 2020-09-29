@@ -4,7 +4,6 @@ use std::ops::Div;
 use std::ops::Neg;
 use std::ops::Sub;
 
-use crate::internal::modulo;
 use crate::measure::*;
 use crate::FixedLength;
 
@@ -74,7 +73,7 @@ impl FixedAngle {
     }
 
     pub fn clockwise_difference(self, other: Self) -> Self {
-        let d = FixedAngle::cd(self.to_decimal_degrees(), other.to_decimal_degrees());
+        let d = FixedAngle::cd(self.as_decimal_degrees(), other.as_decimal_degrees());
         FixedAngle::from_decimal_degrees(d)
     }
 
@@ -94,15 +93,15 @@ impl FixedAngle {
         FixedAngle::from_radians(a.asin())
     }
 
-    pub fn to_radians(self) -> f64 {
-        self.to_decimal_degrees() * PI / 180.0
+    pub fn as_radians(self) -> f64 {
+        self.as_decimal_degrees() * PI / 180.0
     }
 
-    pub fn to_decimal_degrees(self) -> f64 {
+    pub fn as_decimal_degrees(self) -> f64 {
         self.microarcseconds as f64 / FixedAngle::DG_TO_UAS
     }
 
-    pub fn get_degrees(self) -> i64 {
+    pub fn whole_degrees(self) -> i64 {
         let d = FixedAngle::field(self, FixedAngle::DG_TO_UAS, 360.0) as i64;
         if self.microarcseconds < 0 {
             -d
@@ -111,15 +110,15 @@ impl FixedAngle {
         }
     }
 
-    pub fn get_arc_minutes(self) -> u8 {
+    pub fn arc_minutes(self) -> u8 {
         FixedAngle::field(self, 60000000.0, 60.0) as u8
     }
 
-    pub fn get_arc_seconds(self) -> u8 {
+    pub fn arc_seconds(self) -> u8 {
         FixedAngle::field(self, 1000000.0, 60.0) as u8
     }
 
-    pub fn get_arc_milliseconds(self) -> u8 {
+    pub fn arc_milliseconds(self) -> u8 {
         FixedAngle::field(self, 1000.0, 1000.0) as u8
     }
 
@@ -159,11 +158,11 @@ impl Angle for FixedAngle {
     }
 
     fn cos(self) -> f64 {
-        self.to_radians().cos()
+        self.as_radians().cos()
     }
 
     fn sin(self) -> f64 {
-        self.to_radians().sin()
+        self.as_radians().sin()
     }
 
     fn atan2(y: f64, x: f64) -> Self {
@@ -179,12 +178,12 @@ impl Angle for FixedAngle {
     }
 
     fn arc_length(self, radius: FixedLength) -> FixedLength {
-        FixedLength::from_metres(radius.to_metres() * self.to_radians())
+        FixedLength::from_metres(radius.as_metres() * self.as_radians())
     }
 
     fn normalise(self, other: Self) -> Self {
         let a = self + other;
-        let dec = modulo(a.to_decimal_degrees(), 360.0);
+        let dec = modulo(a.as_decimal_degrees(), 360.0);
         FixedAngle::from_decimal_degrees(dec)
     }
 }
@@ -242,7 +241,7 @@ impl Angle for f64 {
 
 impl Measure for FixedAngle {
     fn to_unit(self) -> f64 {
-        self.to_decimal_degrees()
+        self.as_decimal_degrees()
     }
 
     fn from_unit(amount: f64) -> Self {
@@ -261,6 +260,10 @@ impl Measure for FixedAngle {
 }
 
 impl_measure! { FixedAngle }
+
+fn modulo(a: f64, b: f64) -> f64 {
+    ((a % b) + b) % b
+}
 
 #[cfg(test)]
 mod fixed_tests {
@@ -318,55 +321,55 @@ mod resolution_tests {
     #[test]
     fn one_arcmillisecond() {
         let a = FixedAngle::from_decimal_degrees(1.0 / 3600000.0);
-        assert_eq!(0, a.get_degrees());
-        assert_eq!(0, a.get_arc_minutes());
-        assert_eq!(0, a.get_arc_seconds());
-        assert_eq!(1, a.get_arc_milliseconds());
+        assert_eq!(0, a.whole_degrees());
+        assert_eq!(0, a.arc_minutes());
+        assert_eq!(0, a.arc_seconds());
+        assert_eq!(1, a.arc_milliseconds());
     }
 
     #[test]
     fn one_arcsecond() {
         let a = FixedAngle::from_decimal_degrees(1000.0 / 3600000.0);
-        assert_eq!(0, a.get_degrees());
-        assert_eq!(0, a.get_arc_minutes());
-        assert_eq!(1, a.get_arc_seconds());
-        assert_eq!(0, a.get_arc_milliseconds());
+        assert_eq!(0, a.whole_degrees());
+        assert_eq!(0, a.arc_minutes());
+        assert_eq!(1, a.arc_seconds());
+        assert_eq!(0, a.arc_milliseconds());
     }
 
     #[test]
     fn one_arcminute() {
         let a = FixedAngle::from_decimal_degrees(60000.0 / 3600000.0);
-        assert_eq!(0, a.get_degrees());
-        assert_eq!(1, a.get_arc_minutes());
-        assert_eq!(0, a.get_arc_seconds());
-        assert_eq!(0, a.get_arc_milliseconds());
+        assert_eq!(0, a.whole_degrees());
+        assert_eq!(1, a.arc_minutes());
+        assert_eq!(0, a.arc_seconds());
+        assert_eq!(0, a.arc_milliseconds());
     }
 
     #[test]
     fn one_degrees() {
         let a = FixedAngle::from_decimal_degrees(1.0);
-        assert_eq!(1, a.get_degrees());
-        assert_eq!(0, a.get_arc_minutes());
-        assert_eq!(0, a.get_arc_seconds());
-        assert_eq!(0, a.get_arc_milliseconds());
+        assert_eq!(1, a.whole_degrees());
+        assert_eq!(0, a.arc_minutes());
+        assert_eq!(0, a.arc_seconds());
+        assert_eq!(0, a.arc_milliseconds());
     }
 
     #[test]
     fn positve_value() {
         let a = FixedAngle::from_decimal_degrees(154.9150300);
-        assert_eq!(154, a.get_degrees());
-        assert_eq!(54, a.get_arc_minutes());
-        assert_eq!(54, a.get_arc_seconds());
-        assert_eq!(108, a.get_arc_milliseconds());
+        assert_eq!(154, a.whole_degrees());
+        assert_eq!(54, a.arc_minutes());
+        assert_eq!(54, a.arc_seconds());
+        assert_eq!(108, a.arc_milliseconds());
     }
 
     #[test]
     fn negative_value() {
         let a = FixedAngle::from_decimal_degrees(-154.915);
-        assert_eq!(-154, a.get_degrees());
-        assert_eq!(54, a.get_arc_minutes());
-        assert_eq!(54, a.get_arc_seconds());
-        assert_eq!(0, a.get_arc_milliseconds());
+        assert_eq!(-154, a.whole_degrees());
+        assert_eq!(54, a.arc_minutes());
+        assert_eq!(54, a.arc_seconds());
+        assert_eq!(0, a.arc_milliseconds());
     }
 }
 

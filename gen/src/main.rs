@@ -37,12 +37,12 @@ fn gen_sphere(n: String, e: Box<dyn Surface>) -> String {
 fn gen_ellispoid(n: String, e: Box<dyn Surface>) -> String {
     format!(
         "pub const fn {}() -> Ellipsoid {{
-    Ellipsoid {{
-        equatorial_radius: FixedLength::from_micrometres({}),
-        polar_radius: FixedLength::from_micrometres({}),
-        eccentricity: {},
-        flattening: {},
-    }}
+    Ellipsoid::from_all(
+        FixedLength::from_micrometres({}),
+        FixedLength::from_micrometres({}),
+        {},
+        {},
+    )
 }}
 
 pub const fn {}() -> Sphere {{

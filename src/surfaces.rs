@@ -1,12 +1,12 @@
-use crate::{Ellipsoid, Sphere, FixedLength};
+use crate::{Ellipsoid, FixedLength, Sphere};
 
 pub const fn wgs84() -> Ellipsoid {
-    Ellipsoid {
-        equatorial_radius: FixedLength::from_micrometres(6378137000000),
-        polar_radius: FixedLength::from_micrometres(6356752314245),
-        eccentricity: 0.08181919084262157,
-        flattening: 0.0033528106647474805,
-    }
+    Ellipsoid::from_all(
+        FixedLength::from_micrometres(6378137000000),
+        FixedLength::from_micrometres(6356752314245),
+        0.08181919084262157,
+        0.0033528106647474805,
+    )
 }
 
 pub const fn wgs84_sphere() -> Sphere {
@@ -16,4 +16,3 @@ pub const fn wgs84_sphere() -> Sphere {
 pub const fn moon() -> Sphere {
     Sphere::new(FixedLength::from_micrometres(1737400000000))
 }
-

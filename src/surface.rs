@@ -14,15 +14,15 @@ pub trait Surface {
 
 #[derive(Debug)]
 pub struct Ellipsoid {
-    pub(crate) equatorial_radius: FixedLength,
-    pub(crate) polar_radius: FixedLength,
-    pub(crate) eccentricity: f64,
-    pub(crate) flattening: f64,
+    equatorial_radius: FixedLength,
+    polar_radius: FixedLength,
+    eccentricity: f64,
+    flattening: f64,
 }
 
 impl Ellipsoid {
     pub fn new(eqr: FixedLength, invf: f64) -> Self {
-        let a = eqr.to_metres();
+        let a = eqr.as_metres();
         let f = 1.0 / invf;
         let b = a * (1.0 - f);
         let e = (1.0 - (b * b) / (a * a)).sqrt();
@@ -31,6 +31,20 @@ impl Ellipsoid {
             polar_radius: FixedLength::from_metres(b),
             eccentricity: e,
             flattening: f,
+        }
+    }
+
+    pub(crate) const fn from_all(
+        equatorial_radius: FixedLength,
+        polar_radius: FixedLength,
+        eccentricity: f64,
+        flattening: f64,
+    ) -> Self {
+        Ellipsoid {
+            equatorial_radius: equatorial_radius,
+            polar_radius: polar_radius,
+            eccentricity: eccentricity,
+            flattening: flattening,
         }
     }
 }

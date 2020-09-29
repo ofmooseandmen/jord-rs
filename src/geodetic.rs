@@ -3,6 +3,7 @@ use ::std::convert::{From, TryFrom};
 use crate::models::{S84Model, S84};
 use crate::{Angle, FixedAngle, LongitudeRange, Model, Vec3};
 
+// FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct NvectorPos<M: Model> {
     nvector: Vec3,
@@ -84,6 +85,7 @@ impl<M: Model> From<LatLongPos<M>> for NvectorPos<M> {
     }
 }
 
+// FIXME Display & FromStr
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LatLongPos<M: Model> {
     latitude: FixedAngle,
@@ -91,13 +93,13 @@ pub struct LatLongPos<M: Model> {
     model: M,
 }
 
-// FIXME: wrap lat/long
+// FIXME: wrap lat/long & parse
 impl<M: Model> LatLongPos<M> {
     pub fn new(latitude: FixedAngle, longitude: FixedAngle, model: M) -> Result<Self, PosError> {
         if !is_valid_lat(latitude) {
-            Err(PosError::InvalidLatitude(latitude.to_decimal_degrees()))
+            Err(PosError::InvalidLatitude(latitude.as_decimal_degrees()))
         } else if !is_valid_lon(longitude, model.longitude_range()) {
-            Err(PosError::InvalidLongitude(longitude.to_decimal_degrees()))
+            Err(PosError::InvalidLongitude(longitude.as_decimal_degrees()))
         } else {
             Ok(LatLongPos {
                 latitude: latitude,

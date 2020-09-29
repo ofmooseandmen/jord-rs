@@ -66,22 +66,22 @@ impl FixedLength {
         FixedLength::from_metres(nm * FixedLength::NM_TO_M)
     }
 
-    pub fn to_metres(self) -> f64 {
+    pub fn as_metres(self) -> f64 {
         (self.micrometres as f64) / FixedLength::M_TO_UM
     }
 
-    pub fn to_kilometres(self) -> f64 {
-        let m = self.to_metres();
+    pub fn as_kilometres(self) -> f64 {
+        let m = self.as_metres();
         m / FixedLength::KM_TO_M
     }
 
-    pub fn to_feet(self) -> f64 {
-        let m = self.to_metres();
+    pub fn as_feet(self) -> f64 {
+        let m = self.as_metres();
         m / FixedLength::FT_TO_M
     }
 
-    pub fn to_nautical_miles(self) -> f64 {
-        let m = self.to_metres();
+    pub fn as_nautical_miles(self) -> f64 {
+        let m = self.as_metres();
         m / FixedLength::NM_TO_M
     }
 }
@@ -94,7 +94,7 @@ impl Length for FixedLength {
 
 impl Measure for FixedLength {
     fn to_unit(self) -> f64 {
-        self.to_metres()
+        self.as_metres()
     }
 
     fn from_unit(amount: f64) -> Self {
@@ -126,49 +126,49 @@ mod conversion_tests {
 
     #[test]
     fn max_value() {
-        assert_eq!(9223372036.854774, FixedLength::max_value().to_kilometres());
+        assert_eq!(9223372036.854774, FixedLength::max_value().as_kilometres());
     }
 
     #[test]
     fn metres_to_kilometres() {
         let l = FixedLength::from_metres(1000.0);
-        assert_eq!(1.0, l.to_kilometres());
+        assert_eq!(1.0, l.as_kilometres());
     }
 
     #[test]
     fn metres_to_nautical_miles() {
         let l = FixedLength::from_metres(1000.0);
-        assert_eq!(0.5399568034557235, l.to_nautical_miles());
+        assert_eq!(0.5399568034557235, l.as_nautical_miles());
     }
 
     #[test]
     fn kilometres_to_nautical_miles() {
         let l = FixedLength::from_kilometres(1000.0);
-        assert_eq!(539.9568034557235, l.to_nautical_miles());
+        assert_eq!(539.9568034557235, l.as_nautical_miles());
     }
 
     #[test]
     fn nautical_miles_to_metres() {
         let l = FixedLength::from_nautical_miles(10.5);
-        assert_eq!(19446.0, l.to_metres());
+        assert_eq!(19446.0, l.as_metres());
     }
 
     #[test]
     fn nautical_miles_to_kilometres() {
         let l = FixedLength::from_nautical_miles(10.5);
-        assert_eq!(19.446, l.to_kilometres());
+        assert_eq!(19.446, l.as_kilometres());
     }
 
     #[test]
     fn feet_to_metres() {
         let l = FixedLength::from_feet(25000.0);
-        assert_eq!(7620.0, l.to_metres());
+        assert_eq!(7620.0, l.as_metres());
     }
 
     #[test]
     fn metres_to_feet() {
         let l = FixedLength::from_metres(7620.0);
-        assert_eq!(25000.0, l.to_feet());
+        assert_eq!(25000.0, l.as_feet());
     }
 }
 
@@ -179,25 +179,25 @@ mod resolution_tests {
     #[test]
     fn one_metre() {
         let l = FixedLength::from_metres(1.0);
-        assert_eq!(1.0, l.to_metres());
+        assert_eq!(1.0, l.as_metres());
     }
 
     #[test]
     fn one_kilometre() {
         let l = FixedLength::from_kilometres(1.0);
-        assert_eq!(1.0, l.to_kilometres());
+        assert_eq!(1.0, l.as_kilometres());
     }
 
     #[test]
     fn one_nautical_mile() {
         let l = FixedLength::from_nautical_miles(1.0);
-        assert_eq!(1.0, l.to_nautical_miles());
+        assert_eq!(1.0, l.as_nautical_miles());
     }
 
     #[test]
     fn one_feet() {
         let l = FixedLength::from_feet(1.0);
-        assert_eq!(1.0, l.to_feet());
+        assert_eq!(1.0, l.as_feet());
     }
 
     #[test]

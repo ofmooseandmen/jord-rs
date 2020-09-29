@@ -21,7 +21,7 @@ impl Positioning for F64Positioning {
     }
 
     fn earth_radius<M: Spherical>(&self, nv: NvectorPos<M>) -> f64 {
-        nv.model().surface().mean_radius().to_metres()
+        nv.model().surface().mean_radius().as_metres()
     }
 }
 pub const F64: F64Positioning = F64Positioning {};
@@ -46,7 +46,3 @@ impl Positioning for FixedPositioning {
     }
 }
 pub const FIXED: FixedPositioning = FixedPositioning {};
-
-pub fn modulo(a: f64, b: f64) -> f64 {
-    ((a % b) + b) % b
-}

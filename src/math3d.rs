@@ -143,9 +143,25 @@ impl Mat33 {
             Vec3::new(r0.z(), r1.z(), r2.z()),
         )
     }
+}
 
-    pub fn multm(self, other: Self) -> Self {
-        let t2 = other.transpose();
+impl ::std::ops::Mul<Vec3> for Mat33 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Self::Output {
+        Vec3::new(
+            rhs.dot(self.row0()),
+            rhs.dot(self.row1()),
+            rhs.dot(self.row2()),
+        )
+    }
+}
+
+impl ::std::ops::Mul<Mat33> for Mat33 {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        let t2 = rhs.transpose();
         let m1r0 = self.row0();
         let m1r1 = self.row1();
         let m1r2 = self.row2();
@@ -158,14 +174,6 @@ impl Mat33 {
             Vec3::new(m1r0.dot(t2r0), m1r0.dot(t2r1), m1r0.dot(t2r2)),
             Vec3::new(m1r1.dot(t2r0), m1r1.dot(t2r1), m1r1.dot(t2r2)),
             Vec3::new(m1r2.dot(t2r0), m1r2.dot(t2r1), m1r2.dot(t2r2)),
-        )
-    }
-
-    pub fn multv(self, vec: Vec3) -> Vec3 {
-        Vec3::new(
-            vec.dot(self.row0()),
-            vec.dot(self.row1()),
-            vec.dot(self.row2()),
         )
     }
 }

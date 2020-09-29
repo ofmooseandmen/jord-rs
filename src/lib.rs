@@ -38,5 +38,4 @@ pub use crate::surface::{Ellipsoid, Sphere, Surface};
 
 pub mod surfaces;
 
-
-mod internal;
+mod positioning;
