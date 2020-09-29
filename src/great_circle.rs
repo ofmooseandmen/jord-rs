@@ -93,11 +93,7 @@ mod internal {
         p2: NvectorPos<S>,
         rounding: R,
     ) -> Option<f64> {
-        let ib: Option<f64> = initial_bearing_radians(p2, p1, rounding);
-        match ib {
-            None => None,
-            Some(b) => Some(normalise_radians(b, PI)),
-        }
+        initial_bearing_radians(p2, p1, rounding).map(|b| normalise_radians(b, PI))
     }
 
     pub fn initial_bearing_radians<S: Spherical, R: Rounding>(
@@ -123,10 +119,7 @@ mod internal {
     }
 
     fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
-        let sign = match vn {
-            Some(n) => n.dot(v1.cross(v2)).signum(),
-            None => 1.0,
-        };
+        let sign = vn.map_or(1.0, |n| n.dot(v1.cross(v2)).signum());
         let sin_o = sign * v1.cross(v2).norm();
         let cos_o = v1.dot(v2);
         sin_o.atan2(cos_o)
