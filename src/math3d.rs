@@ -74,11 +74,11 @@ impl Vec3 {
     }
 
     pub fn unit(self) -> Self {
-        let scale = 1.0 / self.norm();
-        if scale == 1.0 {
+        let n = self.norm();
+        if eq_unit_norm(n) {
             self
         } else {
-            self * scale
+            self * (1.0 / n)
         }
     }
 
@@ -194,9 +194,14 @@ impl ::std::ops::Mul<Mat33> for Mat33 {
     }
 }
 
+fn eq_unit_norm(n: f64) -> bool {
+    n == 1.0
+}
+
 #[cfg(test)]
-mod vec3_tests {
-    use super::*;
+mod test {
+
+    use crate::Vec3;
 
     #[test]
     fn add_vec3() {

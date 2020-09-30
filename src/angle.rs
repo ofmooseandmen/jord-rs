@@ -2,7 +2,6 @@
 // License: BSD3
 use std::f64::consts::PI;
 
-use crate::internal::modulo;
 use crate::Measure;
 
 /// A signed angle with a resolution of a microarcsecond.
@@ -143,7 +142,7 @@ impl Angle {
     }
 
     fn field(self, div: f64, modu: f64) -> u64 {
-        modulo(self.microarcseconds.abs() as f64 / div, modu) as u64
+        (self.microarcseconds.abs() as f64 / div % modu) as u64
     }
 }
 
@@ -170,8 +169,9 @@ impl Measure for Angle {
 impl_measure! { Angle }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod test {
+
+    use crate::Angle;
 
     #[test]
     fn one_microarcsecond() {

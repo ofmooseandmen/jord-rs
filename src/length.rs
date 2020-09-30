@@ -86,8 +86,9 @@ impl Measure for Length {
 impl_measure! { Length }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod test {
+
+    use crate::Length;
 
     #[test]
     fn metres_to_kilometres() {

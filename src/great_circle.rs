@@ -4,7 +4,7 @@ use crate::{Angle, LatLongPos, Length, NvectorPos, Spherical};
 impl<S: Spherical> LatLongPos<S> {
     pub fn destination(&self, bearing: Angle, distance: Length) -> Self {
         let nv0: NvectorPos<S> = (*self).into();
-        let nv1 = internal::destination(
+        let nv1 = private::destination(
             nv0,
             bearing.as_radians(),
             distance.as_metres(),
@@ -16,25 +16,25 @@ impl<S: Spherical> LatLongPos<S> {
     pub fn distance_to(&self, other: Self) -> Length {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        Length::from_metres(internal::distance_metres(nv1, nv2, Rounding::Angle))
+        Length::from_metres(private::distance_metres(nv1, nv2, Rounding::Angle))
     }
 
     pub fn final_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::final_bearing_radians(nv1, nv2, Rounding::Angle).map(|b| Angle::from_radians(b))
+        private::final_bearing_radians(nv1, nv2, Rounding::Angle).map(Angle::from_radians)
     }
 
     pub fn initial_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::initial_bearing_radians(nv1, nv2, Rounding::Angle).map(|b| Angle::from_radians(b))
+        private::initial_bearing_radians(nv1, nv2, Rounding::Angle).map(Angle::from_radians)
     }
 }
 
 impl<S: Spherical> NvectorPos<S> {
     pub fn destination(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
-        internal::destination(
+        private::destination(
             *self,
             bearing_degrees.to_radians(),
             distance_metres,
@@ -43,21 +43,20 @@ impl<S: Spherical> NvectorPos<S> {
     }
 
     pub fn distance_metres_to(&self, other: Self) -> f64 {
-        internal::distance_metres(*self, other, Rounding::None)
+        private::distance_metres(*self, other, Rounding::None)
     }
 
     pub fn final_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::final_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
+        private::final_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
     }
 
     pub fn initial_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::initial_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
+        private::initial_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
     }
 }
 
-mod internal {
+mod private {
 
-    use crate::internal::modulo;
     use crate::internal::Rounding;
     use crate::{NvectorPos, Spherical, Surface, Vec3};
     use std::f64::consts::PI;
@@ -132,12 +131,12 @@ mod internal {
     }
 
     fn normalise_radians(a: f64, b: f64) -> f64 {
-        modulo(a + b, 2.0 * PI)
+        (a + b) % (2.0 * PI)
     }
 }
 
 #[cfg(test)]
-mod fixed_tests {
+mod lat_long_test {
 
     mod destination_test {
 
@@ -166,7 +165,7 @@ mod fixed_tests {
         }
     }
 
-    mod distance_tests {
+    mod distance_test {
 
         use crate::models::S84;
         use crate::{LatLongPos, Length};
@@ -200,7 +199,7 @@ mod fixed_tests {
         }
     }
 
-    mod final_bearing_tests {
+    mod final_bearing_test {
 
         use crate::{Angle, LatLongPos};
 
@@ -272,7 +271,7 @@ mod fixed_tests {
         }
     }
 
-    mod initial_bearing_tests {
+    mod initial_bearing_test {
 
         use crate::models::S84;
         use crate::{Angle, LatLongPos};

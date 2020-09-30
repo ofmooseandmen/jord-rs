@@ -1,6 +1,5 @@
 use ::std::convert::From;
 
-use crate::internal::modulo;
 use crate::models::{S84Model, S84};
 use crate::{Angle, LongitudeRange, Model, Vec3};
 
@@ -12,20 +11,18 @@ pub struct NvectorPos<M: Model> {
 }
 
 impl<M: Model> NvectorPos<M> {
-    pub fn new(nv: Vec3, model: M) -> Self {
-        NvectorPos {
-            nvector: nv,
-            model: model,
-        }
+    pub fn new(nvector: Vec3, model: M) -> Self {
+        NvectorPos { nvector, model }
     }
 
     // FIXME from_decimal_lat_long and add from_lat_long accepts Angle
     pub fn from_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
-        let nv = nvector_from_lat_long_radians(latitude.to_radians(), longitude.to_radians());
-        NvectorPos {
-            nvector: nv,
-            model: model,
-        }
+        NvectorPos::from_radians(latitude.to_radians(), longitude.to_radians(), model)
+    }
+
+    fn from_radians(latitude: f64, longitude: f64, model: M) -> Self {
+        let nvector = nvector_from_lat_long_radians(latitude, longitude);
+        NvectorPos { nvector, model }
     }
 
     pub fn north_pole(model: M) -> Self {
@@ -74,9 +71,9 @@ impl<M: Model> From<([f64; 3], M)> for NvectorPos<M> {
 
 impl<M: Model> From<LatLongPos<M>> for NvectorPos<M> {
     fn from(llp: LatLongPos<M>) -> Self {
-        NvectorPos::from_lat_long(
-            llp.latitude.as_decimal_degrees(),
-            llp.longitude.as_decimal_degrees(),
+        NvectorPos::from_radians(
+            llp.latitude.as_radians(),
+            llp.longitude.as_radians(),
             llp.model,
         )
     }
@@ -90,7 +87,7 @@ pub struct LatLongPos<M: Model> {
     model: M,
 }
 
-// FIXME: wrap lat/long, parse & antipode
+// FIXME: parse & antipode
 impl<M: Model> LatLongPos<M> {
     pub fn new(latitude: Angle, longitude: Angle, model: M) -> Self {
         let (lat, lon) = wrap(
@@ -101,7 +98,7 @@ impl<M: Model> LatLongPos<M> {
         LatLongPos {
             latitude: Angle::from_decimal_degrees(lat),
             longitude: Angle::from_decimal_degrees(lon),
-            model: model,
+            model,
         }
     }
 
@@ -125,7 +122,7 @@ impl<M: Model> LatLongPos<M> {
         LatLongPos {
             latitude: lat,
             longitude: Angle::from_decimal_degrees(clon),
-            model: model,
+            model,
         }
     }
 
@@ -195,8 +192,12 @@ pub(crate) fn nvector_to_lat_long_radians(nv: Vec3) -> (f64, f64) {
     (lat, lon)
 }
 
+fn eq_lat_pole(lat: f64) -> bool {
+    lat.abs() == 90.0
+}
+
 fn check_pole(lat: f64, lon: f64) -> f64 {
-    if lat.abs() == 90.0 {
+    if eq_lat_pole(lat) {
         0.0
     } else {
         lon
@@ -204,11 +205,9 @@ fn check_pole(lat: f64, lon: f64) -> f64 {
 }
 
 fn convert_lon(lat: f64, lon: f64, lr: &LongitudeRange) -> f64 {
-    if lat.abs() == 90.0 {
+    if eq_lat_pole(lat) {
         0.0
-    } else if *lr == LongitudeRange::L180 {
-        lon
-    } else if is_valid_lon(lon, lr) {
+    } else if *lr == LongitudeRange::L180 || is_valid_lon(lon, lr) {
         lon
     } else {
         lon + 360.0
@@ -220,14 +219,15 @@ fn wrap(lat: f64, lon: f64, lr: &LongitudeRange) -> (f64, f64) {
     if is_valid_lat(lat) && is_valid_lon(lon, lr) {
         (lat, check_pole(lat, lon))
     } else {
-        let quadrant = modulo((lat.abs() / 90.0).floor(), 4.0) as u8;
+        let quadrant = ((lat.abs() / 90.0).floor() % 4.0) as u8;
         let pole;
         if lat > 0.0 {
             pole = 90.0;
         } else {
-            pole = 90.0;
+            pole = -90.0;
         }
-        let offset = modulo(lat, 90.0);
+        let offset = lat % 90.0;
+        println!("offset {}", offset);
 
         let wlat;
         let mut wlon = lon;
@@ -235,11 +235,11 @@ fn wrap(lat: f64, lon: f64, lr: &LongitudeRange) -> (f64, f64) {
             0 => wlat = offset,
             1 => {
                 wlat = pole - offset;
-                wlon = wlon + 180.0;
+                wlon += 180.0;
             }
             2 => {
                 wlat = -offset;
-                wlon = wlon + 180.0;
+                wlon += 180.0;
             }
             3 => wlat = -pole + offset,
             _ => panic!("invalid quadrant {}", quadrant),
@@ -249,7 +249,7 @@ fn wrap(lat: f64, lon: f64, lr: &LongitudeRange) -> (f64, f64) {
             wlon = wlon - ((wlon + 180.0) / 360.0).floor() * 360.0;
         }
 
-        (wlat, convert_lon(wlat, check_pole(wlat, wlon), lr))
+        (wlat, convert_lon(wlat, wlon, lr))
     }
 }
 
@@ -262,5 +262,252 @@ fn is_valid_lon(lon: f64, lr: &LongitudeRange) -> bool {
         lon >= 0.0 && lon <= 360.0
     } else {
         lon >= -180.0 && lon <= 180.0
+    }
+}
+
+#[cfg(test)]
+mod lat_long_test {
+
+    mod pole_test {
+
+        use crate::models::S84;
+        use crate::LatLongPos;
+
+        #[test]
+        fn north_pole() {
+            let np = LatLongPos::north_pole(S84);
+            assert_eq!(90.0, np.latitude().as_decimal_degrees());
+            assert_eq!(0.0, np.longitude().as_decimal_degrees());
+        }
+
+        #[test]
+        fn south_pole() {
+            let sp = LatLongPos::south_pole(S84);
+            assert_eq!(-90.0, sp.latitude().as_decimal_degrees());
+            assert_eq!(0.0, sp.longitude().as_decimal_degrees());
+        }
+
+        #[test]
+        fn longitude_at_north_pole_is_0() {
+            let lat = 90.0;
+            for x in 0..360 {
+                let lon = x as f64 - 180.0;
+                let p = LatLongPos::from_decimal_degrees(lat, lon, S84);
+                assert_eq!(90.0, p.latitude().as_decimal_degrees());
+                assert_eq!(0.0, p.longitude().as_decimal_degrees());
+            }
+        }
+
+        #[test]
+        fn longitude_at_south_pole_is_0() {
+            let lat = -90.0;
+            for x in 0..360 {
+                let lon = x as f64 - 180.0;
+                let p = LatLongPos::from_decimal_degrees(lat, lon, S84);
+                assert_eq!(-90.0, p.latitude().as_decimal_degrees());
+                assert_eq!(0.0, p.longitude().as_decimal_degrees());
+            }
+        }
+    }
+
+    mod wrap_test {
+
+        use crate::{Angle, LatLongPos};
+
+        #[test]
+        fn no_wrapping() {
+            let p = LatLongPos::from_s84(55.555, 22.222);
+            assert_eq!(Angle::from_decimal_degrees(55.555), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(22.222), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_91_degrees() {
+            let p = LatLongPos::from_s84(91.0, 54.0);
+            assert_eq!(Angle::from_decimal_degrees(89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-126.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_181_degrees() {
+            let p = LatLongPos::from_s84(181.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(-1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(180.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_271_degrees() {
+            let p = LatLongPos::from_s84(271.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(-89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_361_degrees() {
+            let p = LatLongPos::from_s84(361.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_631_degrees() {
+            let p = LatLongPos::from_s84(631.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(-89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lat_wrapping_721_degrees() {
+            let p = LatLongPos::from_s84(721.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_91_degrees() {
+            let p = LatLongPos::from_s84(-91.0, 54.0);
+            assert_eq!(Angle::from_decimal_degrees(-89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-126.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_181_degrees() {
+            let p = LatLongPos::from_s84(-181.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(180.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_271_degrees() {
+            let p = LatLongPos::from_s84(-271.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_361_degrees() {
+            let p = LatLongPos::from_s84(-361.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(-1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_631_degrees() {
+            let p = LatLongPos::from_s84(-631.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(89.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lat_wrapping_721_degrees() {
+            let p = LatLongPos::from_s84(-721.0, 0.0);
+            assert_eq!(Angle::from_decimal_degrees(-1.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lon_wrapping_181_degrees() {
+            let p = LatLongPos::from_s84(0.0, 181.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-179.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lon_wrapping_271_degrees() {
+            let p = LatLongPos::from_s84(0.0, 271.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-89.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lon_wrapping_361_degrees() {
+            let p = LatLongPos::from_s84(0.0, 361.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(1.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lon_wrapping_631_degrees() {
+            let p = LatLongPos::from_s84(0.0, 631.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-89.0), p.longitude());
+        }
+
+        #[test]
+        fn positive_lon_wrapping_721_degrees() {
+            let p = LatLongPos::from_s84(0.0, 721.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(1.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lon_wrapping_181_degrees() {
+            let p = LatLongPos::from_s84(0.0, -181.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(179.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lon_wrapping_271_degrees() {
+            let p = LatLongPos::from_s84(0.0, -271.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(89.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lon_wrapping_361_degrees() {
+            let p = LatLongPos::from_s84(0.0, -361.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-1.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lon_wrapping_631_degrees() {
+            let p = LatLongPos::from_s84(0.0, -631.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(89.0), p.longitude());
+        }
+
+        #[test]
+        fn negative_lon_wrapping_721_degrees() {
+            let p = LatLongPos::from_s84(0.0, -721.0);
+            assert_eq!(Angle::from_decimal_degrees(0.0), p.latitude());
+            assert_eq!(Angle::from_decimal_degrees(-1.0), p.longitude());
+        }
+    }
+}
+
+#[cfg(test)]
+mod resolution_test {
+
+    use crate::models::{S84Model, S84};
+    use crate::{LatLongPos, NvectorPos, Vec3};
+
+    #[test]
+    fn from_nvectors() {
+        let nv1 = NvectorPos::new(Vec3::new(0.5, 0.5, 0.5_f64.sqrt()), S84);
+        let nv2 = NvectorPos::new(
+            Vec3::new(0.5000000000000001, 0.5000000000000001, 0.5_f64.sqrt()),
+            S84,
+        );
+        assert_ne!(nv1, nv2);
+
+        let ll1: LatLongPos<S84Model> = nv1.into();
+        let ll2: LatLongPos<S84Model> = nv2.into();
+        assert_eq!(ll1, ll2);
+
+        let nv3: NvectorPos<S84Model> = ll1.into();
+        let nv4: NvectorPos<S84Model> = ll2.into();
+        assert_eq!(nv3, nv4);
+    }
+
+    #[test]
+    fn from_lat_long() {
+        let ll1 = LatLongPos::from_s84(45.0, 45.0);
+        let ll2 = LatLongPos::from_s84(45.0000000005, 45.0000000005);
+        let ll3 = LatLongPos::from_s84(45.0000000001, 45.0000000001);
+
+        assert_ne!(ll1, ll2);
+        assert_eq!(ll1, ll3);
     }
 }

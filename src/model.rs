@@ -15,7 +15,7 @@ pub struct ModelId {
 }
 impl ModelId {
     pub fn new(id: String) -> ModelId {
-        ModelId { id: id }
+        ModelId { id }
     }
 }
 

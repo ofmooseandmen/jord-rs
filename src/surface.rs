@@ -45,10 +45,10 @@ impl Ellipsoid {
         flattening: f64,
     ) -> Self {
         Ellipsoid {
-            equatorial_radius: equatorial_radius,
-            polar_radius: polar_radius,
-            eccentricity: eccentricity,
-            flattening: flattening,
+            equatorial_radius,
+            polar_radius,
+            eccentricity,
+            flattening,
         }
     }
 }
@@ -84,7 +84,7 @@ pub struct Sphere {
 
 impl Sphere {
     pub const fn new(radius: Length) -> Sphere {
-        Sphere { radius: radius }
+        Sphere { radius }
     }
 }
 
