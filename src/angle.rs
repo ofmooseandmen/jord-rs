@@ -55,7 +55,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(10, 30, 45.0).unwrap());
+    /// assert_eq!(Ok(Angle::from_decimal_degrees(10.5125)), Angle::from_dms(10, 30, 45.0));
     /// ```
     pub fn from_dms(degs: i64, mins: i64, secs: f64) -> Result<Self, DmsError> {
         if mins < 0 || mins > 59 {

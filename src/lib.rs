@@ -11,7 +11,7 @@ pub use crate::angle::Angle;
 pub mod great_circle;
 
 pub mod geodetic;
-pub use crate::geodetic::{LatLongPos, NvectorPos, PosError};
+pub use crate::geodetic::{LatLongPos, NvectorPos};
 
 pub mod length;
 pub use crate::length::Length;

@@ -1,5 +1,6 @@
-use ::std::convert::{From, TryFrom};
+use ::std::convert::From;
 
+use crate::internal::modulo;
 use crate::models::{S84Model, S84};
 use crate::{Angle, LongitudeRange, Model, Vec3};
 
@@ -8,12 +9,6 @@ use crate::{Angle, LongitudeRange, Model, Vec3};
 pub struct NvectorPos<M: Model> {
     nvector: Vec3,
     model: M,
-}
-
-#[derive(Debug)]
-pub enum PosError {
-    InvalidLatitude(f64),
-    InvalidLongitude(f64),
 }
 
 impl<M: Model> NvectorPos<M> {
@@ -45,7 +40,7 @@ impl<M: Model> NvectorPos<M> {
         let ll = nvector_to_lat_long_radians(self.nvector);
         let lat = ll.0.to_degrees();
         let lon = ll.1.to_degrees();
-        (lat, convert_lon(lat, lon, self.model.longitude_range()))
+        (lat, convert_lon(lat, lon, &self.model.longitude_range()))
     }
 
     pub fn nvector(&self) -> Vec3 {
@@ -97,23 +92,20 @@ pub struct LatLongPos<M: Model> {
 
 // FIXME: wrap lat/long, parse & antipode
 impl<M: Model> LatLongPos<M> {
-    pub fn new(latitude: Angle, longitude: Angle, model: M) -> Result<Self, PosError> {
-        let latd = latitude.as_decimal_degrees();
-        let longd = longitude.as_decimal_degrees();
-        if !is_valid_lat(latd) {
-            Err(PosError::InvalidLatitude(latd))
-        } else if !is_valid_lon(longd, model.longitude_range()) {
-            Err(PosError::InvalidLongitude(longd))
-        } else {
-            Ok(LatLongPos {
-                latitude: latitude,
-                longitude: Angle::from_decimal_degrees(check_pole(latd, longd)),
-                model: model,
-            })
+    pub fn new(latitude: Angle, longitude: Angle, model: M) -> Self {
+        let (lat, lon) = wrap(
+            latitude.as_decimal_degrees(),
+            longitude.as_decimal_degrees(),
+            &model.longitude_range(),
+        );
+        LatLongPos {
+            latitude: Angle::from_decimal_degrees(lat),
+            longitude: Angle::from_decimal_degrees(lon),
+            model: model,
         }
     }
 
-    pub fn from_decimal_degrees(latitude: f64, longitude: f64, model: M) -> Result<Self, PosError> {
+    pub fn from_decimal_degrees(latitude: f64, longitude: f64, model: M) -> Self {
         LatLongPos::new(
             Angle::from_decimal_degrees(latitude),
             Angle::from_decimal_degrees(longitude),
@@ -128,7 +120,7 @@ impl<M: Model> LatLongPos<M> {
         let clon = convert_lon(
             lat.as_decimal_degrees(),
             lon.as_decimal_degrees(),
-            model.longitude_range(),
+            &model.longitude_range(),
         );
         LatLongPos {
             latitude: lat,
@@ -138,11 +130,11 @@ impl<M: Model> LatLongPos<M> {
     }
 
     pub fn north_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(90.0, 0.0, model).unwrap()
+        LatLongPos::from_decimal_degrees(90.0, 0.0, model)
     }
 
     pub fn south_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(-90.0, 0.0, model).unwrap()
+        LatLongPos::from_decimal_degrees(-90.0, 0.0, model)
     }
 
     pub fn to_nvector(&self) -> Vec3 {
@@ -163,24 +155,19 @@ impl<M: Model> LatLongPos<M> {
 }
 
 impl LatLongPos<S84Model> {
-    // FIXME from_s84
-    pub fn s84(latitude: f64, longitude: f64) -> Result<Self, PosError> {
+    pub fn from_s84(latitude: f64, longitude: f64) -> Self {
         LatLongPos::from_decimal_degrees(latitude, longitude, S84)
     }
 }
 
-impl<M: Model> TryFrom<(Angle, Angle, M)> for LatLongPos<M> {
-    type Error = PosError;
-
-    fn try_from(llm: (Angle, Angle, M)) -> Result<Self, Self::Error> {
+impl<M: Model> From<(Angle, Angle, M)> for LatLongPos<M> {
+    fn from(llm: (Angle, Angle, M)) -> Self {
         LatLongPos::new(llm.0, llm.1, llm.2)
     }
 }
 
-impl<M: Model> TryFrom<(f64, f64, M)> for LatLongPos<M> {
-    type Error = PosError;
-
-    fn try_from(llm: (f64, f64, M)) -> Result<Self, Self::Error> {
+impl<M: Model> From<(f64, f64, M)> for LatLongPos<M> {
+    fn from(llm: (f64, f64, M)) -> Self {
         LatLongPos::from_decimal_degrees(llm.0, llm.1, llm.2)
     }
 }
@@ -216,10 +203,10 @@ fn check_pole(lat: f64, lon: f64) -> f64 {
     }
 }
 
-fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
+fn convert_lon(lat: f64, lon: f64, lr: &LongitudeRange) -> f64 {
     if lat.abs() == 90.0 {
         0.0
-    } else if lr == LongitudeRange::L180 {
+    } else if *lr == LongitudeRange::L180 {
         lon
     } else if is_valid_lon(lon, lr) {
         lon
@@ -228,12 +215,50 @@ fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
     }
 }
 
+// https://gist.github.com/missinglink/d0a085188a8eab2ca66db385bb7c023a
+fn wrap(lat: f64, lon: f64, lr: &LongitudeRange) -> (f64, f64) {
+    if is_valid_lat(lat) && is_valid_lon(lon, lr) {
+        (lat, check_pole(lat, lon))
+    } else {
+        let quadrant = modulo((lat.abs() / 90.0).floor(), 4.0) as u8;
+        let pole;
+        if lat > 0.0 {
+            pole = 90.0;
+        } else {
+            pole = 90.0;
+        }
+        let offset = modulo(lat, 90.0);
+
+        let wlat;
+        let mut wlon = lon;
+        match quadrant {
+            0 => wlat = offset,
+            1 => {
+                wlat = pole - offset;
+                wlon = wlon + 180.0;
+            }
+            2 => {
+                wlat = -offset;
+                wlon = wlon + 180.0;
+            }
+            3 => wlat = -pole + offset,
+            _ => panic!("invalid quadrant {}", quadrant),
+        }
+
+        if wlon > 180.0 || wlon < -180.0 {
+            wlon = wlon - ((wlon + 180.0) / 360.0).floor() * 360.0;
+        }
+
+        (wlat, convert_lon(wlat, check_pole(wlat, wlon), lr))
+    }
+}
+
 fn is_valid_lat(lat: f64) -> bool {
     lat >= -90.0 && lat <= 90.0
 }
 
-fn is_valid_lon(lon: f64, lr: LongitudeRange) -> bool {
-    if lr == LongitudeRange::L360 {
+fn is_valid_lon(lon: f64, lr: &LongitudeRange) -> bool {
+    if *lr == LongitudeRange::L360 {
         lon >= 0.0 && lon <= 360.0
     } else {
         lon >= -180.0 && lon <= 180.0

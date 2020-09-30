@@ -145,7 +145,7 @@ mod fixed_tests {
 
         #[test]
         fn returns_p0_if_distance_is_0() {
-            let p0 = LatLongPos::s84(53.320556, -1.729722).unwrap();
+            let p0 = LatLongPos::from_s84(53.320556, -1.729722);
             assert_eq!(
                 p0,
                 p0.destination(Angle::from_decimal_degrees(96.0217), Length::zero())
@@ -154,8 +154,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_position_along_great_circle_at_distance_and_bearing() {
-            let p0 = LatLongPos::s84(53.320556, -1.729722).unwrap();
-            let p1 = LatLongPos::s84(53.18826954833333, 0.13327449055555557).unwrap();
+            let p0 = LatLongPos::from_s84(53.320556, -1.729722);
+            let p1 = LatLongPos::from_s84(53.18826954833333, 0.13327449055555557);
             assert_eq!(
                 p1,
                 p0.destination(
@@ -173,14 +173,14 @@ mod fixed_tests {
 
         #[test]
         fn returns_0_equal_positions() {
-            let p = LatLongPos::s84(50.066389, -5.714722).unwrap();
+            let p = LatLongPos::from_s84(50.066389, -5.714722);
             assert_eq!(Length::zero(), p.distance_to(p));
         }
 
         #[test]
         fn returns_distance_between_2_positions() {
-            let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -5.714722);
+            let p2 = LatLongPos::from_s84(58.643889, -3.07);
             assert_eq!(Length::from_metres(968854.878007), p1.distance_to(p2));
         }
 
@@ -194,8 +194,8 @@ mod fixed_tests {
 
         #[test]
         fn handles_discontinuity_at_date_line() {
-            let p1 = LatLongPos::s84(50.066389, -179.999722).unwrap();
-            let p2 = LatLongPos::s84(50.066389, 179.999722).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -179.999722);
+            let p2 = LatLongPos::from_s84(50.066389, 179.999722);
             assert_eq!(Length::from_metres(39.685092), p1.distance_to(p2));
         }
     }
@@ -206,25 +206,25 @@ mod fixed_tests {
 
         #[test]
         fn returns_none_equal_positions() {
-            let p = LatLongPos::s84(50.066389, -5.714722).unwrap();
+            let p = LatLongPos::from_s84(50.066389, -5.714722);
             assert_eq!(None, p.final_bearing_to(p));
             assert_eq!(
                 None,
-                p.final_bearing_to(LatLongPos::s84(50.066389, -5.714722).unwrap())
+                p.final_bearing_to(LatLongPos::from_s84(50.066389, -5.714722))
             );
         }
 
         #[test]
         fn returns_0_iso_longitude_going_north() {
-            let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(58.643889, -5.714722).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -5.714722);
+            let p2 = LatLongPos::from_s84(58.643889, -5.714722);
             assert_eq!(Some(Angle::zero()), p1.final_bearing_to(p2));
         }
 
         #[test]
         fn returns_180_iso_longitude_going_south() {
-            let p1 = LatLongPos::s84(58.643889, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(50.066389, -5.714722).unwrap();
+            let p1 = LatLongPos::from_s84(58.643889, -5.714722);
+            let p2 = LatLongPos::from_s84(50.066389, -5.714722);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(180.0)),
                 p1.final_bearing_to(p2)
@@ -233,8 +233,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_90_at_equator_going_east() {
-            let p1 = LatLongPos::s84(0.0, 0.0).unwrap();
-            let p2 = LatLongPos::s84(0.0, 1.0).unwrap();
+            let p1 = LatLongPos::from_s84(0.0, 0.0);
+            let p2 = LatLongPos::from_s84(0.0, 1.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(90.0)),
                 p1.final_bearing_to(p2)
@@ -243,8 +243,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_270_at_equator_going_east() {
-            let p1 = LatLongPos::s84(0.0, 1.0).unwrap();
-            let p2 = LatLongPos::s84(0.0, 0.0).unwrap();
+            let p1 = LatLongPos::from_s84(0.0, 1.0);
+            let p2 = LatLongPos::from_s84(0.0, 0.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(270.0)),
                 p1.final_bearing_to(p2)
@@ -253,8 +253,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_final_bearing_compass_angle() {
-            let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -5.714722);
+            let p2 = LatLongPos::from_s84(58.643889, -3.07);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(11.27520031611111)),
                 p1.final_bearing_to(p2)
@@ -263,8 +263,8 @@ mod fixed_tests {
                 Some(Angle::from_decimal_degrees(189.1198173275)),
                 p2.final_bearing_to(p1)
             );
-            let p3 = LatLongPos::s84(-53.994722, -25.9875).unwrap();
-            let p4 = LatLongPos::s84(54.0, 154.0).unwrap();
+            let p3 = LatLongPos::from_s84(-53.994722, -25.9875);
+            let p4 = LatLongPos::from_s84(54.0, 154.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(125.68508662305555)),
                 p3.final_bearing_to(p4)
@@ -279,25 +279,25 @@ mod fixed_tests {
 
         #[test]
         fn returns_none_equal_positions() {
-            let p = LatLongPos::s84(50.066389, -179.999722).unwrap();
+            let p = LatLongPos::from_s84(50.066389, -179.999722);
             assert_eq!(None, p.initial_bearing_to(p));
             assert_eq!(
                 None,
-                p.initial_bearing_to(LatLongPos::s84(50.066389, -179.999722).unwrap())
+                p.initial_bearing_to(LatLongPos::from_s84(50.066389, -179.999722))
             );
         }
 
         #[test]
         fn returns_0_iso_longitude_going_north() {
-            let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(58.643889, -5.714722).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -5.714722);
+            let p2 = LatLongPos::from_s84(58.643889, -5.714722);
             assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
         fn returns_180_iso_longitude_going_south() {
-            let p1 = LatLongPos::s84(58.643889, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(50.066389, -5.714722).unwrap();
+            let p1 = LatLongPos::from_s84(58.643889, -5.714722);
+            let p2 = LatLongPos::from_s84(50.066389, -5.714722);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
@@ -306,8 +306,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_90_at_equator_going_east() {
-            let p1 = LatLongPos::s84(0.0, 0.0).unwrap();
-            let p2 = LatLongPos::s84(0.0, 1.0).unwrap();
+            let p1 = LatLongPos::from_s84(0.0, 0.0);
+            let p2 = LatLongPos::from_s84(0.0, 1.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(90.0)),
                 p1.initial_bearing_to(p2)
@@ -316,8 +316,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_270_at_equator_going_west() {
-            let p1 = LatLongPos::s84(0.0, 1.0).unwrap();
-            let p2 = LatLongPos::s84(0.0, 0.0).unwrap();
+            let p1 = LatLongPos::from_s84(0.0, 1.0);
+            let p2 = LatLongPos::from_s84(0.0, 0.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(270.0)),
                 p1.initial_bearing_to(p2)
@@ -326,15 +326,15 @@ mod fixed_tests {
 
         #[test]
         fn returns_0_at_prime_meridian_going_north() {
-            let p1 = LatLongPos::s84(50.0, 0.0).unwrap();
-            let p2 = LatLongPos::s84(58.0, 0.0).unwrap();
+            let p1 = LatLongPos::from_s84(50.0, 0.0);
+            let p2 = LatLongPos::from_s84(58.0, 0.0);
             assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
         fn returns_180_at_prime_meridian_going_south() {
-            let p1 = LatLongPos::s84(58.0, 0.0).unwrap();
-            let p2 = LatLongPos::s84(50.0, 0.0).unwrap();
+            let p1 = LatLongPos::from_s84(58.0, 0.0);
+            let p2 = LatLongPos::from_s84(50.0, 0.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
@@ -343,15 +343,15 @@ mod fixed_tests {
 
         #[test]
         fn returns_0_at_date_line_going_north() {
-            let p1 = LatLongPos::s84(50.0, 180.0).unwrap();
-            let p2 = LatLongPos::s84(58.0, 180.0).unwrap();
+            let p1 = LatLongPos::from_s84(50.0, 180.0);
+            let p2 = LatLongPos::from_s84(58.0, 180.0);
             assert_eq!(Some(Angle::zero()), p1.initial_bearing_to(p2));
         }
 
         #[test]
         fn returns_180_at_date_line_going_south() {
-            let p1 = LatLongPos::s84(58.0, 180.0).unwrap();
-            let p2 = LatLongPos::s84(50.0, 180.0).unwrap();
+            let p1 = LatLongPos::from_s84(58.0, 180.0);
+            let p2 = LatLongPos::from_s84(50.0, 180.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
@@ -375,7 +375,7 @@ mod fixed_tests {
         #[test]
         fn returns_180_south_pole_to_date_line() {
             let p1 = LatLongPos::south_pole(S84);
-            let p2 = LatLongPos::s84(50.0, 180.0).unwrap();
+            let p2 = LatLongPos::from_s84(50.0, 180.0);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(180.0)),
                 p1.initial_bearing_to(p2)
@@ -384,8 +384,8 @@ mod fixed_tests {
 
         #[test]
         fn returns_initial_bearing_compass_angle() {
-            let p1 = LatLongPos::s84(50.066389, -5.714722).unwrap();
-            let p2 = LatLongPos::s84(58.643889, -3.07).unwrap();
+            let p1 = LatLongPos::from_s84(50.066389, -5.714722);
+            let p2 = LatLongPos::from_s84(58.643889, -3.07);
             assert_eq!(
                 Some(Angle::from_decimal_degrees(9.1198173275)),
                 p1.initial_bearing_to(p2)
