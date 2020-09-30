@@ -1,7 +1,76 @@
+// FIXME Result instead of Option
+use std::marker::PhantomData;
+
 use crate::internal::Rounding;
-use crate::{Angle, LatLongPos, Length, NvectorPos, Spherical};
+use crate::{Angle, LatLongPos, Length, NvectorPos, Spherical, Vec3};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GreatCircle<P> {
+    position_type: PhantomData<P>,
+    normal: Vec3,
+}
+
+impl<S: Spherical> GreatCircle<LatLongPos<S>> {
+    pub fn from_lat_longs(
+        p1: LatLongPos<S>,
+        p2: LatLongPos<S>,
+    ) -> Option<GreatCircle<LatLongPos<S>>> {
+        private::arc_normal(p1.to_nvector(), p2.to_nvector()).map(|n| GreatCircle {
+            position_type: PhantomData,
+            normal: n,
+        })
+    }
+
+    pub fn from_lat_long_bearing(pos: LatLongPos<S>, bearing: Angle) -> GreatCircle<LatLongPos<S>> {
+        let normal = private::arc_normal_bearing_radians(
+            pos.to_nvector(),
+            bearing.as_radians(),
+            Rounding::Angle,
+        );
+        GreatCircle {
+            position_type: PhantomData,
+            normal,
+        }
+    }
+}
+
+impl<S: Spherical> GreatCircle<NvectorPos<S>> {
+    pub fn from_nvectors(
+        p1: NvectorPos<S>,
+        p2: NvectorPos<S>,
+    ) -> Option<GreatCircle<NvectorPos<S>>> {
+        private::arc_normal(p1.nvector(), p2.nvector()).map(|n| GreatCircle {
+            position_type: PhantomData,
+            normal: n,
+        })
+    }
+
+    pub fn from_nvector_bearing_degrees(
+        pos: NvectorPos<S>,
+        bearing_degrees: f64,
+    ) -> GreatCircle<NvectorPos<S>> {
+        let normal = private::arc_normal_bearing_radians(
+            pos.nvector(),
+            bearing_degrees.to_radians(),
+            Rounding::None,
+        );
+        GreatCircle {
+            position_type: PhantomData,
+            normal,
+        }
+    }
+}
 
 impl<S: Spherical> LatLongPos<S> {
+    pub fn cross_track_distance(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
+        let nv: NvectorPos<S> = (*self).into();
+        Length::from_metres(private::cross_track_distance_metres(
+            nv,
+            gc.normal,
+            Rounding::Angle,
+        ))
+    }
+
     pub fn destination(&self, bearing: Angle, distance: Length) -> Self {
         let nv0: NvectorPos<S> = (*self).into();
         let nv1 = private::destination(
@@ -33,6 +102,10 @@ impl<S: Spherical> LatLongPos<S> {
 }
 
 impl<S: Spherical> NvectorPos<S> {
+    pub fn cross_track_distance_metres(&self, gc: GreatCircle<LatLongPos<S>>) -> f64 {
+        private::cross_track_distance_metres(*self, gc.normal, Rounding::None)
+    }
+
     pub fn destination(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
         private::destination(
             *self,
@@ -123,6 +196,34 @@ mod private {
         }
     }
 
+    pub fn arc_normal(v1: Vec3, v2: Vec3) -> Option<Vec3> {
+        if v1 == v2 || v1 * -1.0 == v2 {
+            // coincidental or antipode
+            None
+        } else {
+            Some(v1.cross(v2))
+        }
+    }
+
+    pub fn arc_normal_bearing_radians(v: Vec3, bearing_radians: f64, rounding: Rounding) -> Vec3 {
+        // easting
+        let e = rounding.north_pole().cross(v);
+        // northing
+        let n = v.cross(e);
+        let se = e * (bearing_radians.cos() / e.norm());
+        let sn = n * (bearing_radians.sin() / n.norm());
+        sn - se
+    }
+
+    pub fn cross_track_distance_metres<S: Spherical>(
+        p: NvectorPos<S>,
+        n: Vec3,
+        rounding: Rounding,
+    ) -> f64 {
+        let a = rounding.round_radians(signed_radians_between(n, p.nvector(), None) - (PI / 2.0));
+        a * p.model().surface().mean_radius().as_metres()
+    }
+
     fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
         let sign = vn.map_or(1.0, |n| n.dot(v1.cross(v2)).signum());
         let sin_o = sign * v1.cross(v2).norm();
@@ -137,6 +238,28 @@ mod private {
 
 #[cfg(test)]
 mod lat_long_test {
+
+    mod cross_track_distance_test {
+
+        use crate::{GreatCircle, LatLongPos, Length};
+
+        #[test]
+        fn returns_negative_length_if_left() {
+            let p = LatLongPos::from_s84(53.2611, -0.7972);
+            let gcp1 = LatLongPos::from_s84(53.3206, -1.7297);
+            let gcp2 = LatLongPos::from_s84(53.1887, 0.1334);
+            let gc1 = GreatCircle::from_lat_longs(gcp1, gcp2).unwrap();
+            let expected = Length::from_metres(-307.549992);
+            assert_eq!(expected, p.cross_track_distance(gc1));
+
+            // same result with great circle from position and bearing
+            let gc2 =
+                GreatCircle::from_lat_long_bearing(gcp1, gcp1.initial_bearing_to(gcp2).unwrap());
+            assert_eq!(expected, p.cross_track_distance(gc2));
+        }
+
+        // FIXME more tests (see jord), need antipode + interpolate
+    }
 
     mod destination_test {
 
