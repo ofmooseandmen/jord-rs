@@ -13,6 +13,22 @@ pub struct Mat33 {
 }
 
 impl Vec3 {
+    pub(crate) const fn unit_z() -> Vec3 {
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        }
+    }
+
+    pub(crate) const fn neg_unit_z() -> Vec3 {
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: -1.0,
+        }
+    }
+
     pub const fn zero() -> Vec3 {
         Vec3 {
             x: 0.0,

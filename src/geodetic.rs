@@ -24,6 +24,7 @@ impl<M: Model> NvectorPos<M> {
         }
     }
 
+    // FIXME from_decimal_lat_long and add from_lat_long accepts Angle
     pub fn from_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
         let nv = nvector_from_lat_long_radians(latitude.to_radians(), longitude.to_radians());
         NvectorPos {
@@ -33,11 +34,11 @@ impl<M: Model> NvectorPos<M> {
     }
 
     pub fn north_pole(model: M) -> Self {
-        NvectorPos::new(Vec3::new(0.0, 0.0, 1.0), model)
+        NvectorPos::new(Vec3::unit_z(), model)
     }
 
     pub fn south_pole(model: M) -> Self {
-        NvectorPos::new(Vec3::new(0.0, 0.0, -1.0), model)
+        NvectorPos::new(Vec3::neg_unit_z(), model)
     }
 
     pub fn to_lat_long(&self) -> (f64, f64) {
@@ -162,6 +163,7 @@ impl<M: Model> LatLongPos<M> {
 }
 
 impl LatLongPos<S84Model> {
+    // FIXME from_s84
     pub fn s84(latitude: f64, longitude: f64) -> Result<Self, PosError> {
         LatLongPos::from_decimal_degrees(latitude, longitude, S84)
     }
@@ -189,21 +191,21 @@ impl<M: Model> From<NvectorPos<M>> for LatLongPos<M> {
     }
 }
 
-fn nvector_to_lat_long_radians(nv: Vec3) -> (f64, f64) {
+pub(crate) fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
+    let cl = lat.cos();
+    let x = cl * lon.cos();
+    let y = cl * lon.sin();
+    let z = lat.sin();
+    Vec3::new(x, y, z)
+}
+
+pub(crate) fn nvector_to_lat_long_radians(nv: Vec3) -> (f64, f64) {
     let x = nv.x();
     let y = nv.y();
     let z = nv.z();
     let lat = z.atan2((x * x + y * y).sqrt());
     let lon = y.atan2(x);
     (lat, lon)
-}
-
-fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
-    let cl = lat.cos();
-    let x = cl * lon.cos();
-    let y = cl * lon.sin();
-    let z = lat.sin();
-    Vec3::new(x, y, z)
 }
 
 fn check_pole(lat: f64, lon: f64) -> f64 {

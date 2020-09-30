@@ -1,47 +1,57 @@
-use crate::internal::{LL, NV};
+use crate::internal::Rounding;
 use crate::{Angle, LatLongPos, Length, NvectorPos, Spherical};
 
 impl<S: Spherical> LatLongPos<S> {
     pub fn destination(&self, bearing: Angle, distance: Length) -> Self {
         let nv0: NvectorPos<S> = (*self).into();
-        let nv1 = internal::destination(nv0, bearing.as_radians(), distance.as_metres(), LL);
+        let nv1 = internal::destination(
+            nv0,
+            bearing.as_radians(),
+            distance.as_metres(),
+            Rounding::Angle,
+        );
         nv1.into()
     }
 
     pub fn distance_to(&self, other: Self) -> Length {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        Length::from_metres(internal::distance_metres(nv1, nv2, LL))
+        Length::from_metres(internal::distance_metres(nv1, nv2, Rounding::Angle))
     }
 
     pub fn final_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::final_bearing_radians(nv1, nv2, LL).map(|b| Angle::from_radians(b))
+        internal::final_bearing_radians(nv1, nv2, Rounding::Angle).map(|b| Angle::from_radians(b))
     }
 
     pub fn initial_bearing_to(&self, other: Self) -> Option<Angle> {
         let nv1: NvectorPos<S> = (*self).into();
         let nv2: NvectorPos<S> = other.into();
-        internal::initial_bearing_radians(nv1, nv2, LL).map(|b| Angle::from_radians(b))
+        internal::initial_bearing_radians(nv1, nv2, Rounding::Angle).map(|b| Angle::from_radians(b))
     }
 }
 
 impl<S: Spherical> NvectorPos<S> {
     pub fn destination(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
-        internal::destination(*self, bearing_degrees.to_radians(), distance_metres, NV)
+        internal::destination(
+            *self,
+            bearing_degrees.to_radians(),
+            distance_metres,
+            Rounding::None,
+        )
     }
 
     pub fn distance_metres_to(&self, other: Self) -> f64 {
-        internal::distance_metres(*self, other, NV)
+        internal::distance_metres(*self, other, Rounding::None)
     }
 
     pub fn final_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::final_bearing_radians(*self, other, NV).map(|b| b.to_degrees())
+        internal::final_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
     }
 
     pub fn initial_bearing_degrees_to(&self, other: Self) -> Option<f64> {
-        internal::initial_bearing_radians(*self, other, NV).map(|b| b.to_degrees())
+        internal::initial_bearing_radians(*self, other, Rounding::None).map(|b| b.to_degrees())
     }
 }
 
@@ -52,20 +62,18 @@ mod internal {
     use crate::{NvectorPos, Spherical, Surface, Vec3};
     use std::f64::consts::PI;
 
-    pub fn destination<S: Spherical, R: Rounding>(
+    pub fn destination<S: Spherical>(
         p0: NvectorPos<S>,
         bearing_radians: f64,
         distance_metres: f64,
-        rounding: R,
+        rounding: Rounding,
     ) -> NvectorPos<S> {
         if distance_metres == 0.0 {
             p0
         } else {
             let v0 = p0.nvector();
             // east direction vector at p0
-            let np = rounding
-                .round_pos(NvectorPos::north_pole(p0.model()))
-                .nvector();
+            let np = rounding.north_pole();
             let ed = np.cross(v0).unit();
             // north direction vector at p0
             let nd = v0.cross(ed);
@@ -75,31 +83,31 @@ mod internal {
             // unit vector in the direction of the azimuth
             let de = nd * bearing_radians.cos() + ed * bearing_radians.sin();
             let nv = v0 * ca.cos() + de * ca.sin();
-            rounding.round_pos(NvectorPos::new(nv, p0.model()))
+            NvectorPos::new(nv, p0.model())
         }
     }
 
-    pub fn distance_metres<S: Spherical, R: Rounding>(
+    pub fn distance_metres<S: Spherical>(
         p1: NvectorPos<S>,
         p2: NvectorPos<S>,
-        rounding: R,
+        rounding: Rounding,
     ) -> f64 {
         let a = rounding.round_radians(signed_radians_between(p1.nvector(), p2.nvector(), None));
         a * p1.model().surface().mean_radius().as_metres()
     }
 
-    pub fn final_bearing_radians<S: Spherical, R: Rounding>(
+    pub fn final_bearing_radians<S: Spherical>(
         p1: NvectorPos<S>,
         p2: NvectorPos<S>,
-        rounding: R,
+        rounding: Rounding,
     ) -> Option<f64> {
         initial_bearing_radians(p2, p1, rounding).map(|b| normalise_radians(b, PI))
     }
 
-    pub fn initial_bearing_radians<S: Spherical, R: Rounding>(
+    pub fn initial_bearing_radians<S: Spherical>(
         p1: NvectorPos<S>,
         p2: NvectorPos<S>,
-        rounding: R,
+        rounding: Rounding,
     ) -> Option<f64> {
         let v1 = p1.nvector();
         let v2 = p2.nvector();
@@ -109,9 +117,7 @@ mod internal {
             // great circle through p1 & p2
             let gc1 = v1.cross(v2);
             // great circle through p1 & north pole
-            let np = rounding
-                .round_pos(NvectorPos::north_pole(p1.model()))
-                .nvector();
+            let np = rounding.north_pole();
             let gc2 = v1.cross(np);
             let a = signed_radians_between(gc1, gc2, Some(v1));
             Some(normalise_radians(a, 2.0 * PI))
