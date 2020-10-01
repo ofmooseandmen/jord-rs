@@ -78,7 +78,7 @@ impl Vec3 {
         if eq_unit_norm(n) {
             self
         } else {
-            self * (1.0 / n)
+            self / n
         }
     }
 
@@ -117,6 +117,14 @@ impl ::std::ops::Mul<f64> for Vec3 {
 
     fn mul(self, rhs: f64) -> Self {
         Vec3::new(self.x() * rhs, self.y() * rhs, self.z() * rhs)
+    }
+}
+
+impl ::std::ops::Mul<Vec3> for f64 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Self::Output {
+        Vec3::new(rhs.x() * self, rhs.y() * self, rhs.z() * self)
     }
 }
 
@@ -214,5 +222,10 @@ mod test {
     fn multiply_vec3_by_f64() {
         let v = Vec3::new(4.0, 5.0, 6.0);
         assert_eq!(Vec3::new(8.0, 10.0, 12.0), v * 2.0);
+    }
+
+    #[test]
+    fn unit() {
+        assert_eq!(Vec3::new(0.0, 1.0, 0.0), Vec3::new(0.0, 3.0, 0.0).unit());
     }
 }

@@ -15,7 +15,7 @@ impl<M: Model> NvectorPos<M> {
         NvectorPos { nvector, model }
     }
 
-    // FIXME from_decimal_lat_long and add from_lat_long accepts Angle
+    // FIXME from_decimal_lat_long and add from_lat_long accepts Angle?
     pub fn from_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
         NvectorPos::from_radians(latitude.to_radians(), longitude.to_radians(), model)
     }

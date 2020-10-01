@@ -1,5 +1,19 @@
-#![forbid(unsafe_code)]
-#![deny(missing_debug_implementations)]
+#![forbid(
+    anonymous_parameters,
+    clippy::all,
+    const_err,
+    illegal_floating_point_literal_pattern,
+    late_bound_lifetime_arguments,
+    path_statements,
+    patterns_in_fns_without_body,
+    rust_2018_idioms,
+    trivial_casts,
+    trivial_numeric_casts,
+    unreachable_pub,
+    unsafe_code,
+    unused_extern_crates,
+    missing_debug_implementations
+)]
 
 #[macro_use]
 mod measure;
@@ -7,6 +21,9 @@ pub use crate::measure::Measure;
 
 pub mod angle;
 pub use crate::angle::Angle;
+
+pub mod error;
+pub use crate::error::Error;
 
 pub mod great_circle;
 pub use crate::great_circle::GreatCircle;
@@ -37,4 +54,5 @@ pub use crate::surface::{Ellipsoid, Sphere, Surface};
 
 pub mod surfaces;
 
-mod internal;
+mod rounding;
+use crate::rounding::Rounding;
