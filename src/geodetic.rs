@@ -49,7 +49,7 @@ impl<M: Model> NvectorPos<M> {
     }
 
     pub fn antipode(&self) -> Self {
-        let anti = self.nvector * -1.0;
+        let anti = antipode(self.nvector);
         NvectorPos {
             nvector: anti,
             model: self.model,
@@ -87,7 +87,7 @@ pub struct LatLongPos<M: Model> {
     model: M,
 }
 
-// FIXME: parse & antipode
+// FIXME: parse
 impl<M: Model> LatLongPos<M> {
     pub fn new(latitude: Angle, longitude: Angle, model: M) -> Self {
         let (lat, lon) = wrap(
@@ -149,6 +149,15 @@ impl<M: Model> LatLongPos<M> {
     pub fn model(&self) -> M {
         self.model
     }
+
+    pub fn antipode(&self) -> Self {
+        let anti = antipode(self.to_nvector());
+        LatLongPos::from_nvector(anti, self.model)
+    }
+}
+
+pub(crate) fn antipode(v: Vec3) -> Vec3 {
+    -1.0 * v
 }
 
 impl LatLongPos<S84Model> {
