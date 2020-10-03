@@ -1,8 +1,8 @@
-// FIXME Result instead of Option
 use std::marker::PhantomData;
 
 use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Rounding, Spherical, Vec3};
 
+// FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GreatCircle<P> {
     position_type: PhantomData<P>,
@@ -98,8 +98,13 @@ impl<S: Spherical> LatLongPos<S> {
     }
 
     pub fn intermediate_pos_to(&self, to: Self, f: f64) -> Result<Self, Error> {
-        private::intermediate_pos_to((*self).to_nvector(), to.to_nvector(), f)
+        private::intermediate_pos((*self).to_nvector(), to.to_nvector(), f)
             .map(|v| LatLongPos::from_nvector(v, (*self).model()))
+    }
+
+    pub fn turn(&self, from: Self, to: Self) -> Result<Angle, Error> {
+        private::turn_radians(from.to_nvector(), (*self).to_nvector(), to.to_nvector())
+            .map(Angle::from_radians)
     }
 }
 
@@ -132,8 +137,13 @@ impl<S: Spherical> NvectorPos<S> {
     }
 
     pub fn intermediate_pos_to(&self, to: Self, f: f64) -> Result<Self, Error> {
-        private::intermediate_pos_to((*self).nvector(), to.nvector(), f)
+        private::intermediate_pos((*self).nvector(), to.nvector(), f)
             .map(|v| NvectorPos::new(v, (*self).model()))
+    }
+
+    pub fn turn_degrees(&self, from: Self, to: Self) -> Result<f64, Error> {
+        private::turn_radians(from.nvector(), (*self).nvector(), to.nvector())
+            .map(|b| b.to_degrees())
     }
 }
 
@@ -236,12 +246,18 @@ mod private {
         }
     }
 
-    pub(crate) fn intermediate_pos_to(v1: Vec3, v2: Vec3, f: f64) -> Result<Vec3, Error> {
+    pub(crate) fn intermediate_pos(v1: Vec3, v2: Vec3, f: f64) -> Result<Vec3, Error> {
         if f < 0.0 || f > 1.0 {
             Err(Error::OutOfRange)
         } else {
             Ok((v1 + f * (v2 - v1)).unit())
         }
+    }
+
+    pub(crate) fn turn_radians(from: Vec3, at: Vec3, to: Vec3) -> Result<f64, Error> {
+        let nfa = arc_normal(from, at)?;
+        let nat = arc_normal(at, to)?;
+        Ok(signed_radians_between(nfa.unit(), nat.unit(), Some(at)))
     }
 
     fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
@@ -595,6 +611,64 @@ mod lat_long_test {
             let p2 = LatLongPos::from_s84(55.605833, 13.035833);
             let pe = LatLongPos::from_s84(54.78355703138889, 5.194985318055555);
             assert_eq!(Ok(pe), p1.intermediate_pos_to(p2, 0.5));
+        }
+    }
+
+    mod turn_test {
+
+        use crate::{Angle, Error, LatLongPos};
+
+        #[test]
+        fn positive_turn() {
+            assert_eq!(
+                Ok(Angle::from_decimal_degrees(18.192705871944444)),
+                LatLongPos::from_s84(45.0, 0.0).turn(
+                    LatLongPos::from_s84(0.0, 0.0),
+                    LatLongPos::from_s84(60.0, -10.0)
+                )
+            );
+        }
+
+        #[test]
+        fn negative_turn() {
+            assert_eq!(
+                Ok(Angle::from_decimal_degrees(-18.192705871944444)),
+                LatLongPos::from_s84(45.0, 0.0).turn(
+                    LatLongPos::from_s84(0.0, 0.0),
+                    LatLongPos::from_s84(60.0, 10.0)
+                )
+            );
+        }
+
+        #[test]
+        fn zero_turn() {
+            assert_eq!(
+                Ok(Angle::zero()),
+                LatLongPos::from_s84(45.0, 0.0).turn(
+                    LatLongPos::from_s84(0.0, 0.0),
+                    LatLongPos::from_s84(90.0, 0.0)
+                )
+            );
+        }
+
+        #[test]
+        fn half_turn() {
+            let a = LatLongPos::from_s84(45.0, 63.0);
+            let b = LatLongPos::from_s84(-54.0, -89.0);
+            assert_eq!(Ok(Angle::from_decimal_degrees(180.0)), a.turn(b, b));
+            assert_eq!(Ok(Angle::from_decimal_degrees(180.0)), b.turn(a, a));
+        }
+
+        #[test]
+        fn no_turn() {
+            let a = LatLongPos::from_s84(45.0, 63.0);
+            let b = LatLongPos::from_s84(-54.0, -89.0);
+            assert_eq!(Err(Error::CoincidentalPositions), a.turn(a, a));
+            assert_eq!(Err(Error::CoincidentalPositions), a.turn(a, b));
+            assert_eq!(Err(Error::CoincidentalPositions), a.turn(b, a));
+            assert_eq!(Err(Error::CoincidentalPositions), b.turn(a, b));
+            assert_eq!(Err(Error::CoincidentalPositions), b.turn(b, a));
+            assert_eq!(Err(Error::CoincidentalPositions), b.turn(b, b));
         }
     }
 }
