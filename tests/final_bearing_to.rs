@@ -3,7 +3,7 @@ mod lat_long_pos {
     use jord::{Angle, Error, LatLongPos};
 
     #[test]
-    fn returns_err_equal_positions() {
+    fn final_bearing_to_same_position() {
         let p = LatLongPos::from_s84(50.066389, -5.714722);
         assert_eq!(Err(Error::CoincidentalPositions), p.final_bearing_to(p));
         assert_eq!(
@@ -13,14 +13,14 @@ mod lat_long_pos {
     }
 
     #[test]
-    fn returns_0_iso_longitude_going_north() {
+    fn final_bearing_to_iso_longitude_going_north() {
         let p1 = LatLongPos::from_s84(50.066389, -5.714722);
         let p2 = LatLongPos::from_s84(58.643889, -5.714722);
         assert_eq!(Ok(Angle::zero()), p1.final_bearing_to(p2));
     }
 
     #[test]
-    fn returns_180_iso_longitude_going_south() {
+    fn final_bearing_to_iso_longitude_going_south() {
         let p1 = LatLongPos::from_s84(58.643889, -5.714722);
         let p2 = LatLongPos::from_s84(50.066389, -5.714722);
         assert_eq!(
@@ -30,7 +30,7 @@ mod lat_long_pos {
     }
 
     #[test]
-    fn returns_90_at_equator_going_east() {
+    fn at_equator_final_bearing_to_east() {
         let p1 = LatLongPos::from_s84(0.0, 0.0);
         let p2 = LatLongPos::from_s84(0.0, 1.0);
         assert_eq!(
@@ -40,7 +40,7 @@ mod lat_long_pos {
     }
 
     #[test]
-    fn returns_270_at_equator_going_east() {
+    fn at_equator_final_bearing_to_west() {
         let p1 = LatLongPos::from_s84(0.0, 1.0);
         let p2 = LatLongPos::from_s84(0.0, 0.0);
         assert_eq!(
@@ -50,7 +50,7 @@ mod lat_long_pos {
     }
 
     #[test]
-    fn returns_final_bearing_compass_angle() {
+    fn final_bearing_to() {
         let p1 = LatLongPos::from_s84(50.066389, -5.714722);
         let p2 = LatLongPos::from_s84(58.643889, -3.07);
         assert_eq!(

@@ -215,7 +215,7 @@ mod resolution {
     use jord::{LatLongPos, NvectorPos, Vec3};
 
     #[test]
-    fn from_nvectors() {
+    fn nvector() {
         let nv1 = NvectorPos::new(Vec3::new(0.5, 0.5, 0.5_f64.sqrt()), S84);
         let nv2 = NvectorPos::new(
             Vec3::new(0.5000000000000001, 0.5000000000000001, 0.5_f64.sqrt()),
@@ -233,7 +233,7 @@ mod resolution {
     }
 
     #[test]
-    fn from_lat_long() {
+    fn lat_long() {
         let ll1 = LatLongPos::from_s84(45.0, 45.0);
         let ll2 = LatLongPos::from_s84(45.0000000005, 45.0000000005);
         let ll3 = LatLongPos::from_s84(45.0000000001, 45.0000000001);

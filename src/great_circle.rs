@@ -61,7 +61,7 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
 }
 
 impl<S: Spherical> LatLongPos<S> {
-    pub fn cross_track_distance(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
+    pub fn cross_track_distance_to(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
         let nv: NvectorPos<S> = (*self).into();
         Length::from_metres(private::cross_track_distance_metres(
             nv,
@@ -109,7 +109,7 @@ impl<S: Spherical> LatLongPos<S> {
 }
 
 impl<S: Spherical> NvectorPos<S> {
-    pub fn cross_track_distance_metres(&self, gc: GreatCircle<LatLongPos<S>>) -> f64 {
+    pub fn cross_track_distance_metres_to(&self, gc: GreatCircle<LatLongPos<S>>) -> f64 {
         private::cross_track_distance_metres(*self, gc.normal, Rounding::None)
     }
 

@@ -14,6 +14,6 @@ fn multiply_vec3_by_f64() {
 }
 
 #[test]
-fn unit() {
+fn unit_vec3() {
     assert_eq!(Vec3::new(0.0, 1.0, 0.0), Vec3::new(0.0, 3.0, 0.0).unit());
 }

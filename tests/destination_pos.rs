@@ -3,7 +3,7 @@ mod lat_long_pos {
     use jord::{Angle, LatLongPos, Length};
 
     #[test]
-    fn returns_p0_if_distance_is_0() {
+    fn zero_distance_destination_pos() {
         let p0 = LatLongPos::from_s84(53.320556, -1.729722);
         assert_eq!(
             p0,
@@ -12,7 +12,7 @@ mod lat_long_pos {
     }
 
     #[test]
-    fn returns_position_along_great_circle_at_distance_and_bearing() {
+    fn destination_pos() {
         let p0 = LatLongPos::from_s84(53.320556, -1.729722);
         let p1 = LatLongPos::from_s84(53.18826954833333, 0.13327449055555557);
         assert_eq!(

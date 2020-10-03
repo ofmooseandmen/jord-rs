@@ -49,7 +49,7 @@ fn one_degrees() {
 }
 
 #[test]
-fn positve_value() {
+fn positive_angle() {
     let a = Angle::from_decimal_degrees(154.9150300);
     assert_eq!(154, a.whole_degrees());
     assert_eq!(54, a.arcminutes());
@@ -58,7 +58,7 @@ fn positve_value() {
 }
 
 #[test]
-fn negative_value() {
+fn negative_angle() {
     let a = Angle::from_decimal_degrees(-154.915);
     assert_eq!(-154, a.whole_degrees());
     assert_eq!(54, a.arcminutes());
