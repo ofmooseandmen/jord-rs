@@ -17,15 +17,6 @@ pub struct Angle {
     microarcseconds: i64,
 }
 
-/// The error type returned by the [`Angle::from_dms`] function.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum DmsError {
-    /// Arcminutes are outside [0, 59].
-    InvalidArcMinutes,
-    /// Arcseconds are outside [0, 60].
-    InvalidArcSeconds,
-}
-
 /// The number of microarcseconds in one degree.
 const DG_TO_UAS: f64 = 3_600_000_000.0;
 
@@ -50,25 +41,19 @@ impl Angle {
     }
 
     /// Create a new `Angle` with the given number of whole degrees, arcminutes and decimal arcseconds.
-    /// Fails if given arcminutes are outside [0, 59] and/or arcseconds are outside [0, 60].
+    /// Given arcminutes and arcseconds are wrapped if needed.
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(Ok(Angle::from_decimal_degrees(10.5125)), Angle::from_dms(10, 30, 45.0));
+    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(10, 30, 45.0));
+    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(9, 89, 105.0));
     /// ```
-    // FIXME wrap instead of Error
-    pub fn from_dms(degs: i64, mins: i64, secs: f64) -> Result<Self, DmsError> {
-        if mins < 0 || mins > 59 {
-            Err(DmsError::InvalidArcMinutes)
-        } else if secs < 0.0 || secs >= 60.0 {
-            Err(DmsError::InvalidArcSeconds)
+    pub fn from_dms(degs: i64, mins: i64, secs: f64) -> Self {
+        let d = degs.abs() as f64 + (mins as f64 / 60.0) + (secs / 3600.0);
+        if degs < 0 {
+            Angle::from_decimal_degrees(-d)
         } else {
-            let d = degs.abs() as f64 + (mins as f64 / 60.0) + (secs / 3600.0);
-            if degs < 0 {
-                Ok(Angle::from_decimal_degrees(-d))
-            } else {
-                Ok(Angle::from_decimal_degrees(d))
-            }
+            Angle::from_decimal_degrees(d)
         }
     }
 
@@ -101,7 +86,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(-154, Angle::from_dms(-154, 3, 42.5).unwrap().whole_degrees());
+    /// assert_eq!(-154, Angle::from_dms(-154, 3, 42.5).whole_degrees());
     /// ```
     pub fn whole_degrees(self) -> i64 {
         let d = Angle::field(self, DG_TO_UAS, 360.0) as i64;
@@ -116,7 +101,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(45, Angle::from_dms(-154, 45, 42.5).unwrap().arcminutes());
+    /// assert_eq!(45, Angle::from_dms(-154, 45, 42.5).arcminutes());
     /// ```
     pub fn arcminutes(self) -> u8 {
         Angle::field(self, 60000000.0, 60.0) as u8
@@ -126,7 +111,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(42, Angle::from_dms(-154, 45, 42.5).unwrap().arcseconds());
+    /// assert_eq!(42, Angle::from_dms(-154, 45, 42.5).arcseconds());
     /// ```
     pub fn arcseconds(self) -> u8 {
         Angle::field(self, 1000000.0, 60.0) as u8
@@ -136,7 +121,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(500, Angle::from_dms(-154, 45, 42.5).unwrap().arcmilliseconds());
+    /// assert_eq!(500, Angle::from_dms(-154, 45, 42.5).arcmilliseconds());
     /// ```
     pub fn arcmilliseconds(self) -> u16 {
         Angle::field(self, 1000.0, 1000.0) as u16
@@ -168,75 +153,3 @@ impl Measure for Angle {
 }
 
 impl_measure! { Angle }
-
-#[cfg(test)]
-mod test {
-
-    use crate::Angle;
-
-    #[test]
-    fn one_microarcsecond() {
-        assert_eq!(
-            Angle::from_decimal_degrees(60.0),
-            Angle::from_decimal_degrees(59.9999999999)
-        );
-        assert_ne!(
-            Angle::from_decimal_degrees(60.0),
-            Angle::from_decimal_degrees(59.999999998)
-        );
-    }
-
-    #[test]
-    fn one_arcmillisecond() {
-        let a = Angle::from_decimal_degrees(1.0 / 3600000.0);
-        assert_eq!(0, a.whole_degrees());
-        assert_eq!(0, a.arcminutes());
-        assert_eq!(0, a.arcseconds());
-        assert_eq!(1, a.arcmilliseconds());
-    }
-
-    #[test]
-    fn one_arcsecond() {
-        let a = Angle::from_decimal_degrees(1000.0 / 3600000.0);
-        assert_eq!(0, a.whole_degrees());
-        assert_eq!(0, a.arcminutes());
-        assert_eq!(1, a.arcseconds());
-        assert_eq!(0, a.arcmilliseconds());
-    }
-
-    #[test]
-    fn one_arcminute() {
-        let a = Angle::from_decimal_degrees(60000.0 / 3600000.0);
-        assert_eq!(0, a.whole_degrees());
-        assert_eq!(1, a.arcminutes());
-        assert_eq!(0, a.arcseconds());
-        assert_eq!(0, a.arcmilliseconds());
-    }
-
-    #[test]
-    fn one_degrees() {
-        let a = Angle::from_decimal_degrees(1.0);
-        assert_eq!(1, a.whole_degrees());
-        assert_eq!(0, a.arcminutes());
-        assert_eq!(0, a.arcseconds());
-        assert_eq!(0, a.arcmilliseconds());
-    }
-
-    #[test]
-    fn positve_value() {
-        let a = Angle::from_decimal_degrees(154.9150300);
-        assert_eq!(154, a.whole_degrees());
-        assert_eq!(54, a.arcminutes());
-        assert_eq!(54, a.arcseconds());
-        assert_eq!(108, a.arcmilliseconds());
-    }
-
-    #[test]
-    fn negative_value() {
-        let a = Angle::from_decimal_degrees(-154.915);
-        assert_eq!(-154, a.whole_degrees());
-        assert_eq!(54, a.arcminutes());
-        assert_eq!(54, a.arcseconds());
-        assert_eq!(0, a.arcmilliseconds());
-    }
-}
