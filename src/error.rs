@@ -2,6 +2,7 @@ use core::fmt::{Display, Formatter, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    CoincidentalGreatCircles,
     AntipodalPositions,
     CoincidentalPositions,
     OutOfRange,

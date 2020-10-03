@@ -1,11 +1,9 @@
-use std::marker::PhantomData;
-
 use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Rounding, Spherical, Vec3};
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GreatCircle<P> {
-    position_type: PhantomData<P>,
+    position: P,
     normal: Vec3,
 }
 
@@ -15,7 +13,7 @@ impl<S: Spherical> GreatCircle<LatLongPos<S>> {
         p2: LatLongPos<S>,
     ) -> Result<GreatCircle<LatLongPos<S>>, Error> {
         private::arc_normal(p1.to_nvector(), p2.to_nvector()).map(|n| GreatCircle {
-            position_type: PhantomData,
+            position: p1,
             normal: n,
         })
     }
@@ -27,9 +25,17 @@ impl<S: Spherical> GreatCircle<LatLongPos<S>> {
             Rounding::Angle,
         );
         GreatCircle {
-            position_type: PhantomData,
+            position: pos,
             normal,
         }
+    }
+
+    pub fn intersections_with(&self, other: Self) -> Result<(LatLongPos<S>, LatLongPos<S>), Error> {
+        let (i1, i2) = private::intersections((*self).normal, other.normal)?;
+        Ok((
+            LatLongPos::from_nvector(i1, (*self).position.model()),
+            LatLongPos::from_nvector(i2, (*self).position.model()),
+        ))
     }
 }
 
@@ -39,7 +45,7 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
         p2: NvectorPos<S>,
     ) -> Result<GreatCircle<NvectorPos<S>>, Error> {
         private::arc_normal(p1.nvector(), p2.nvector()).map(|n| GreatCircle {
-            position_type: PhantomData,
+            position: p1,
             normal: n,
         })
     }
@@ -54,9 +60,17 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
             Rounding::None,
         );
         GreatCircle {
-            position_type: PhantomData,
+            position: pos,
             normal,
         }
+    }
+
+    pub fn intersections_with(&self, other: Self) -> Result<(NvectorPos<S>, NvectorPos<S>), Error> {
+        let (i1, i2) = private::intersections((*self).normal, other.normal)?;
+        Ok((
+            NvectorPos::new(i1, (*self).position.model()),
+            NvectorPos::new(i2, (*self).position.model()),
+        ))
     }
 }
 
@@ -243,6 +257,16 @@ mod private {
             let gc2 = v1.cross(np);
             let a = signed_radians_between(gc1, gc2, Some(v1));
             Ok(normalise_radians(a, 2.0 * PI))
+        }
+    }
+
+    pub(crate) fn intersections(n1: Vec3, n2: Vec3) -> Result<(Vec3, Vec3), Error> {
+        let i1 = n1.cross(n2);
+        if i1 == Vec3::zero() {
+            // same or opposite great circle
+            Err(Error::CoincidentalGreatCircles)
+        } else {
+            Ok((i1, antipode(i1)))
         }
     }
 
