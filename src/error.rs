@@ -5,6 +5,7 @@ pub enum Error {
     CoincidentalGreatCircles,
     AntipodalPositions,
     CoincidentalPositions,
+    NotEnoughPositions,
     OutOfRange,
     //FIXME __NonExhaustive, or [non_exhaustive]
 }

@@ -8,6 +8,17 @@ pub struct GreatCircle<P> {
 }
 
 impl<S: Spherical> GreatCircle<LatLongPos<S>> {
+    pub fn new(pos: LatLongPos<S>, bearing: Angle) -> GreatCircle<LatLongPos<S>> {
+        let normal = private::arc_normal_bearing_radians(
+            pos.to_nvector(),
+            bearing.as_radians(),
+            Rounding::Angle,
+        );
+        GreatCircle {
+            position: pos,
+            normal,
+        }
+    }
     pub fn from_lat_longs(
         p1: LatLongPos<S>,
         p2: LatLongPos<S>,
@@ -19,15 +30,7 @@ impl<S: Spherical> GreatCircle<LatLongPos<S>> {
     }
 
     pub fn from_lat_long_bearing(pos: LatLongPos<S>, bearing: Angle) -> GreatCircle<LatLongPos<S>> {
-        let normal = private::arc_normal_bearing_radians(
-            pos.to_nvector(),
-            bearing.as_radians(),
-            Rounding::Angle,
-        );
-        GreatCircle {
-            position: pos,
-            normal,
-        }
+        GreatCircle::new(pos, bearing)
     }
 
     pub fn intersections_with(&self, other: Self) -> Result<(LatLongPos<S>, LatLongPos<S>), Error> {
@@ -75,6 +78,15 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
 }
 
 impl<S: Spherical> LatLongPos<S> {
+    pub fn from_mean(ps: &[LatLongPos<S>]) -> Result<Self, Error> {
+        let m = private::mean(
+            ps.iter().map(LatLongPos::to_nvector).collect(),
+            Rounding::Angle,
+        )?;
+        // unwrap is safe because mean returns Err if ps is empty
+        Ok(LatLongPos::from_nvector(m, ps.first().unwrap().model()))
+    }
+
     pub fn cross_track_distance_to(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
         let nv: NvectorPos<S> = (*self).into();
         Length::from_metres(private::cross_track_distance_metres(
@@ -123,6 +135,12 @@ impl<S: Spherical> LatLongPos<S> {
 }
 
 impl<S: Spherical> NvectorPos<S> {
+    pub fn from_mean(ps: &[NvectorPos<S>]) -> Result<Self, Error> {
+        let m = private::mean(ps.iter().map(NvectorPos::nvector).collect(), Rounding::None)?;
+        // unwrap is safe because mean returns Err if ps is empty
+        Ok(NvectorPos::new(m, ps.first().unwrap().model()))
+    }
+
     pub fn cross_track_distance_metres_to(&self, gc: GreatCircle<LatLongPos<S>>) -> f64 {
         private::cross_track_distance_metres(*self, gc.normal, Rounding::None)
     }
@@ -263,9 +281,10 @@ mod private {
     pub(crate) fn intersections(n1: Vec3, n2: Vec3) -> Result<(Vec3, Vec3), Error> {
         let i1 = n1.cross(n2);
         if i1 == Vec3::zero() {
-            // same or opposite great circle
+            // same or opposite great circles
             Err(Error::CoincidentalGreatCircles)
         } else {
+            // FIXME, return lazy antipode
             Ok((i1, antipode(i1)))
         }
     }
@@ -278,10 +297,30 @@ mod private {
         }
     }
 
+    pub(crate) fn mean(vs: Vec<Vec3>, rounding: Rounding) -> Result<Vec3, Error> {
+        if vs.is_empty() {
+            Err(Error::NotEnoughPositions)
+        } else if vs.len() == 1 {
+            Ok(*vs.first().unwrap())
+        } else if vs
+            .iter()
+            .map(|v| rounding.round_pos(antipode(*v)))
+            .any(|v| vs.contains(&v))
+        {
+            Err(Error::AntipodalPositions)
+        } else {
+            Ok(unchecked_mean(vs))
+        }
+    }
+
     pub(crate) fn turn_radians(from: Vec3, at: Vec3, to: Vec3) -> Result<f64, Error> {
         let nfa = arc_normal(from, at)?;
         let nat = arc_normal(at, to)?;
         Ok(signed_radians_between(nfa.unit(), nat.unit(), Some(at)))
+    }
+
+    fn unchecked_mean(vs: Vec<Vec3>) -> Vec3 {
+        vs.iter().fold(Vec3::zero(), |sum, v| sum + *v)
     }
 
     fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
