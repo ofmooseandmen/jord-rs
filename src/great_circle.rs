@@ -34,11 +34,9 @@ impl<S: Spherical> GreatCircle<LatLongPos<S>> {
     }
 
     pub fn intersections_with(&self, other: Self) -> Result<(LatLongPos<S>, LatLongPos<S>), Error> {
-        let (i1, i2) = private::intersections((*self).normal, other.normal)?;
-        Ok((
-            LatLongPos::from_nvector(i1, (*self).position.model()),
-            LatLongPos::from_nvector(i2, (*self).position.model()),
-        ))
+        let i = private::gc_intersection::<LatLongPos<S>>(*self, other)?;
+        let lli = LatLongPos::from_nvector(i, (*self).position.model());
+        Ok((lli, lli.antipode()))
     }
 }
 
@@ -69,11 +67,9 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
     }
 
     pub fn intersections_with(&self, other: Self) -> Result<(NvectorPos<S>, NvectorPos<S>), Error> {
-        let (i1, i2) = private::intersections((*self).normal, other.normal)?;
-        Ok((
-            NvectorPos::new(i1, (*self).position.model()),
-            NvectorPos::new(i2, (*self).position.model()),
-        ))
+        let i = private::gc_intersection::<NvectorPos<S>>(*self, other)?;
+        let nvi = NvectorPos::new(i, (*self).position.model());
+        Ok((nvi, nvi.antipode()))
     }
 }
 
@@ -182,7 +178,7 @@ impl<S: Spherical> NvectorPos<S> {
 mod private {
 
     use crate::geodetic::antipode;
-    use crate::{Error, NvectorPos, Rounding, Spherical, Surface, Vec3};
+    use crate::{Error, GreatCircle, NvectorPos, Rounding, Spherical, Surface, Vec3};
     use std::f64::consts::PI;
 
     pub(crate) fn arc_normal(v1: Vec3, v2: Vec3) -> Result<Vec3, Error> {
@@ -278,14 +274,16 @@ mod private {
         }
     }
 
-    pub(crate) fn intersections(n1: Vec3, n2: Vec3) -> Result<(Vec3, Vec3), Error> {
-        let i1 = n1.cross(n2);
-        if i1 == Vec3::zero() {
+    pub(crate) fn gc_intersection<P>(
+        gc1: GreatCircle<P>,
+        gc2: GreatCircle<P>,
+    ) -> Result<Vec3, Error> {
+        let i = gc1.normal.cross(gc2.normal);
+        if i == Vec3::zero() {
             // same or opposite great circles
             Err(Error::CoincidentalGreatCircles)
         } else {
-            // FIXME, return lazy antipode
-            Ok((i1, antipode(i1)))
+            Ok(i)
         }
     }
 
