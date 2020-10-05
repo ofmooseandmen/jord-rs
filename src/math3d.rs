@@ -82,9 +82,9 @@ impl Vec3 {
         }
     }
 
-    pub fn square_distance(self, other: Self) -> f64 {
+    pub fn square_distance_to(self, other: Self) -> f64 {
         let dx = self.x() - other.x();
-        let dy = self.y() - other.x();
+        let dy = self.y() - other.y();
         let dz = self.z() - other.z();
         dx * dx + dy * dy + dz * dz
     }

@@ -26,7 +26,7 @@ pub mod error;
 pub use crate::error::Error;
 
 pub mod great_circle;
-pub use crate::great_circle::GreatCircle;
+pub use crate::great_circle::{GreatCircle, MinorArc};
 
 pub mod geodetic;
 pub use crate::geodetic::{LatLongPos, NvectorPos};

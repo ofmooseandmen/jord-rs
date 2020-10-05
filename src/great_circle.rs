@@ -8,17 +8,6 @@ pub struct GreatCircle<P> {
 }
 
 impl<S: Spherical> GreatCircle<LatLongPos<S>> {
-    pub fn new(pos: LatLongPos<S>, bearing: Angle) -> GreatCircle<LatLongPos<S>> {
-        let normal = private::arc_normal_bearing_radians(
-            pos.to_nvector(),
-            bearing.as_radians(),
-            Rounding::Angle,
-        );
-        GreatCircle {
-            position: pos,
-            normal,
-        }
-    }
     pub fn from_lat_longs(
         p1: LatLongPos<S>,
         p2: LatLongPos<S>,
@@ -30,7 +19,15 @@ impl<S: Spherical> GreatCircle<LatLongPos<S>> {
     }
 
     pub fn from_lat_long_bearing(pos: LatLongPos<S>, bearing: Angle) -> GreatCircle<LatLongPos<S>> {
-        GreatCircle::new(pos, bearing)
+        let normal = private::arc_normal_bearing_radians(
+            pos.to_nvector(),
+            bearing.as_radians(),
+            Rounding::Angle,
+        );
+        GreatCircle {
+            position: pos,
+            normal,
+        }
     }
 
     pub fn intersections_with(&self, other: Self) -> Result<(LatLongPos<S>, LatLongPos<S>), Error> {
@@ -70,6 +67,79 @@ impl<S: Spherical> GreatCircle<NvectorPos<S>> {
         let i = private::gc_intersection::<NvectorPos<S>>(*self, other)?;
         let nvi = NvectorPos::new(i, (*self).position.model());
         Ok((nvi, nvi.antipode()))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MinorArc<P> {
+    start_pos: P,
+    end_pos: P,
+    normal: Vec3,
+}
+
+impl<P: Copy> MinorArc<P> {
+    pub fn start_pos(&self) -> P {
+        self.start_pos
+    }
+
+    pub fn end_pos(&self) -> P {
+        self.end_pos
+    }
+}
+
+impl<S: Spherical> MinorArc<LatLongPos<S>> {
+    pub fn from_lat_longs(
+        start_pos: LatLongPos<S>,
+        end_pos: LatLongPos<S>,
+    ) -> Result<MinorArc<LatLongPos<S>>, Error> {
+        private::arc_normal(start_pos.to_nvector(), end_pos.to_nvector()).map(|n| MinorArc {
+            start_pos,
+            end_pos,
+            normal: n,
+        })
+    }
+
+    pub fn intersection_with(&self, other: Self) -> Result<LatLongPos<S>, Error> {
+        let ma = MinorArc {
+            start_pos: self.start_pos.to_nvector(),
+            end_pos: self.end_pos.to_nvector(),
+            normal: self.normal,
+        };
+        let mb = MinorArc {
+            start_pos: other.start_pos.to_nvector(),
+            end_pos: other.end_pos.to_nvector(),
+            normal: other.normal,
+        };
+        let i = private::intersection(ma, mb, Rounding::Angle)?;
+        Ok(LatLongPos::from_nvector(i, self.start_pos.model()))
+    }
+}
+
+impl<S: Spherical> MinorArc<NvectorPos<S>> {
+    pub fn from_nvectors(
+        start_pos: NvectorPos<S>,
+        end_pos: NvectorPos<S>,
+    ) -> Result<MinorArc<NvectorPos<S>>, Error> {
+        private::arc_normal(start_pos.nvector(), end_pos.nvector()).map(|n| MinorArc {
+            start_pos,
+            end_pos,
+            normal: n,
+        })
+    }
+
+    pub fn intersection_with(&self, other: Self) -> Result<NvectorPos<S>, Error> {
+        let ma = MinorArc {
+            start_pos: self.start_pos.nvector(),
+            end_pos: self.end_pos.nvector(),
+            normal: self.normal,
+        };
+        let mb = MinorArc {
+            start_pos: other.start_pos.nvector(),
+            end_pos: other.end_pos.nvector(),
+            normal: other.normal,
+        };
+        let i = private::intersection(ma, mb, Rounding::None)?;
+        Ok(NvectorPos::new(i, self.start_pos.model()))
     }
 }
 
@@ -178,7 +248,7 @@ impl<S: Spherical> NvectorPos<S> {
 mod private {
 
     use crate::geodetic::antipode;
-    use crate::{Error, GreatCircle, NvectorPos, Rounding, Spherical, Surface, Vec3};
+    use crate::{Error, GreatCircle, MinorArc, NvectorPos, Rounding, Spherical, Surface, Vec3};
     use std::f64::consts::PI;
 
     pub(crate) fn arc_normal(v1: Vec3, v2: Vec3) -> Result<Vec3, Error> {
@@ -256,6 +326,13 @@ mod private {
         initial_bearing_radians(v2, v1, rounding).map(|b| normalise_radians(b, PI))
     }
 
+    pub(crate) fn gc_intersection<P>(
+        gc1: GreatCircle<P>,
+        gc2: GreatCircle<P>,
+    ) -> Result<Vec3, Error> {
+        normal_intersection(gc1.normal, gc2.normal)
+    }
+
     pub(crate) fn initial_bearing_radians(
         v1: Vec3,
         v2: Vec3,
@@ -274,24 +351,33 @@ mod private {
         }
     }
 
-    pub(crate) fn gc_intersection<P>(
-        gc1: GreatCircle<P>,
-        gc2: GreatCircle<P>,
-    ) -> Result<Vec3, Error> {
-        let i = gc1.normal.cross(gc2.normal);
-        if i == Vec3::zero() {
-            // same or opposite great circles
-            Err(Error::CoincidentalGreatCircles)
-        } else {
-            Ok(i)
-        }
-    }
-
     pub(crate) fn intermediate_pos(v1: Vec3, v2: Vec3, f: f64) -> Result<Vec3, Error> {
         if f < 0.0 || f > 1.0 {
             Err(Error::OutOfRange)
         } else {
             Ok((v1 + f * (v2 - v1)).unit())
+        }
+    }
+
+    pub(crate) fn intersection(
+        ma: MinorArc<Vec3>,
+        mb: MinorArc<Vec3>,
+        rounding: Rounding,
+    ) -> Result<Vec3, Error> {
+        let i = rounding.round_pos(normal_intersection(ma.normal, mb.normal)?);
+        let mid = unchecked_mean(vec![ma.start_pos, ma.end_pos, mb.start_pos, mb.end_pos]);
+        let pot;
+        if i.dot(mid) > 0.0 {
+            pot = i;
+        } else {
+            pot = rounding.round_pos(antipode(i));
+        }
+        if is_on_minor_arc(pot, ma.start_pos, ma.end_pos)
+            && is_on_minor_arc(pot, mb.start_pos, mb.end_pos)
+        {
+            Ok(pot)
+        } else {
+            Err(Error::NoIntersection)
         }
     }
 
@@ -317,8 +403,23 @@ mod private {
         Ok(signed_radians_between(nfa.unit(), nat.unit(), Some(at)))
     }
 
-    fn unchecked_mean(vs: Vec<Vec3>) -> Vec3 {
-        vs.iter().fold(Vec3::zero(), |sum, v| sum + *v)
+    fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
+        let l = mas.square_distance_to(mae);
+        v.square_distance_to(mas) <= l && v.square_distance_to(mae) <= l
+    }
+
+    fn normal_intersection(n1: Vec3, n2: Vec3) -> Result<Vec3, Error> {
+        let i = n1.cross(n2);
+        if i == Vec3::zero() {
+            // same or opposite normals
+            Err(Error::CoincidentalPath)
+        } else {
+            Ok(i)
+        }
+    }
+
+    fn normalise_radians(a: f64, b: f64) -> f64 {
+        (a + b) % (2.0 * PI)
     }
 
     fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
@@ -328,7 +429,7 @@ mod private {
         sin_o.atan2(cos_o)
     }
 
-    fn normalise_radians(a: f64, b: f64) -> f64 {
-        (a + b) % (2.0 * PI)
+    fn unchecked_mean(vs: Vec<Vec3>) -> Vec3 {
+        vs.iter().fold(Vec3::zero(), |sum, v| sum + *v)
     }
 }

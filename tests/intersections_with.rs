@@ -8,10 +8,7 @@ mod lat_long_pos {
             LatLongPos::from_s84(51.885, 0.235),
             Angle::from_decimal_degrees(108.63),
         );
-        assert_eq!(
-            Err(Error::CoincidentalGreatCircles),
-            gc.intersections_with(gc)
-        );
+        assert_eq!(Err(Error::CoincidentalPath), gc.intersections_with(gc));
     }
 
     #[test]
@@ -20,10 +17,7 @@ mod lat_long_pos {
         let p2 = LatLongPos::from_s84(52.885, 1.235);
         let gc1 = GreatCircle::from_lat_longs(p1, p2).unwrap();
         let gc2 = GreatCircle::from_lat_longs(p2, p1).unwrap();
-        assert_eq!(
-            Err(Error::CoincidentalGreatCircles),
-            gc1.intersections_with(gc2)
-        );
+        assert_eq!(Err(Error::CoincidentalPath), gc1.intersections_with(gc2));
     }
 
     #[test]

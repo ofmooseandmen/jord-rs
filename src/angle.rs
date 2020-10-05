@@ -40,20 +40,23 @@ impl Angle {
         }
     }
 
-    /// Create a new `Angle` with the given number of whole degrees, arcminutes and decimal arcseconds.
-    /// Given arcminutes and arcseconds are wrapped if needed.
+    /// Create a new `Angle` with the given number of whole degrees, minutes, seconds and milliseconds.
+    /// Given minutes, seconds and milliseconds are wrapped if needed.
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(10, 30, 45.0));
-    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(9, 89, 105.0));
+    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(10, 30, 45, 0));
+    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(9, 89, 105, 0));
     /// ```
-    pub fn from_dms(degs: i64, mins: i64, secs: f64) -> Self {
-        let d = degs.abs() as f64 + (mins as f64 / 60.0) + (secs / 3600.0);
-        if degs < 0 {
-            Angle::from_decimal_degrees(-d)
+    pub fn from_dms(degrees: i16, minutess: u8, seconds: u8, milliseconds: u16) -> Self {
+        let dd = degrees.abs() as f64
+            + (minutess as f64 / 60.0)
+            + (seconds as f64 / 3600.0)
+            + (milliseconds as f64 / (3600.0 * 1000.0));
+        if degrees < 0 {
+            Angle::from_decimal_degrees(-dd)
         } else {
-            Angle::from_decimal_degrees(d)
+            Angle::from_decimal_degrees(dd)
         }
     }
 
@@ -86,7 +89,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(-154, Angle::from_dms(-154, 3, 42.5).whole_degrees());
+    /// assert_eq!(-154, Angle::from_dms(-154, 3, 42, 500).whole_degrees());
     /// ```
     pub fn whole_degrees(self) -> i64 {
         let d = Angle::field(self, DG_TO_UAS, 360.0) as i64;
@@ -101,7 +104,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(45, Angle::from_dms(-154, 45, 42.5).arcminutes());
+    /// assert_eq!(45, Angle::from_dms(-154, 45, 42, 500).arcminutes());
     /// ```
     pub fn arcminutes(self) -> u8 {
         Angle::field(self, 60000000.0, 60.0) as u8
@@ -111,7 +114,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(42, Angle::from_dms(-154, 45, 42.5).arcseconds());
+    /// assert_eq!(42, Angle::from_dms(-154, 45, 42, 500).arcseconds());
     /// ```
     pub fn arcseconds(self) -> u8 {
         Angle::field(self, 1000000.0, 60.0) as u8
@@ -121,7 +124,7 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(500, Angle::from_dms(-154, 45, 42.5).arcmilliseconds());
+    /// assert_eq!(500, Angle::from_dms(-154, 45, 42, 500).arcmilliseconds());
     /// ```
     pub fn arcmilliseconds(self) -> u16 {
         Angle::field(self, 1000.0, 1000.0) as u16

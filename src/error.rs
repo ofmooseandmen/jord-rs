@@ -2,9 +2,10 @@ use core::fmt::{Display, Formatter, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    CoincidentalGreatCircles,
     AntipodalPositions,
+    CoincidentalPath,
     CoincidentalPositions,
+    NoIntersection,
     NotEnoughPositions,
     OutOfRange,
     //FIXME __NonExhaustive, or [non_exhaustive]
