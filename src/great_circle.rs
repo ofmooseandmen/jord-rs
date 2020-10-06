@@ -1,4 +1,4 @@
-use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Rounding, Spherical, Vec3};
+use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Rounding, Spherical, Surface, Vec3};
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -153,30 +153,46 @@ impl<S: Spherical> LatLongPos<S> {
         Ok(LatLongPos::from_nvector(m, ps.first().unwrap().model()))
     }
 
-    pub fn cross_track_distance_to(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
-        let nv: NvectorPos<S> = (*self).into();
-        Length::from_metres(private::cross_track_distance_metres(
-            nv,
-            gc.normal,
+    pub fn along_track_distance_to(&self, ma: MinorArc<LatLongPos<S>>) -> Length {
+        let metres = private::along_track_distance_metres(
+            self.to_nvector(),
+            ma.start_pos.to_nvector(),
+            ma.normal,
+            self.earth_radius_metres(),
             Rounding::Angle,
-        ))
+        );
+        Length::from_metres(metres)
+    }
+
+    pub fn cross_track_distance_to(&self, gc: GreatCircle<LatLongPos<S>>) -> Length {
+        let metres = private::cross_track_distance_metres(
+            self.to_nvector(),
+            gc.normal,
+            self.earth_radius_metres(),
+            Rounding::Angle,
+        );
+        Length::from_metres(metres)
     }
 
     pub fn destination_pos(&self, bearing: Angle, distance: Length) -> Self {
-        let nv0: NvectorPos<S> = (*self).into();
-        let nv1 = private::destination_pos(
-            nv0,
+        let dest = private::destination_pos(
+            self.to_nvector(),
             bearing.as_radians(),
             distance.as_metres(),
+            self.earth_radius_metres(),
             Rounding::Angle,
         );
-        nv1.into()
+        LatLongPos::from_nvector(dest, self.model())
     }
 
     pub fn distance_to(&self, to: Self) -> Length {
-        let nv1: NvectorPos<S> = (*self).into();
-        let nv2: NvectorPos<S> = to.into();
-        Length::from_metres(private::distance_metres(nv1, nv2, Rounding::Angle))
+        let metres = private::distance_metres(
+            self.to_nvector(),
+            to.to_nvector(),
+            self.earth_radius_metres(),
+            Rounding::Angle,
+        );
+        Length::from_metres(metres)
     }
 
     pub fn final_bearing_to(&self, to: Self) -> Result<Angle, Error> {
@@ -198,6 +214,10 @@ impl<S: Spherical> LatLongPos<S> {
         private::turn_radians(from.to_nvector(), (*self).to_nvector(), to.to_nvector())
             .map(Angle::from_radians)
     }
+
+    fn earth_radius_metres(&self) -> f64 {
+        self.model().surface().mean_radius().as_metres()
+    }
 }
 
 impl<S: Spherical> NvectorPos<S> {
@@ -207,21 +227,43 @@ impl<S: Spherical> NvectorPos<S> {
         Ok(NvectorPos::new(m, ps.first().unwrap().model()))
     }
 
-    pub fn cross_track_distance_metres_to(&self, gc: GreatCircle<LatLongPos<S>>) -> f64 {
-        private::cross_track_distance_metres(*self, gc.normal, Rounding::None)
-    }
-
-    pub fn destination_pos(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
-        private::destination_pos(
-            *self,
-            bearing_degrees.to_radians(),
-            distance_metres,
+    pub fn along_track_distance_metres_to(&self, ma: MinorArc<NvectorPos<S>>) -> f64 {
+        private::along_track_distance_metres(
+            self.nvector(),
+            ma.start_pos.nvector(),
+            ma.normal,
+            self.earth_radius_metres(),
             Rounding::None,
         )
     }
 
+    pub fn cross_track_distance_metres_to(&self, gc: GreatCircle<NvectorPos<S>>) -> f64 {
+        private::cross_track_distance_metres(
+            self.nvector(),
+            gc.normal,
+            self.earth_radius_metres(),
+            Rounding::None,
+        )
+    }
+
+    pub fn destination_pos(&self, bearing_degrees: f64, distance_metres: f64) -> NvectorPos<S> {
+        let dest = private::destination_pos(
+            self.nvector(),
+            bearing_degrees.to_radians(),
+            distance_metres,
+            self.earth_radius_metres(),
+            Rounding::None,
+        );
+        NvectorPos::new(dest, self.model())
+    }
+
     pub fn distance_metres_to(&self, to: Self) -> f64 {
-        private::distance_metres(*self, to, Rounding::None)
+        private::distance_metres(
+            self.nvector(),
+            to.nvector(),
+            self.earth_radius_metres(),
+            Rounding::None,
+        )
     }
 
     pub fn final_bearing_degrees_to(&self, to: Self) -> Result<f64, Error> {
@@ -243,13 +285,29 @@ impl<S: Spherical> NvectorPos<S> {
         private::turn_radians(from.nvector(), (*self).nvector(), to.nvector())
             .map(|b| b.to_degrees())
     }
+
+    fn earth_radius_metres(&self) -> f64 {
+        self.model().surface().mean_radius().as_metres()
+    }
 }
 
 mod private {
 
     use crate::geodetic::antipode;
-    use crate::{Error, GreatCircle, MinorArc, NvectorPos, Rounding, Spherical, Surface, Vec3};
+    use crate::{Error, GreatCircle, MinorArc, Rounding, Vec3};
     use std::f64::consts::PI;
+
+    pub(crate) fn along_track_distance_metres(
+        pos: Vec3,
+        start: Vec3,
+        normal: Vec3,
+        radius_metres: f64,
+        rounding: Rounding,
+    ) -> f64 {
+        let o = normal.cross(pos).cross(normal);
+        let a = rounding.round_radians(signed_radians_between(start, o, Some(normal)));
+        arc_length_metres(a, radius_metres)
+    }
 
     pub(crate) fn arc_normal(v1: Vec3, v2: Vec3) -> Result<Vec3, Error> {
         if v1 == v2 {
@@ -275,47 +333,48 @@ mod private {
         sn - se
     }
 
-    pub(crate) fn cross_track_distance_metres<S: Spherical>(
-        p: NvectorPos<S>,
-        n: Vec3,
+    pub(crate) fn cross_track_distance_metres(
+        pos: Vec3,
+        normal: Vec3,
+        radius_metres: f64,
         rounding: Rounding,
     ) -> f64 {
-        let a = rounding.round_radians(signed_radians_between(n, p.nvector(), None) - (PI / 2.0));
-        a * p.model().surface().mean_radius().as_metres()
+        let a = rounding.round_radians(signed_radians_between(normal, pos, None) - (PI / 2.0));
+        arc_length_metres(a, radius_metres)
     }
 
-    pub(crate) fn destination_pos<S: Spherical>(
-        p0: NvectorPos<S>,
+    pub(crate) fn destination_pos(
+        p0: Vec3,
         bearing_radians: f64,
         distance_metres: f64,
+        radius_metres: f64,
         rounding: Rounding,
-    ) -> NvectorPos<S> {
+    ) -> Vec3 {
         if distance_metres == 0.0 {
             p0
         } else {
-            let v0 = p0.nvector();
             // east direction vector at p0
             let np = rounding.north_pole();
-            let ed = np.cross(v0).unit();
+            let ed = np.cross(p0).unit();
             // north direction vector at p0
-            let nd = v0.cross(ed);
+            let nd = p0.cross(ed);
             // central angle
-            let r = p0.model().surface().mean_radius().as_metres();
-            let ca = rounding.round_radians(distance_metres / r);
+            let ca = rounding.round_radians(distance_metres / radius_metres);
             // unit vector in the direction of the azimuth
             let de = nd * bearing_radians.cos() + ed * bearing_radians.sin();
-            let nv = v0 * ca.cos() + de * ca.sin();
-            NvectorPos::new(nv, p0.model())
+            let nv = p0 * ca.cos() + de * ca.sin();
+            nv
         }
     }
 
-    pub(crate) fn distance_metres<S: Spherical>(
-        p1: NvectorPos<S>,
-        p2: NvectorPos<S>,
+    pub(crate) fn distance_metres(
+        p1: Vec3,
+        p2: Vec3,
+        radius_metres: f64,
         rounding: Rounding,
     ) -> f64 {
-        let a = rounding.round_radians(signed_radians_between(p1.nvector(), p2.nvector(), None));
-        a * p1.model().surface().mean_radius().as_metres()
+        let a = rounding.round_radians(signed_radians_between(p1, p2, None));
+        arc_length_metres(a, radius_metres)
     }
 
     pub(crate) fn final_bearing_radians(
@@ -401,6 +460,11 @@ mod private {
         let nfa = arc_normal(from, at)?;
         let nat = arc_normal(at, to)?;
         Ok(signed_radians_between(nfa.unit(), nat.unit(), Some(at)))
+    }
+
+    #[inline]
+    fn arc_length_metres(radians: f64, radius_metres: f64) -> f64 {
+        radians * radius_metres
     }
 
     fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
