@@ -53,6 +53,3 @@ pub mod surface;
 pub use crate::surface::{Ellipsoid, Sphere, Surface};
 
 pub mod surfaces;
-
-mod rounding;
-use crate::rounding::Rounding;

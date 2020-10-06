@@ -166,6 +166,12 @@ impl LatLongPos<S84Model> {
     }
 }
 
+impl NvectorPos<S84Model> {
+    pub fn from_s84(latitude: f64, longitude: f64) -> Self {
+        NvectorPos::from_lat_long(latitude, longitude, S84)
+    }
+}
+
 impl<M: Model> From<(Angle, Angle, M)> for LatLongPos<M> {
     fn from(llm: (Angle, Angle, M)) -> Self {
         LatLongPos::new(llm.0, llm.1, llm.2)

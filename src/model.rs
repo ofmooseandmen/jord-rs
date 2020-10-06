@@ -19,7 +19,7 @@ impl ModelId {
     }
 }
 
-pub trait Model: Clone + Copy {
+pub trait Model: Clone + Copy + PartialEq {
     type Surface: Surface;
     fn model_id(&self) -> ModelId;
     fn surface(&self) -> Self::Surface;
