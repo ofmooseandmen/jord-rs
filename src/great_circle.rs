@@ -1,4 +1,4 @@
-use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Spherical, Vec3};
+use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Spherical, SurfacePos, Vec3};
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -148,8 +148,7 @@ impl<S: Spherical> LatLongPos<S> {
     }
 
     pub fn intermediate_pos_to(&self, to: Self, f: f64) -> Result<Self, Error> {
-        private::intermediate_pos((*self).to_nvector(), to.to_nvector(), f)
-            .map(|v| LatLongPos::from_nvector(v, (*self).model()))
+        private::intermediate_pos(*self, to, f)
     }
 
     pub fn projection_onto(&self, ma: MinorArc<LatLongPos<S>>) -> Result<LatLongPos<S>, Error> {
@@ -193,8 +192,7 @@ impl<S: Spherical> NvectorPos<S> {
     }
 
     pub fn intermediate_pos_to(&self, to: Self, f: f64) -> Result<Self, Error> {
-        private::intermediate_pos((*self).nvector(), to.nvector(), f)
-            .map(|v| NvectorPos::new(v, (*self).model()))
+        private::intermediate_pos(*self, to, f)
     }
 
     pub fn projection_onto(&self, ma: MinorArc<NvectorPos<S>>) -> Result<NvectorPos<S>, Error> {
@@ -208,104 +206,35 @@ impl<S: Spherical> NvectorPos<S> {
 
 mod private {
 
-    // FIXME remove Rounding
-    use crate::geodetic::nvector_from_lat_long_radians;
-    use crate::{
-        Angle, Error, GreatCircle, LatLongPos, MinorArc, NvectorPos, Spherical, Surface, Vec3,
-    };
+    use crate::{Error, GreatCircle, MinorArc, Spherical, Surface, SurfacePos, Vec3};
     use std::f64::consts::PI;
 
-    // FIXME name???
-    pub(crate) trait Pos<S: Spherical>: Clone + Copy + PartialEq {
-        fn from_nvector(nv: Vec3, model: S) -> Self;
-        fn as_nvector(&self) -> Vec3;
-        fn antipode(&self) -> Self;
-        fn model(&self) -> S;
-        fn north_pole() -> Vec3;
-        fn round_radians(radians: f64) -> f64;
-    }
-
-    impl<S: Spherical> Pos<S> for NvectorPos<S> {
-        fn from_nvector(nv: Vec3, model: S) -> Self {
-            NvectorPos::new(nv, model)
-        }
-
-        fn as_nvector(&self) -> Vec3 {
-            self.nvector()
-        }
-
-        fn antipode(&self) -> Self {
-            self.antipode()
-        }
-
-        fn model(&self) -> S {
-            self.model()
-        }
-
-        fn north_pole() -> Vec3 {
-            Vec3::unit_z()
-        }
-
-        fn round_radians(radians: f64) -> f64 {
-            radians
-        }
-    }
-
-    impl<S: Spherical> Pos<S> for LatLongPos<S> {
-        fn from_nvector(nv: Vec3, model: S) -> Self {
-            LatLongPos::from_nvector(nv, model)
-        }
-        fn as_nvector(&self) -> Vec3 {
-            self.to_nvector()
-        }
-
-        fn antipode(&self) -> Self {
-            self.antipode()
-        }
-
-        fn model(&self) -> S {
-            self.model()
-        }
-
-        fn north_pole() -> Vec3 {
-            nvector_from_lat_long_radians(PI / 2.0, 0.0)
-        }
-
-        fn round_radians(radians: f64) -> f64 {
-            Angle::from_radians(radians).as_radians()
-        }
-    }
-
-    pub(crate) fn along_track_distance_metres<S: Spherical, P: Pos<S>>(
+    pub(crate) fn along_track_distance_metres<S: Spherical, P: SurfacePos<S>>(
         pos: P,
         ma: MinorArc<P>,
     ) -> f64 {
         let normal = ma.normal;
-        let v = pos.as_nvector();
+        let v = pos.to_nvector();
         let o = normal.cross(v).cross(normal);
-        let a = P::round_radians(signed_radians_between(
-            ma.start_pos.as_nvector(),
-            o,
-            Some(normal),
-        ));
+        let a = signed_radians_between(ma.start_pos.to_nvector(), o, Some(normal));
         arc_length_metres(a, earth_radius_metres(pos))
     }
 
-    pub(crate) fn arc_normal<S: Spherical, P: Pos<S>>(p1: P, p2: P) -> Result<Vec3, Error> {
+    pub(crate) fn arc_normal<S: Spherical, P: SurfacePos<S>>(p1: P, p2: P) -> Result<Vec3, Error> {
         if p1 == p2 {
             Err(Error::CoincidentalPositions)
         } else if p1.antipode() == p2 {
             Err(Error::AntipodalPositions)
         } else {
-            Ok(p1.as_nvector().cross(p2.as_nvector()))
+            Ok(p1.to_nvector().cross(p2.to_nvector()))
         }
     }
 
-    pub(crate) fn arc_normal_bearing_radians<S: Spherical, P: Pos<S>>(
+    pub(crate) fn arc_normal_bearing_radians<S: Spherical, P: SurfacePos<S>>(
         pos: P,
         bearing_radians: f64,
     ) -> Vec3 {
-        let v = pos.as_nvector();
+        let v = pos.to_nvector();
         // easting
         let e = P::north_pole().cross(v);
         // northing
@@ -315,16 +244,15 @@ mod private {
         sn - se
     }
 
-    pub(crate) fn cross_track_distance_metres<S: Spherical, P: Pos<S>>(
+    pub(crate) fn cross_track_distance_metres<S: Spherical, P: SurfacePos<S>>(
         pos: P,
         normal: Vec3,
     ) -> f64 {
-        let a =
-            P::round_radians(signed_radians_between(normal, pos.as_nvector(), None) - (PI / 2.0));
+        let a = signed_radians_between(normal, pos.to_nvector(), None) - (PI / 2.0);
         arc_length_metres(a, earth_radius_metres(pos))
     }
 
-    pub(crate) fn destination_pos<S: Spherical, P: Pos<S>>(
+    pub(crate) fn destination_pos<S: Spherical, P: SurfacePos<S>>(
         p0: P,
         bearing_radians: f64,
         distance_metres: f64,
@@ -332,14 +260,14 @@ mod private {
         if distance_metres == 0.0 {
             p0
         } else {
-            let v0 = p0.as_nvector();
+            let v0 = p0.to_nvector();
             // east direction vector at p0
             let np = P::north_pole();
             let ed = np.cross(v0).unit();
             // north direction vector at p0
             let nd = v0.cross(ed);
             // central angle
-            let ca = P::round_radians(distance_metres / earth_radius_metres(p0));
+            let ca = distance_metres / earth_radius_metres(p0);
             // unit vector in the direction of the azimuth
             let de = nd * bearing_radians.cos() + ed * bearing_radians.sin();
             let nv = v0 * ca.cos() + de * ca.sin();
@@ -347,16 +275,12 @@ mod private {
         }
     }
 
-    pub(crate) fn distance_metres<S: Spherical, P: Pos<S>>(p1: P, p2: P) -> f64 {
-        let a = P::round_radians(signed_radians_between(
-            p1.as_nvector(),
-            p2.as_nvector(),
-            None,
-        ));
+    pub(crate) fn distance_metres<S: Spherical, P: SurfacePos<S>>(p1: P, p2: P) -> f64 {
+        let a = signed_radians_between(p1.to_nvector(), p2.to_nvector(), None);
         arc_length_metres(a, earth_radius_metres(p1))
     }
 
-    pub(crate) fn final_bearing_radians<S: Spherical, P: Pos<S>>(
+    pub(crate) fn final_bearing_radians<S: Spherical, P: SurfacePos<S>>(
         p1: P,
         p2: P,
     ) -> Result<f64, Error> {
@@ -370,15 +294,15 @@ mod private {
         normal_intersection(gc1.normal, gc2.normal)
     }
 
-    pub(crate) fn initial_bearing_radians<S: Spherical, P: Pos<S>>(
+    pub(crate) fn initial_bearing_radians<S: Spherical, P: SurfacePos<S>>(
         p1: P,
         p2: P,
     ) -> Result<f64, Error> {
         if p1 == p2 {
             Err(Error::CoincidentalPositions)
         } else {
-            let v1 = p1.as_nvector();
-            let v2 = p2.as_nvector();
+            let v1 = p1.to_nvector();
+            let v2 = p2.to_nvector();
             // great circle through p1 & p2
             let gc1 = v1.cross(v2);
             // great circle through p1 & north pole
@@ -389,22 +313,29 @@ mod private {
         }
     }
 
-    pub(crate) fn intermediate_pos(v1: Vec3, v2: Vec3, f: f64) -> Result<Vec3, Error> {
+    pub(crate) fn intermediate_pos<S: Spherical, P: SurfacePos<S>>(
+        p1: P,
+        p2: P,
+        f: f64,
+    ) -> Result<P, Error> {
         if f < 0.0 || f > 1.0 {
             Err(Error::OutOfRange)
         } else {
-            Ok((v1 + f * (v2 - v1)).unit())
+            let v1 = p1.to_nvector();
+            let v2 = p2.to_nvector();
+            let v = (v1 + f * (v2 - v1)).unit();
+            Ok(P::from_nvector(v, p1.model()))
         }
     }
 
-    pub(crate) fn intersection<S: Spherical, P: Pos<S>>(
+    pub(crate) fn intersection<S: Spherical, P: SurfacePos<S>>(
         ma: MinorArc<P>,
         mb: MinorArc<P>,
     ) -> Result<P, Error> {
-        let mas = ma.start_pos.as_nvector();
-        let mae = ma.end_pos.as_nvector();
-        let mbs = mb.start_pos.as_nvector();
-        let mbe = mb.end_pos.as_nvector();
+        let mas = ma.start_pos.to_nvector();
+        let mae = ma.end_pos.to_nvector();
+        let mbs = mb.start_pos.to_nvector();
+        let mbe = mb.end_pos.to_nvector();
         let iv = normal_intersection(ma.normal, mb.normal)?;
         let i = P::from_nvector(iv, ma.start_pos.model());
         let mid = unchecked_mean(vec![mas, mae, mbs, mbe]);
@@ -414,7 +345,7 @@ mod private {
         } else {
             pot = i.antipode()
         }
-        let vpot = pot.as_nvector();
+        let vpot = pot.to_nvector();
         if is_on_minor_arc(vpot, mas, mae) && is_on_minor_arc(vpot, mbs, mbe) {
             Ok(pot)
         } else {
@@ -422,27 +353,30 @@ mod private {
         }
     }
 
-    pub(crate) fn mean<S: Spherical, P: Pos<S>>(ps: &[P]) -> Result<Vec3, Error> {
+    pub(crate) fn mean<S: Spherical, P: SurfacePos<S>>(ps: &[P]) -> Result<Vec3, Error> {
         if ps.is_empty() {
             Err(Error::NotEnoughPositions)
         } else if ps.len() == 1 {
-            Ok((*ps.first().unwrap()).as_nvector())
+            Ok((*ps.first().unwrap()).to_nvector())
         } else if ps.iter().map(|p| (*p).antipode()).any(|p| ps.contains(&p)) {
             Err(Error::AntipodalPositions)
         } else {
-            Ok(unchecked_mean(ps.iter().map(|p| p.as_nvector()).collect()))
+            Ok(unchecked_mean(ps.iter().map(|p| p.to_nvector()).collect()))
         }
     }
 
-    pub(crate) fn projection<S: Spherical, P: Pos<S>>(pos: P, ma: MinorArc<P>) -> Result<P, Error> {
+    pub(crate) fn projection<S: Spherical, P: SurfacePos<S>>(
+        pos: P,
+        ma: MinorArc<P>,
+    ) -> Result<P, Error> {
         let na = P::from_nvector(ma.normal.unit(), pos.model());
         // normal to great circle (na, p) - if na is p or antipode of p, then projection is not possible
         let nb = P::from_nvector(arc_normal(na, pos)?.unit(), pos.model());
 
-        let mas = ma.start_pos.as_nvector();
-        let mae = ma.end_pos.as_nvector();
-        let nav = na.as_nvector();
-        let nbv = nb.as_nvector();
+        let mas = ma.start_pos.to_nvector();
+        let mae = ma.end_pos.to_nvector();
+        let nav = na.to_nvector();
+        let nbv = nb.to_nvector();
 
         let mid = unchecked_mean(vec![mas, mae, nav, nbv]);
         let iv = normal_intersection(nav, nbv)?;
@@ -453,14 +387,14 @@ mod private {
         } else {
             pot = i.antipode();
         }
-        if is_on_minor_arc(pot.as_nvector(), mas, mae) {
+        if is_on_minor_arc(pot.to_nvector(), mas, mae) {
             Ok(pot)
         } else {
             Err(Error::NoIntersection)
         }
     }
 
-    pub(crate) fn turn_radians<S: Spherical, P: Pos<S>>(
+    pub(crate) fn turn_radians<S: Spherical, P: SurfacePos<S>>(
         from: P,
         at: P,
         to: P,
@@ -470,7 +404,7 @@ mod private {
         Ok(signed_radians_between(
             nfa.unit(),
             nat.unit(),
-            Some(at.as_nvector()),
+            Some(at.to_nvector()),
         ))
     }
 
@@ -480,7 +414,7 @@ mod private {
     }
 
     #[inline]
-    fn earth_radius_metres<S: Spherical, P: Pos<S>>(p: P) -> f64 {
+    fn earth_radius_metres<S: Spherical, P: SurfacePos<S>>(p: P) -> f64 {
         p.model().surface().mean_radius().as_metres()
     }
 

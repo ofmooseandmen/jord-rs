@@ -1,7 +1,7 @@
 mod lat_long_pos {
 
     use jord::models::S84Model;
-    use jord::{Error, LatLongPos, Length};
+    use jord::{Error, LatLongPos, Length, SurfacePos};
 
     #[test]
     fn mean_no_position() {

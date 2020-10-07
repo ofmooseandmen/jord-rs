@@ -11,7 +11,7 @@ mod lat_long_pos {
         )
         .unwrap();
         assert_eq!(
-            Length::from_kilometres(-62.329309979),
+            Length::from_kilometres(-62.329309973),
             p.along_track_distance_to(ma)
         )
     }
@@ -25,7 +25,7 @@ mod lat_long_pos {
         )
         .unwrap();
         assert_eq!(
-            Length::from_kilometres(62.3315791),
+            Length::from_kilometres(62.331579102),
             p.along_track_distance_to(ma)
         )
     }

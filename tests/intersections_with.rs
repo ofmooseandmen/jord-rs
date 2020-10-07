@@ -1,6 +1,6 @@
 mod lat_long_pos {
 
-    use jord::{Angle, Error, GreatCircle, LatLongPos};
+    use jord::{Angle, Error, GreatCircle, LatLongPos, SurfacePos};
 
     #[test]
     fn intersections_with_same_great_circle() {

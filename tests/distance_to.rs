@@ -28,6 +28,6 @@ mod lat_long_pos {
     fn distance_to_across_date_line() {
         let p1 = LatLongPos::from_s84(50.066389, -179.999722);
         let p2 = LatLongPos::from_s84(50.066389, 179.999722);
-        assert_eq!(Length::from_metres(39.685092), p1.distance_to(p2));
+        assert_eq!(Length::from_metres(39.685096), p1.distance_to(p2));
     }
 }

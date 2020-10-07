@@ -1,7 +1,7 @@
 mod lat_long_pos {
 
     use jord::models::S84;
-    use jord::{Error, LatLongPos, MinorArc};
+    use jord::{Error, LatLongPos, MinorArc, SurfacePos};
 
     #[test]
     fn no_minor_arc_between_same_position() {
@@ -33,7 +33,7 @@ mod lat_long_pos {
 mod nvector_pos {
 
     use jord::models::S84;
-    use jord::{Error, MinorArc, NvectorPos};
+    use jord::{Error, MinorArc, NvectorPos, SurfacePos};
 
     #[test]
     fn no_minor_arc_between_same_position() {

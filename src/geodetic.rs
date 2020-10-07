@@ -1,7 +1,16 @@
-use ::std::convert::From;
+use std::convert::From;
+use std::f64::consts::PI;
 
 use crate::models::{S84Model, S84};
 use crate::{Angle, LongitudeRange, Model, Vec3};
+
+pub trait SurfacePos<M: Model>: Clone + Copy + PartialEq {
+    fn from_nvector(nv: Vec3, model: M) -> Self;
+    fn to_nvector(&self) -> Vec3;
+    fn antipode(&self) -> Self;
+    fn model(&self) -> M;
+    fn north_pole() -> Vec3;
+}
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -43,17 +52,31 @@ impl<M: Model> NvectorPos<M> {
     pub fn nvector(&self) -> Vec3 {
         self.nvector
     }
+}
 
-    pub fn model(&self) -> M {
-        self.model
+impl<M: Model> SurfacePos<M> for NvectorPos<M> {
+    fn from_nvector(nv: Vec3, model: M) -> Self {
+        NvectorPos::new(nv, model)
     }
 
-    pub fn antipode(&self) -> Self {
+    fn to_nvector(&self) -> Vec3 {
+        self.nvector()
+    }
+
+    fn antipode(&self) -> Self {
         let anti = antipode(self.nvector);
         NvectorPos {
             nvector: anti,
             model: self.model,
         }
+    }
+
+    fn model(&self) -> M {
+        self.model
+    }
+
+    fn north_pole() -> Vec3 {
+        Vec3::unit_z()
     }
 }
 
@@ -110,7 +133,25 @@ impl<M: Model> LatLongPos<M> {
         )
     }
 
-    pub fn from_nvector(nv: Vec3, model: M) -> Self {
+    pub fn north_pole(model: M) -> Self {
+        LatLongPos::from_decimal_degrees(90.0, 0.0, model)
+    }
+
+    pub fn south_pole(model: M) -> Self {
+        LatLongPos::from_decimal_degrees(-90.0, 0.0, model)
+    }
+
+    pub fn latitude(&self) -> Angle {
+        self.latitude
+    }
+
+    pub fn longitude(&self) -> Angle {
+        self.longitude
+    }
+}
+
+impl<M: Model> SurfacePos<M> for LatLongPos<M> {
+    fn from_nvector(nv: Vec3, model: M) -> Self {
         let ll = nvector_to_lat_long_radians(nv);
         let lat = Angle::from_radians(ll.0);
         let lon = Angle::from_radians(ll.1);
@@ -125,34 +166,21 @@ impl<M: Model> LatLongPos<M> {
             model,
         }
     }
-
-    pub fn north_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(90.0, 0.0, model)
-    }
-
-    pub fn south_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(-90.0, 0.0, model)
-    }
-
-    pub fn to_nvector(&self) -> Vec3 {
+    fn to_nvector(&self) -> Vec3 {
         nvector_from_lat_long_radians(self.latitude.as_radians(), self.longitude.as_radians())
     }
 
-    pub fn latitude(&self) -> Angle {
-        self.latitude
+    fn antipode(&self) -> Self {
+        let anti = antipode(self.to_nvector());
+        LatLongPos::from_nvector(anti, self.model)
     }
 
-    pub fn longitude(&self) -> Angle {
-        self.longitude
-    }
-
-    pub fn model(&self) -> M {
+    fn model(&self) -> M {
         self.model
     }
 
-    pub fn antipode(&self) -> Self {
-        let anti = antipode(self.to_nvector());
-        LatLongPos::from_nvector(anti, self.model)
+    fn north_pole() -> Vec3 {
+        nvector_from_lat_long_radians(PI / 2.0, 0.0)
     }
 }
 

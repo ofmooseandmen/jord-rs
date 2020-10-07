@@ -61,6 +61,12 @@ impl Length {
         let m = self.as_metres();
         m / Length::NM_TO_M
     }
+
+    pub fn abs(self) -> Self {
+        Length {
+            micrometres: self.micrometres.abs(),
+        }
+    }
 }
 
 impl Measure for Length {

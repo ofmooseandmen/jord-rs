@@ -29,7 +29,7 @@ pub mod great_circle;
 pub use crate::great_circle::{GreatCircle, MinorArc};
 
 pub mod geodetic;
-pub use crate::geodetic::{LatLongPos, NvectorPos};
+pub use crate::geodetic::{LatLongPos, NvectorPos, SurfacePos};
 
 pub mod length;
 pub use crate::length::Length;
