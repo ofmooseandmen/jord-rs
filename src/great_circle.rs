@@ -7,6 +7,15 @@ pub struct GreatCircle<P> {
     normal: Vec3,
 }
 
+impl<P> GreatCircle<P> {
+    pub fn from_minor_arc(ma: MinorArc<P>) -> GreatCircle<P> {
+        GreatCircle {
+            position: ma.start_pos,
+            normal: ma.normal,
+        }
+    }
+}
+
 impl<S: Spherical> GreatCircle<LatLongPos<S>> {
     pub fn from_lat_longs(
         p1: LatLongPos<S>,
@@ -113,6 +122,13 @@ impl<S: Spherical> MinorArc<NvectorPos<S>> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Side {
+    LeftOf,
+    RightOf,
+    None,
+}
+
 impl<S: Spherical> LatLongPos<S> {
     pub fn from_mean(ps: &[LatLongPos<S>]) -> Result<Self, Error> {
         let m = private::mean(ps)?;
@@ -157,6 +173,10 @@ impl<S: Spherical> LatLongPos<S> {
 
     pub fn projection_onto(&self, ma: MinorArc<LatLongPos<S>>) -> Result<LatLongPos<S>, Error> {
         private::projection(*self, ma)
+    }
+
+    pub fn side_of(&self, gc: GreatCircle<LatLongPos<S>>) -> Side {
+        private::side(*self, gc)
     }
 
     pub fn turn(&self, from: Self, to: Self) -> Result<Angle, Error> {
@@ -207,6 +227,10 @@ impl<S: Spherical> NvectorPos<S> {
         private::projection(*self, ma)
     }
 
+    pub fn side_of(&self, gc: GreatCircle<NvectorPos<S>>) -> Side {
+        private::side(*self, gc)
+    }
+
     pub fn turn_degrees(&self, from: Self, to: Self) -> Result<f64, Error> {
         private::turn_radians(from, *self, to).map(|b| b.to_degrees())
     }
@@ -214,7 +238,7 @@ impl<S: Spherical> NvectorPos<S> {
 
 mod private {
 
-    use crate::{Error, GreatCircle, MinorArc, Spherical, Surface, SurfacePos, Vec3};
+    use crate::{Error, GreatCircle, MinorArc, Side, Spherical, Surface, SurfacePos, Vec3};
     use std::f64::consts::PI;
 
     pub(crate) fn along_track_distance_metres<S: Spherical, P: SurfacePos<S>>(
@@ -444,6 +468,17 @@ mod private {
             Ok(pot)
         } else {
             Err(Error::NoIntersection)
+        }
+    }
+
+    pub(crate) fn side<S: Spherical, P: SurfacePos<S>>(pos: P, gc: GreatCircle<P>) -> Side {
+        let side = pos.to_nvector().dot(gc.normal);
+        if side < 0.0 {
+            Side::RightOf
+        } else if side > 0.0 {
+            Side::LeftOf
+        } else {
+            Side::None
         }
     }
 
