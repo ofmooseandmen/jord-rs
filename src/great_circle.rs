@@ -151,6 +151,10 @@ impl<S: Spherical> LatLongPos<S> {
         private::intermediate_pos(*self, to, f)
     }
 
+    pub fn is_enclosed_by(&self, vertices: &[LatLongPos<S>]) -> bool {
+        private::pos_enclosed_by(*self, vertices)
+    }
+
     pub fn projection_onto(&self, ma: MinorArc<LatLongPos<S>>) -> Result<LatLongPos<S>, Error> {
         private::projection(*self, ma)
     }
@@ -193,6 +197,10 @@ impl<S: Spherical> NvectorPos<S> {
 
     pub fn intermediate_pos_to(&self, to: Self, f: f64) -> Result<Self, Error> {
         private::intermediate_pos(*self, to, f)
+    }
+
+    pub fn is_enclosed_by(&self, vertices: &[NvectorPos<S>]) -> bool {
+        private::pos_enclosed_by(*self, vertices)
     }
 
     pub fn projection_onto(&self, ma: MinorArc<NvectorPos<S>>) -> Result<NvectorPos<S>, Error> {
@@ -362,6 +370,51 @@ mod private {
             Err(Error::AntipodalPositions)
         } else {
             Ok(unchecked_mean(ps.iter().map(|p| p.to_nvector()).collect()))
+        }
+    }
+
+    pub(crate) fn pos_enclosed_by<S: Spherical, P: SurfacePos<S>>(pos: P, ps: &[P]) -> bool {
+        if ps.len() < 3 {
+            false
+        } else {
+            let head = ps.first().unwrap();
+            let end;
+            if head == ps.last().unwrap() {
+                end = ps.len() - 1;
+            } else {
+                end = ps.len();
+            }
+            if end < 3 {
+                false
+            } else {
+                let nv = pos.to_nvector();
+                let mut sum = 0.0;
+                let mut is_vertex = false;
+                for i in 0..(end - 1) {
+                    let current_vertex = ps[i];
+                    if current_vertex == pos {
+                        is_vertex = true;
+                        break;
+                    }
+                    let next_vertex = ps[i + 1];
+                    let vv = nv - current_vertex.to_nvector();
+                    let vn = nv - next_vertex.to_nvector();
+                    sum += signed_radians_between(vv, vn, Some(nv));
+                }
+                if is_vertex {
+                    false
+                } else {
+                    let end_vertex = ps[end - 1];
+                    if end_vertex == pos {
+                        false
+                    } else {
+                        let vv = nv - end_vertex.to_nvector();
+                        let vn = nv - head.to_nvector();
+                        sum += signed_radians_between(vv, vn, Some(nv));
+                        sum.abs() > PI
+                    }
+                }
+            }
         }
     }
 
