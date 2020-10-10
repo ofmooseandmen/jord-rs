@@ -1,0 +1,82 @@
+# Common ellipsoidal and spherical models.
+mod models
+
+# World Geodetic System 1984.
+ellipsoidal WGS84
+  surface: WGS84
+  longitude_range: L180
+
+# Geodetic Reference System 1980.
+ellipsoidal GRS80
+  surface: GRS80
+  longitude_range: L180
+
+# World Geodetic System 1972.
+ellipsoidal WGS72
+  surface: WGS72
+  longitude_range: L180
+
+# European Terrestrial Reference System 1989.
+ellipsoidal ETRS89
+  surface: GRS80
+  longitude_range: L180
+
+# North American Datum of 1983.
+ellipsoidal NAD83
+  surface: GRS80
+  longitude_range: L180
+
+# European Datum 1950.
+ellipsoidal ED50
+  surface: Intl_1924
+  longitude_range: L180
+
+# Irland.
+ellipsoidal Irl_1975
+  surface: Airy_Modified
+  longitude_range: L180
+
+# North American Datum of 1927.
+ellipsoidal NAD27
+  surface: Clarke_1866
+  longitude_range: L180
+
+# NTF (Paris) / France I.
+ellipsoidal NTF
+  surface: Clarke_1880_IGN
+  longitude_range: L180
+
+# Ordnance Survey Great Britain 1936.
+ellipsoidal OSGB36
+  surface: Airy_1830
+  longitude_range: L180
+
+# Geodetic Datum for Germany.
+ellipsoidal Potsdam
+  surface: Bessel_1841
+  longitude_range: L180
+
+# Tokyo Japan.
+ellipsoidal Tokyo_Japan
+  surface: Bessel_1841
+  longitude_range: L180
+
+# Mars Orbiter Laser Altimeter.
+ellipsoidal Mars_2000
+  surface: Mars_2000
+  longitude_range: L360
+
+# Spherical Earth model derived from WGS84 ellipsoid.
+spherical S84
+  surface: WGS84
+  longitude_range: L180
+
+# Spherical Mars model derived from Mars2000 ellipsoid.
+spherical SMars_2000
+  surface: Mars_2000
+  longitude_range: L360
+
+# Moon IAU/IAG.
+spherical Moon
+  surface: Moon
+  longitude_range: L180

@@ -1,4 +1,4 @@
-# Common surfaces of different celestial bodies
+# Common surfaces of different celestial bodies.
 mod surfaces
 
 # World Geodetic 84 Ellipsoid.

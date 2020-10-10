@@ -2,6 +2,9 @@ use std::env;
 use std::fs::File;
 use std::io::{self, Write};
 
+mod model;
+pub use model::*;
+
 mod surface;
 pub use surface::*;
 
@@ -60,7 +63,7 @@ where
         Ok((module, txt)) => {
             let mut vec = Vec::new();
             let mut done = false;
-            let mut rest = txt;
+            let mut rest = txt.skip_empty();
             while !done {
                 let (s, t) = parse(&rest)?;
                 rest = t;
@@ -120,5 +123,18 @@ pub fn main() -> std::io::Result<()> {
         gen_surface,
         surface_imports(),
         &out_surfaces,
-    )
+    )?;
+
+    let mut in_models = in_dir.to_owned();
+    in_models.push_str("/models.txt");
+
+    let text = Text::from_file_content(in_models)?;
+    let models = parse(text, parse_model)?;
+
+    let mut out_models = out_dir.to_owned();
+    out_models.push_str(&format!("/{}.rs", models.1));
+
+    gen(models.0, models.2, gen_model, model_imports(), &out_models)?;
+
+    Ok(())
 }

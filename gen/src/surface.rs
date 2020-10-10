@@ -3,7 +3,7 @@ use std::io::{self, Error, ErrorKind};
 use crate::text::*;
 use jord::{Ellipsoid, Length, Sphere, Surface};
 
-pub enum Surf {
+pub enum SurfaceDef {
     Sphere {
         comment: String,
         name: String,
@@ -20,14 +20,14 @@ pub fn surface_imports() -> String {
     "Ellipsoid, Length, Sphere".to_string()
 }
 
-pub fn gen_surface(surface: Surf) -> String {
+pub fn gen_surface(surface: SurfaceDef) -> String {
     match surface {
-        Surf::Ellipsoid {
+        SurfaceDef::Ellipsoid {
             comment,
             name,
             data,
         } => gen_ellispoid(comment, name, data),
-        Surf::Sphere {
+        SurfaceDef::Sphere {
             comment,
             name,
             data,
@@ -35,15 +35,14 @@ pub fn gen_surface(surface: Surf) -> String {
     }
 }
 
-pub fn parse_surface(text: &Text) -> io::Result<(Surf, Text)> {
-    let txt = text.skip_empty();
-    let (comment, txt) = txt.next_if_prefixed("# ")?;
+pub fn parse_surface(text: &Text) -> io::Result<(SurfaceDef, Text)> {
+    let (comment, txt) = text.next_if_prefixed("# ")?;
     let (name, txt) = txt.next()?;
     match txt.next_if_prefixed("  a: ") {
         Err(_) => {
             let (r, txt) = txt.next_if_prefixed("  r: ")?;
             Ok((
-                Surf::Sphere {
+                SurfaceDef::Sphere {
                     comment,
                     name,
                     data: Sphere::new(parse_metres(r)?),
@@ -54,7 +53,7 @@ pub fn parse_surface(text: &Text) -> io::Result<(Surf, Text)> {
         Ok((a, txt)) => {
             let (invf, txt) = txt.next_if_prefixed("  1/f: ")?;
             Ok((
-                Surf::Ellipsoid {
+                SurfaceDef::Ellipsoid {
                     comment,
                     name,
                     data: Ellipsoid::new(parse_metres(a)?, invf.parse::<f64>().unwrap()),
@@ -78,7 +77,7 @@ fn parse_metres(s: String) -> io::Result<Length> {
 fn gen_sphere(c: String, n: String, e: Sphere) -> String {
     format!(
         "/// {}
-pub const {}: Sphere = Sphere::new(Length::from_micrometres({}));
+pub const {}_SPHERE: Sphere = Sphere::new(Length::from_micrometres({}));
 
 ",
         c,
@@ -90,15 +89,15 @@ pub const {}: Sphere = Sphere::new(Length::from_micrometres({}));
 fn gen_ellispoid(c: String, n: String, e: Ellipsoid) -> String {
     format!(
         "/// {}
-pub const {}: Ellipsoid = Ellipsoid::from_all(
+pub const {}_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
     Length::from_micrometres({}),
     Length::from_micrometres({}),
     {},
     {},
 );
 
-/// {}
-pub const {}: Sphere = Sphere::new(Length::from_micrometres({}));
+/// Sphere derived from: {}
+pub const {}_SPHERE: Sphere = Sphere::new(Length::from_micrometres({}));
 
 ",
         c,
@@ -107,8 +106,8 @@ pub const {}: Sphere = Sphere::new(Length::from_micrometres({}));
         e.polar_radius().micrometres(),
         e.eccentricity(),
         e.flattening(),
-        "Sphere derived from: ".to_owned() + &c,
-        n.to_uppercase() + "_SPHERE",
+        c,
+        n.to_uppercase(),
         e.mean_radius().micrometres(),
     )
 }
