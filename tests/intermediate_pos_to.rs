@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::{Error, LatLongPos};
 
@@ -32,3 +32,4 @@ mod lat_long_pos {
         assert_eq!(Ok(pe), p1.intermediate_pos_to(p2, 0.5));
     }
 }
+*/

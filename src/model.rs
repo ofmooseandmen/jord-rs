@@ -1,6 +1,6 @@
 use crate::Surface;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LongitudeRange {
     L180,
     L360,

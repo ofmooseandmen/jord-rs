@@ -77,12 +77,12 @@ fn parse_metres(s: String) -> io::Result<Length> {
 fn gen_sphere(c: String, n: String, e: Sphere) -> String {
     format!(
         "/// {}
-pub const {}_SPHERE: Sphere = Sphere::new(Length::from_micrometres({}));
+pub const {}_SPHERE: Sphere = Sphere::new(Length::from_metres({}f64));
 
 ",
         c,
         n.to_uppercase(),
-        e.mean_radius().micrometres(),
+        e.mean_radius().metres(),
     )
 }
 
@@ -90,24 +90,24 @@ fn gen_ellispoid(c: String, n: String, e: Ellipsoid) -> String {
     format!(
         "/// {}
 pub const {}_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres({}),
-    Length::from_micrometres({}),
-    {},
-    {},
+    Length::from_metres({}f64),
+    Length::from_metres({}f64),
+    {}f64,
+    {}f64,
 );
 
 /// Sphere derived from: {}
-pub const {}_SPHERE: Sphere = Sphere::new(Length::from_micrometres({}));
+pub const {}_SPHERE: Sphere = Sphere::new(Length::from_metres({}f64));
 
 ",
         c,
         n.to_uppercase(),
-        e.equatorial_radius().micrometres(),
-        e.polar_radius().micrometres(),
+        e.equatorial_radius().metres(),
+        e.polar_radius().metres(),
         e.eccentricity(),
         e.flattening(),
         c,
         n.to_uppercase(),
-        e.mean_radius().micrometres(),
+        e.mean_radius().metres(),
     )
 }

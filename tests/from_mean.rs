@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::models::S84Model;
     use jord::{Error, LatLongPos, Length, SurfacePos};
@@ -46,4 +46,4 @@ mod lat_long_pos {
         dists.dedup();
         assert_eq!(1, dists.len());
     }
-}
+}*/

@@ -1,4 +1,4 @@
-mod places;
+/*mod places;
 pub use places::*;
 
 mod lat_long_pos {
@@ -42,3 +42,4 @@ mod lat_long_pos {
         );
     }
 }
+*/

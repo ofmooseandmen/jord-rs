@@ -1,4 +1,4 @@
-mod places;
+/*mod places;
 pub use places::*;
 
 mod lat_long_pos {
@@ -102,3 +102,4 @@ mod lat_long_pos {
         assert_eq!(false, i.is_enclosed_by(&poly2));
     }
 }
+*/

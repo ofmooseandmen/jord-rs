@@ -1,4 +1,4 @@
-mod lat_long {
+/*mod lat_long {
 
     mod pole {
 
@@ -241,4 +241,4 @@ mod resolution {
         assert_ne!(ll1, ll2);
         assert_eq!(ll1, ll3);
     }
-}
+}*/

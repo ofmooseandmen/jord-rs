@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::{Error, LatLongPos, MinorArc};
 
@@ -123,3 +123,4 @@ mod lat_long_pos {
         );
     }
 }
+*/

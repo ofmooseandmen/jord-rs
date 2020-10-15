@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::models::S84;
     use jord::{Error, LatLongPos, MinorArc, SurfacePos};
@@ -61,3 +61,4 @@ mod nvector_pos {
         );
     }
 }
+*/

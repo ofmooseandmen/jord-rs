@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/* mod lat_long_pos {
 
     use jord::{LatLongPos, Length, MinorArc};
 
@@ -44,4 +44,4 @@ mod lat_long_pos {
         let ma = MinorArc::from_lat_longs(start, end).unwrap();
         assert_eq!(start.distance_to(end), end.along_track_distance_to(ma))
     }
-}
+}*/

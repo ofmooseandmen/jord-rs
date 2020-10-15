@@ -1,27 +1,23 @@
 // Copyright: (c) 2020 Cedric Liegeois
 // License: BSD3
 
-/// Trait implemented by all measurable quantities with a fixed resolution.
-pub trait Measure {
+/// Trait implemented by all measurable quantities.
+pub trait Measurement {
     /// Creates a new quantity from the given amount expressed in the default unit.
     fn from_default_unit(amount: f64) -> Self;
-    /// Creates a new quantity from the given amount expressed in the resolution unit.    
-    fn from_resolution_unit(amount: i64) -> Self;
     /// Returns this quantity in the default unit.
     fn as_default_unit(self) -> f64;
-    /// Returns this quantity in the resolution unit.
-    fn as_resolution_unit(self) -> i64;
 }
 
 #[macro_export]
-macro_rules! impl_measure {
+macro_rules! impl_measurement {
     ($($t:ty)*) => ($(
 
         impl ::std::ops::Add for $t {
             type Output = Self;
 
             fn add(self, rhs: Self) -> Self {
-                Self::from_resolution_unit(self.as_resolution_unit() + rhs.as_resolution_unit())
+                Self::from_default_unit(self.as_default_unit() + rhs.as_default_unit())
             }
         }
 
@@ -29,7 +25,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn sub(self, rhs: Self) -> Self {
-                Self::from_resolution_unit(self.as_resolution_unit() - rhs.as_resolution_unit())
+                Self::from_default_unit(self.as_default_unit() - rhs.as_default_unit())
             }
         }
 
@@ -37,7 +33,7 @@ macro_rules! impl_measure {
             type Output = Self;
 
             fn neg(self) -> Self {
-                Self::from_resolution_unit(self.as_resolution_unit().neg())
+                Self::from_default_unit(self.as_default_unit().neg())
             }
         }
 

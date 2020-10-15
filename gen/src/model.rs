@@ -67,13 +67,21 @@ pub const {}: {}Model = {}Model {{}};
 pub struct {}Model {{}}
 
 ",
-        model.comment, model.id.to_uppercase(), m_id_ype, m_id_ype, model.comment, m_id_ype,
+        model.comment,
+        model.id.to_uppercase(),
+        m_id_ype,
+        m_id_ype,
+        model.comment,
+        m_id_ype,
     )
 }
 
 fn gen_impl(model: &ModelDef) -> String {
     let (surface_type, surface) = match model.mtype {
-        Type::Ellipsoidal => ("Ellipsoid", format!("{}_ELLIPSOID", model.surface.to_uppercase())),
+        Type::Ellipsoidal => (
+            "Ellipsoid",
+            format!("{}_ELLIPSOID", model.surface.to_uppercase()),
+        ),
         Type::Spherical => ("Sphere", format!("{}_SPHERE", model.surface.to_uppercase())),
     };
 
@@ -92,7 +100,12 @@ fn gen_impl(model: &ModelDef) -> String {
 }}
 
 ",
-        model_id_type(model), surface_type, model.id.to_uppercase(), model.longitude_range, surface_type, surface,
+        model_id_type(model),
+        surface_type,
+        model.id.to_uppercase(),
+        model.longitude_range,
+        surface_type,
+        surface,
     )
 }
 
@@ -105,7 +118,8 @@ fn gen_type_impl(model: &ModelDef) -> String {
         "impl {} for {}Model {{}}
 
 ",
-        mtrait, model_id_type(model)
+        mtrait,
+        model_id_type(model)
     )
 }
 

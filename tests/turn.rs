@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::{Angle, Error, LatLongPos};
 
@@ -55,3 +55,4 @@ mod lat_long_pos {
         assert_eq!(Err(Error::CoincidentalPositions), b.turn(b, b));
     }
 }
+*/

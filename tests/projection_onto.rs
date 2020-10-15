@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::models::{S84Model, S84};
     use jord::{Error, GreatCircle, LatLongPos, Length, MinorArc, NvectorPos, SurfacePos};
@@ -89,3 +89,4 @@ mod lat_long_pos {
         assert_eq!(Ok(end), end.projection_onto(ma));
     }
 }
+*/

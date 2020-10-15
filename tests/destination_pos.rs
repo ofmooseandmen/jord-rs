@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/* mod lat_long_pos {
 
     use jord::{Angle, LatLongPos, Length};
 
@@ -19,4 +19,4 @@ mod lat_long_pos {
         );
         assert_eq!(expected, actual);
     }
-}
+}*/

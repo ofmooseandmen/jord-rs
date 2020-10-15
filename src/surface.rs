@@ -26,7 +26,7 @@ pub struct Ellipsoid {
 
 impl Ellipsoid {
     pub fn new(eqr: Length, invf: f64) -> Self {
-        let a = eqr.as_metres();
+        let a = eqr.metres();
         let f = 1.0 / invf;
         let b = a * (1.0 - f);
         let e = (1.0 - (b * b) / (a * a)).sqrt();

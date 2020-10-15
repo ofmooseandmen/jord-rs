@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::models::S84;
     use jord::{Angle, Error, LatLongPos};
@@ -122,3 +122,4 @@ mod lat_long_pos {
         );
     }
 }
+*/

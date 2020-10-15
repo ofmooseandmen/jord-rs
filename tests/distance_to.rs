@@ -1,4 +1,4 @@
-mod lat_long_pos {
+/*mod lat_long_pos {
 
     use jord::models::S84;
     use jord::{LatLongPos, Length};
@@ -30,4 +30,4 @@ mod lat_long_pos {
         let p2 = LatLongPos::from_s84(50.066389, 179.999722);
         assert_eq!(Length::from_metres(39.685096), p1.distance_to(p2));
     }
-}
+}*/
