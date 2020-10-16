@@ -30,9 +30,14 @@ impl<M: Model> HorizontalPos<M> {
     }
 
     pub fn from_decimal_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
-        let (lat, lon) = wrap(latitude, longitude, model.longitude_range());
-        let nvector = nvector_from_lat_long_radians(lat.to_radians(), lon.to_radians());
-        HorizontalPos(nvector, model)
+        if eq_lat_north_pole(latitude) {
+            HorizontalPos::north_pole(model)
+        } else if eq_lat_south_pole(latitude) {
+            HorizontalPos::south_pole(model)
+        } else {
+            let nvector = nvector_from_lat_long_degrees(latitude, longitude);
+            HorizontalPos(nvector, model)
+        }
     }
 
     pub fn from_lat_long(latitude: Angle, longitude: Angle, model: M) -> Self {
@@ -52,9 +57,9 @@ impl<M: Model> HorizontalPos<M> {
     }
 
     pub fn to_lat_long(&self) -> LatLong {
-        let ll = nvector_to_lat_long_radians(self.0);
-        let lat = ll.0.to_degrees();
-        let lon = ll.1.to_degrees();
+        let ll = nvector_to_lat_long_degrees(self.0);
+        let lat = ll.0;
+        let lon = ll.1;
         LatLong(
             Angle::from_decimal_degrees(lat),
             Angle::from_decimal_degrees(convert_lon(lat, lon, self.1.longitude_range())),
@@ -103,7 +108,9 @@ impl<M: Model> From<(Vec3, M)> for HorizontalPos<M> {
     }
 }
 
-fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
+fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
+    let lat = latitude.to_radians();
+    let lon = longitude.to_radians();
     let cl = lat.cos();
     let x = cl * lon.cos();
     let y = cl * lon.sin();
@@ -111,25 +118,25 @@ fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-fn nvector_to_lat_long_radians(nv: Vec3) -> (f64, f64) {
+fn nvector_to_lat_long_degrees(nv: Vec3) -> (f64, f64) {
     let x = nv.x();
     let y = nv.y();
     let z = nv.z();
     let lat = z.atan2((x * x + y * y).sqrt());
     let lon = y.atan2(x);
-    (lat, lon)
+    (lat.to_degrees(), lon.to_degrees())
+}
+
+fn eq_lat_north_pole(lat: f64) -> bool {
+    lat == 90.0
+}
+
+fn eq_lat_south_pole(lat: f64) -> bool {
+    lat == -90.0
 }
 
 fn eq_lat_pole(lat: f64) -> bool {
-    lat.abs() == 90.0
-}
-
-fn check_pole(lat: f64, lon: f64) -> f64 {
-    if eq_lat_pole(lat) {
-        0.0
-    } else {
-        lon
-    }
+    eq_lat_north_pole(lat.abs())
 }
 
 fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
@@ -140,49 +147,6 @@ fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
     } else {
         lon + 360.0
     }
-}
-
-// https://gist.github.com/missinglink/d0a085188a8eab2ca66db385bb7c023a
-fn wrap(lat: f64, lon: f64, lr: LongitudeRange) -> (f64, f64) {
-    if is_valid_lat(lat) && is_valid_lon(lon, lr) {
-        (lat, check_pole(lat, lon))
-    } else {
-        let quadrant = ((lat.abs() / 90.0).floor() % 4.0) as u8;
-        let pole;
-        if lat > 0.0 {
-            pole = 90.0;
-        } else {
-            pole = -90.0;
-        }
-        let offset = lat % 90.0;
-        println!("offset {}", offset);
-
-        let wlat;
-        let mut wlon = lon;
-        match quadrant {
-            0 => wlat = offset,
-            1 => {
-                wlat = pole - offset;
-                wlon += 180.0;
-            }
-            2 => {
-                wlat = -offset;
-                wlon += 180.0;
-            }
-            3 => wlat = -pole + offset,
-            _ => panic!("invalid quadrant {}", quadrant),
-        }
-
-        if wlon > 180.0 || wlon < -180.0 {
-            wlon = wlon - ((wlon + 180.0) / 360.0).floor() * 360.0;
-        }
-
-        (wlat, convert_lon(wlat, wlon, lr))
-    }
-}
-
-fn is_valid_lat(lat: f64) -> bool {
-    lat >= -90.0 && lat <= 90.0
 }
 
 fn is_valid_lon(lon: f64, lr: LongitudeRange) -> bool {
