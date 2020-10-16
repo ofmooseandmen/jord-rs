@@ -18,6 +18,14 @@ impl LatLong {
     pub fn rounded_to(&self, resolution: AngleResolution) -> Self {
         LatLong(self.0.rounded_to(resolution), self.1.rounded_to(resolution))
     }
+
+    pub const fn north_pole() -> Self {
+        LatLong(Angle::from_decimal_degrees(90.0), Angle::zero())
+    }
+
+    pub const fn south_pole() -> Self {
+        LatLong(Angle::from_decimal_degrees(-90.0), Angle::zero())
+    }
 }
 
 // FIXME Display
@@ -57,13 +65,19 @@ impl<M: Model> HorizontalPos<M> {
     }
 
     pub fn to_lat_long(&self) -> LatLong {
-        let ll = nvector_to_lat_long_degrees(self.0);
-        let lat = ll.0;
-        let lon = ll.1;
-        LatLong(
-            Angle::from_decimal_degrees(lat),
-            Angle::from_decimal_degrees(convert_lon(lat, lon, self.1.longitude_range())),
-        )
+        if self.0 == Vec3::unit_z() {
+            LatLong::north_pole()
+        } else if self.0 == Vec3::neg_unit_z() {
+            LatLong::south_pole()
+        } else {
+            let ll = nvector_to_lat_long_degrees(self.0);
+            let lat = ll.0;
+            let lon = ll.1;
+            LatLong(
+                Angle::from_decimal_degrees(lat),
+                Angle::from_decimal_degrees(convert_lon(lat, lon, self.1.longitude_range())),
+            )
+        }
     }
 
     pub fn rounded_to(&self, resolution: AngleResolution) -> Self {

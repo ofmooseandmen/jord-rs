@@ -12,7 +12,7 @@ pub struct GreatCircle<S: Spherical> {
 impl<S: Spherical> GreatCircle<S> {
     pub fn new(position: HorizontalPos<S>, bearing: Angle) -> GreatCircle<S> {
         GreatCircle {
-            position: position,
+            position,
             normal: arc_normal_bearing(position, bearing),
         }
     }
@@ -41,7 +41,7 @@ impl<S: Spherical> GreatCircle<S> {
 
     pub fn intersections_with(
         &self,
-        other: Self,
+        _other: Self,
     ) -> Result<(HorizontalPos<S>, HorizontalPos<S>), Error> {
         Result::Err(Error::CoincidentalPositions)
     }
@@ -83,7 +83,7 @@ impl<S: Spherical> MinorArc<S> {
         self.end_pos
     }
 
-    pub fn intersection_with(&self, other: Self) -> Result<HorizontalPos<S>, Error> {
+    pub fn intersection_with(&self, _other: Self) -> Result<HorizontalPos<S>, Error> {
         Result::Err(Error::CoincidentalPositions)
     }
 }
