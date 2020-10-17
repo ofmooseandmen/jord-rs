@@ -1,8 +1,16 @@
+use std::fmt;
+
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Vec3 {
     x: f64,
     y: f64,
     z: f64,
+}
+
+impl fmt::Display for Vec3 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}, {}]", self.x, self.y, self.z)
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]

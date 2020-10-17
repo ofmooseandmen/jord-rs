@@ -6,7 +6,7 @@ fn one_arcmillisecond() {
     assert_eq!(0, a.arcdegrees());
     assert_eq!(0, a.arcminutes());
     assert_eq!(0, a.arcseconds());
-    assert_eq!(1, a.arcmilliseconds());
+    assert_eq!(1, a.milliarcseconds());
 }
 
 #[test]
@@ -15,7 +15,7 @@ fn one_arcsecond() {
     assert_eq!(0, a.arcdegrees());
     assert_eq!(0, a.arcminutes());
     assert_eq!(1, a.arcseconds());
-    assert_eq!(0, a.arcmilliseconds());
+    assert_eq!(0, a.milliarcseconds());
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn one_arcminute() {
     assert_eq!(0, a.arcdegrees());
     assert_eq!(1, a.arcminutes());
     assert_eq!(0, a.arcseconds());
-    assert_eq!(0, a.arcmilliseconds());
+    assert_eq!(0, a.milliarcseconds());
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn one_degrees() {
     assert_eq!(1, a.arcdegrees());
     assert_eq!(0, a.arcminutes());
     assert_eq!(0, a.arcseconds());
-    assert_eq!(0, a.arcmilliseconds());
+    assert_eq!(0, a.milliarcseconds());
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn positive_angle() {
     assert_eq!(154, a.arcdegrees());
     assert_eq!(54, a.arcminutes());
     assert_eq!(54, a.arcseconds());
-    assert_eq!(108, a.arcmilliseconds());
+    assert_eq!(108, a.milliarcseconds());
 }
 
 #[test]
@@ -51,5 +51,5 @@ fn negative_angle() {
     assert_eq!(-154, a.arcdegrees());
     assert_eq!(54, a.arcminutes());
     assert_eq!(54, a.arcseconds());
-    assert_eq!(0, a.arcmilliseconds());
+    assert_eq!(0, a.milliarcseconds());
 }

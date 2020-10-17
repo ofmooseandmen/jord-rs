@@ -2,7 +2,17 @@
 // License: BSD3
 use crate::Measurement;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AngleResolution {
+    Arcsecond,
+    Milliarcsecond,
+    Microarcsecond,
+}
+
 /// A signed angle.
+///
+/// * `Resolution::Milli`: milliarcsecond, when used as a latitude/longitude this roughly translate to a precision of 0.03 metres at the equator
+/// * `Resolution::Micro` to microarcsecond, when used as a latitude/longitude this roughly translate to a precision of 0.03 millimetres at the equator
 ///
 /// `Angle` implements many traits, including [`Add`], [`Sub`], [`Mul`], and
 /// [`Div`], among others.
@@ -10,13 +20,6 @@ use crate::Measurement;
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Angle {
     decimal_degrees: f64,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AngleResolution {
-    Arcsecond,
-    Milliarcsecond,
-    Microarcsecond,
 }
 
 /// The number of seconds in one degree.
@@ -66,16 +69,16 @@ impl Angle {
         } else {
             dd = add;
         }
-        Angle::from_decimal_degrees(dd).rounded_to(AngleResolution::Milliarcsecond)
+        Angle::from_decimal_degrees(dd).round(AngleResolution::Milliarcsecond)
     }
 
-    pub fn rounded_to(self, resolution: AngleResolution) -> Self {
-        let res = match resolution {
+    pub fn round(self, resolution: AngleResolution) -> Self {
+        let scale = match resolution {
             AngleResolution::Arcsecond => DG_TO_SECS,
             AngleResolution::Milliarcsecond => DG_TO_MILLIS,
             AngleResolution::Microarcsecond => DG_TO_MICROS,
         };
-        let decimal_degrees = ((self.decimal_degrees * res).round()) / res;
+        let decimal_degrees = ((self.decimal_degrees * scale).round()) / scale;
         Angle { decimal_degrees }
     }
 
@@ -118,9 +121,9 @@ impl Angle {
     ///
     ///  ```rust
     /// # use jord::Angle;
-    /// assert_eq!(500, Angle::from_dms(-154, 45, 42, 500).arcmilliseconds());
+    /// assert_eq!(500, Angle::from_dms(-154, 45, 42, 500).milliarcseconds());
     /// ```
-    pub fn arcmilliseconds(self) -> u16 {
+    pub fn milliarcseconds(self) -> u16 {
         Angle::field(self, 1000.0, 1000.0) as u16
     }
 

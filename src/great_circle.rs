@@ -263,7 +263,7 @@ fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
 }
 
 fn unchecked_mean(vs: Vec<Vec3>) -> Vec3 {
-    vs.iter().fold(Vec3::zero(), |sum, v| sum + *v)
+    vs.iter().fold(Vec3::zero(), |sum, v| sum + *v).unit()
 }
 
 #[inline]

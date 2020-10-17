@@ -15,8 +15,8 @@ impl LatLong {
         self.1
     }
 
-    pub fn rounded_to(&self, resolution: AngleResolution) -> Self {
-        LatLong(self.0.rounded_to(resolution), self.1.rounded_to(resolution))
+    pub fn round(&self, resolution: AngleResolution) -> Self {
+        LatLong(self.0.round(resolution), self.1.round(resolution))
     }
 
     pub const fn north_pole() -> Self {
@@ -80,8 +80,8 @@ impl<M: Model> HorizontalPos<M> {
         }
     }
 
-    pub fn rounded_to(&self, resolution: AngleResolution) -> Self {
-        let ll = self.to_lat_long().rounded_to(resolution);
+    pub fn round(&self, resolution: AngleResolution) -> Self {
+        let ll = self.to_lat_long().round(resolution);
         HorizontalPos::from_lat_long(ll.0, ll.1, self.1)
     }
 
