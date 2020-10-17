@@ -152,7 +152,7 @@ impl<S: Spherical> HorizontalPos<S> {
     }
 
     pub fn final_bearing_to(&self, to: Self) -> Result<Angle, Error> {
-        let ib = self.initial_bearing_to(to)?;
+        let ib = to.initial_bearing_to(*self)?;
         Ok(Angle::from_decimal_degrees(normalise(
             ib.decimal_degrees(),
             180.0,
