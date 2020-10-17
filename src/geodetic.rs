@@ -30,7 +30,7 @@ impl LatLong {
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HorizontalPos<M: Model>(Vec3, M);
+pub struct HorizontalPos<M>(Vec3, M);
 
 impl<M: Model> HorizontalPos<M> {
     pub fn new(nvector: Vec3, model: M) -> Self {
