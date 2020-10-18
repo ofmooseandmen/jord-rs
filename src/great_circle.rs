@@ -140,8 +140,8 @@ impl<S: Spherical> HorizontalPos<S> {
         arc_length(a, earth_radius(self))
     }
 
-    pub fn cross_track_distance_to(&self, gc: GreatCircle<S>) -> Length {
-        let a = signed_radians_between(gc.normal, self.nvector(), None) - (PI / 2.0);
+    pub fn cross_track_distance_to(&self, great_circle: GreatCircle<S>) -> Length {
+        let a = signed_radians_between(great_circle.normal, self.nvector(), None) - (PI / 2.0);
         arc_length(a, earth_radius(self))
     }
 
@@ -254,6 +254,17 @@ impl<S: Spherical> HorizontalPos<S> {
                     }
                 }
             }
+        }
+    }
+
+    pub fn side_of(&self, great_circle: GreatCircle<S>) -> Side {
+        let side = self.nvector().dot(great_circle.normal);
+        if side < 0.0 {
+            Side::RightOf
+        } else if side > 0.0 {
+            Side::LeftOf
+        } else {
+            Side::None
         }
     }
 }
@@ -375,17 +386,6 @@ mod private {
             Ok(pot)
         } else {
             Err(Error::NoIntersection)
-        }
-    }
-
-    pub(crate) fn side<S: Spherical, P: SurfacePos<S>>(pos: P, gc: GreatCircle<P>) -> Side {
-        let side = pos.to_nvector().dot(gc.normal);
-        if side < 0.0 {
-            Side::RightOf
-        } else if side > 0.0 {
-            Side::LeftOf
-        } else {
-            Side::None
         }
     }
 
