@@ -101,8 +101,7 @@ fn north_pole_initial_bearing_to_date_line() {
     let p1 = HorizontalPos::north_pole(S84);
     let p2 = HorizontalPos::from_s84(50.0, 180.0);
     assert_eq!(
-        // FIXME: check
-        Ok(Angle::zero()),
+        Ok(Angle::from_decimal_degrees(0.0)),
         p1.initial_bearing_to(p2)
     );
 }
@@ -112,8 +111,27 @@ fn south_pole_initial_bearing_to_date_line() {
     let p1 = HorizontalPos::south_pole(S84);
     let p2 = HorizontalPos::from_s84(50.0, 180.0);
     assert_eq!(
-        // FIXME: check
-        Ok(Angle::zero()),
+        Ok(Angle::from_decimal_degrees(180.0)),
+        p1.initial_bearing_to(p2)
+    );
+}
+
+#[test]
+fn north_pole_initial_bearing_to() {
+    let p1 = HorizontalPos::north_pole(S84);
+    let p2 = HorizontalPos::from_s84(50.0, 154.0);
+    assert_eq!(
+        Ok(Angle::from_decimal_degrees(26.0)),
+        p1.initial_bearing_to(p2)
+    );
+}
+
+#[test]
+fn south_pole_initial_bearing_to() {
+    let p1 = HorizontalPos::south_pole(S84);
+    let p2 = HorizontalPos::from_s84(50.0, 154.0);
+    assert_eq!(
+        Ok(Angle::from_decimal_degrees(154.0)),
         p1.initial_bearing_to(p2)
     );
 }

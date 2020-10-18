@@ -21,6 +21,14 @@ pub struct Mat33 {
 }
 
 impl Vec3 {
+    pub(crate) const fn unit_x() -> Vec3 {
+        Vec3 {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }
+
     pub(crate) const fn unit_z() -> Vec3 {
         Vec3 {
             x: 0.0,

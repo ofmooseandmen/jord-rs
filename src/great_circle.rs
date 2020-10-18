@@ -167,8 +167,17 @@ impl<S: Spherical> HorizontalPos<S> {
             let v2 = to.nvector();
             // great circle through p1 & p2
             let gc1 = v1.cross(v2);
-            // great circle through p1 & north pole
-            let gc2 = v1.cross(NORTH_POLE);
+            let gc2;
+            if v1 == NORTH_POLE {
+                // great circle through null-island & p1
+                gc2 = NULL_ISLAND.cross(v1);
+            } else if v1 == SOUTH_POLE {
+                // great circle through south pole & null-island
+                gc2 = v1.cross(NULL_ISLAND);
+            } else {
+                // great circle through p1 & north pole
+                gc2 = v1.cross(NORTH_POLE);
+            }
             let a = signed_radians_between(gc1, gc2, Some(v1)).to_degrees();
             Ok(Angle::from_decimal_degrees(normalise(a, 360.0)))
         }
@@ -232,6 +241,10 @@ impl<S: Spherical> HorizontalPos<S> {
 }
 
 const NORTH_POLE: Vec3 = Vec3::unit_z();
+
+const SOUTH_POLE: Vec3 = Vec3::neg_unit_z();
+
+const NULL_ISLAND: Vec3 = Vec3::unit_x();
 
 fn arc_normal<S: Spherical>(p1: HorizontalPos<S>, p2: HorizontalPos<S>) -> Result<Vec3, Error> {
     if p1 == p2 {
