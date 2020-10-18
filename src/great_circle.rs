@@ -41,9 +41,11 @@ impl<S: Spherical> GreatCircle<S> {
 
     pub fn intersections_with(
         &self,
-        _other: Self,
+        other: Self,
     ) -> Result<(HorizontalPos<S>, HorizontalPos<S>), Error> {
-        Result::Err(Error::CoincidentalPositions)
+        let i = normal_intersection(self.normal, other.normal)?;
+        let hpi = HorizontalPos::new(i, self.position.model());
+        Ok((hpi, hpi.antipode()))
     }
 }
 
@@ -83,8 +85,24 @@ impl<S: Spherical> MinorArc<S> {
         self.end_pos
     }
 
-    pub fn intersection_with(&self, _other: Self) -> Result<HorizontalPos<S>, Error> {
-        Result::Err(Error::CoincidentalPositions)
+    pub fn intersection_with(&self, other: Self) -> Result<HorizontalPos<S>, Error> {
+        let mas = self.start_pos.nvector();
+        let mae = self.end_pos.nvector();
+        let mbs = other.start_pos.nvector();
+        let mbe = other.end_pos.nvector();
+        let i = normal_intersection(self.normal, other.normal)?;
+        let mid = unchecked_mean(vec![mas, mae, mbs, mbe]);
+        let pot;
+        if i.dot(mid) > 0.0 {
+            pot = i;
+        } else {
+            pot = -1.0 * i
+        }
+        if is_on_minor_arc(pot, mas, mae) && is_on_minor_arc(pot, mbs, mbe) {
+            Ok(HorizontalPos::new(pot, self.start_pos.model()))
+        } else {
+            Err(Error::NoIntersection)
+        }
     }
 }
 
@@ -293,6 +311,21 @@ fn normalise(a: f64, b: f64) -> f64 {
     (a + b) % 360.0
 }
 
+fn normal_intersection(n1: Vec3, n2: Vec3) -> Result<Vec3, Error> {
+    let i = n1.cross(n2);
+    if i == Vec3::zero() {
+        // same or opposite normals
+        Err(Error::CoincidentalPath)
+    } else {
+        Ok(i.unit())
+    }
+}
+
+fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
+    let l = mas.square_distance_to(mae);
+    v.square_distance_to(mas) <= l && v.square_distance_to(mae) <= l
+}
+
 /*
 use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Spherical, SurfacePos, Vec3};
 
@@ -314,38 +347,6 @@ impl<S: Spherical> LatLongPos<S> {
 }
 
 mod private {
-
-    pub(crate) fn gc_intersection<P>(
-        gc1: GreatCircle<P>,
-        gc2: GreatCircle<P>,
-    ) -> Result<Vec3, Error> {
-        normal_intersection(gc1.normal, gc2.normal)
-    }
-
-    pub(crate) fn intersection<S: Spherical, P: SurfacePos<S>>(
-        ma: MinorArc<P>,
-        mb: MinorArc<P>,
-    ) -> Result<P, Error> {
-        let mas = ma.start_pos.to_nvector();
-        let mae = ma.end_pos.to_nvector();
-        let mbs = mb.start_pos.to_nvector();
-        let mbe = mb.end_pos.to_nvector();
-        let iv = normal_intersection(ma.normal, mb.normal)?;
-        let i = P::from_nvector(iv, ma.start_pos.model());
-        let mid = unchecked_mean(vec![mas, mae, mbs, mbe]);
-        let pot;
-        if iv.dot(mid) > 0.0 {
-            pot = i;
-        } else {
-            pot = i.antipode()
-        }
-        let vpot = pot.to_nvector();
-        if is_on_minor_arc(vpot, mas, mae) && is_on_minor_arc(vpot, mbs, mbe) {
-            Ok(pot)
-        } else {
-            Err(Error::NoIntersection)
-        }
-    }
 
     pub(crate) fn projection<S: Spherical, P: SurfacePos<S>>(
         pos: P,
@@ -402,20 +403,6 @@ mod private {
         ))
     }
 
-    fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
-        let l = mas.square_distance_to(mae);
-        v.square_distance_to(mas) <= l && v.square_distance_to(mae) <= l
-    }
-
-    fn normal_intersection(n1: Vec3, n2: Vec3) -> Result<Vec3, Error> {
-        let i = n1.cross(n2);
-        if i == Vec3::zero() {
-            // same or opposite normals
-            Err(Error::CoincidentalPath)
-        } else {
-            Ok(i)
-        }
-    }
 
 }
 */
