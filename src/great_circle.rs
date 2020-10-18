@@ -91,17 +91,23 @@ impl<S: Spherical> MinorArc<S> {
         let mbs = other.start_pos.nvector();
         let mbe = other.end_pos.nvector();
         let i = normal_intersection(self.normal, other.normal)?;
-        let mid = unchecked_mean(vec![mas, mae, mbs, mbe]);
-        let pot;
-        if i.dot(mid) > 0.0 {
-            pot = i;
+        if mas == mbs || mas == mbe {
+            Ok(self.start_pos)
+        } else if mae == mbs || mae == mbe {
+            Ok(self.end_pos)
         } else {
-            pot = -1.0 * i
-        }
-        if is_on_minor_arc(pot, mas, mae) && is_on_minor_arc(pot, mbs, mbe) {
-            Ok(HorizontalPos::new(pot, self.start_pos.model()))
-        } else {
-            Err(Error::NoIntersection)
+            let mid = unchecked_mean(vec![mas, mae, mbs, mbe]);
+            let pot;
+            if i.dot(mid) > 0.0 {
+                pot = i;
+            } else {
+                pot = -1.0 * i
+            }
+            if is_on_minor_arc(pot, mas, mae) && is_on_minor_arc(pot, mbs, mbe) {
+                Ok(HorizontalPos::new(pot, self.start_pos.model()))
+            } else {
+                Err(Error::NoIntersection)
+            }
         }
     }
 }
@@ -151,7 +157,7 @@ impl<S: Spherical> HorizontalPos<S> {
         } else {
             let v0 = self.nvector();
             // east direction vector at p0
-            let ed = NORTH_POLE.cross(v0).unit();
+            let ed = easting(v0);
             // north direction vector at p0
             let nd = v0.cross(ed);
             // central angle
@@ -188,13 +194,13 @@ impl<S: Spherical> HorizontalPos<S> {
             let gc2;
             if v1 == NORTH_POLE {
                 // great circle through null-island & p1
-                gc2 = NULL_ISLAND.cross(v1);
+                gc2 = NULL_ISLAND.cross(v1)
             } else if v1 == SOUTH_POLE {
                 // great circle through south pole & null-island
-                gc2 = v1.cross(NULL_ISLAND);
+                gc2 = v1.cross(NULL_ISLAND)
             } else {
                 // great circle through p1 & north pole
-                gc2 = v1.cross(NORTH_POLE);
+                gc2 = v1.cross(NORTH_POLE)
             }
             let a = signed_radians_between(gc1, gc2, Some(v1)).to_degrees();
             Ok(Angle::from_decimal_degrees(normalise(a, 360.0)))
@@ -257,6 +263,15 @@ impl<S: Spherical> HorizontalPos<S> {
         }
     }
 
+    pub fn projection_onto(&self, minor_arc: MinorArc<S>) -> Result<HorizontalPos<S>, Error> {
+        let atd = self.along_track_distance_to(minor_arc);
+        let d = minor_arc.start_pos.distance_to(minor_arc.end_pos);
+        let f = atd / d;
+        minor_arc
+            .start_pos
+            .intermediate_pos_to(minor_arc.end_pos, f)
+    }
+
     pub fn side_of(&self, great_circle: GreatCircle<S>) -> Side {
         let side = self.nvector().dot(great_circle.normal);
         if side < 0.0 {
@@ -266,6 +281,13 @@ impl<S: Spherical> HorizontalPos<S> {
         } else {
             Side::None
         }
+    }
+
+    pub fn turn(&self, from: Self, to: Self) -> Result<Angle, Error> {
+        let nfa = arc_normal(from, *self)?;
+        let nat = arc_normal(*self, to)?;
+        let a = signed_radians_between(nfa.unit(), nat.unit(), Some(self.nvector())).to_degrees();
+        Ok(Angle::from_decimal_degrees(a))
     }
 }
 
@@ -288,13 +310,23 @@ fn arc_normal<S: Spherical>(p1: HorizontalPos<S>, p2: HorizontalPos<S>) -> Resul
 fn arc_normal_bearing<S: Spherical>(pos: HorizontalPos<S>, bearing: Angle) -> Vec3 {
     let v = pos.nvector();
     // easting
-    let e = NORTH_POLE.cross(v);
+    let e = easting(v);
     // northing
     let n = v.cross(e);
     let bearing_radians = bearing.decimal_degrees().to_radians();
     let se = e * (bearing_radians.cos() / e.norm());
     let sn = n * (bearing_radians.sin() / n.norm());
     sn - se
+}
+
+fn easting(v: Vec3) -> Vec3 {
+    if v == NORTH_POLE {
+        v.cross(NULL_ISLAND).unit()
+    } else if v == SOUTH_POLE {
+        NULL_ISLAND.cross(v).unit()
+    } else {
+        NORTH_POLE.cross(v).unit()
+    }
 }
 
 fn signed_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
@@ -336,73 +368,3 @@ fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
     let l = mas.square_distance_to(mae);
     v.square_distance_to(mas) <= l && v.square_distance_to(mae) <= l
 }
-
-/*
-use crate::{Angle, Error, LatLongPos, Length, NvectorPos, Spherical, SurfacePos, Vec3};
-
-
-impl<S: Spherical> LatLongPos<S> {
-
-
-    pub fn projection_onto(&self, ma: MinorArc<LatLongPos<S>>) -> Result<LatLongPos<S>, Error> {
-        private::projection(*self, ma)
-    }
-
-    pub fn side_of(&self, gc: GreatCircle<LatLongPos<S>>) -> Side {
-        private::side(*self, gc)
-    }
-
-    pub fn turn(&self, from: Self, to: Self) -> Result<Angle, Error> {
-        private::turn_radians(from, *self, to).map(Angle::from_radians)
-    }
-}
-
-mod private {
-
-    pub(crate) fn projection<S: Spherical, P: SurfacePos<S>>(
-        pos: P,
-        ma: MinorArc<P>,
-    ) -> Result<P, Error> {
-    // FIXME: no! use along_track_distance_to
-        let na = P::from_nvector(ma.normal.unit(), pos.model());
-        // normal to great circle (na, p) - if na is p or antipode of p, then projection is not possible
-        let nb = P::from_nvector(arc_normal(na, pos)?.unit(), pos.model());
-
-        let mas = ma.start_pos.to_nvector();
-        let mae = ma.end_pos.to_nvector();
-        let nav = na.to_nvector();
-        let nbv = nb.to_nvector();
-
-        let mid = unchecked_mean(vec![mas, mae, nav, nbv]);
-        let iv = normal_intersection(nav, nbv)?;
-        let i = P::from_nvector(iv, ma.start_pos.model());
-        let pot;
-        if iv.dot(mid) > 0.0 {
-            pot = i;
-        } else {
-            pot = i.antipode();
-        }
-        if is_on_minor_arc(pot.to_nvector(), mas, mae) {
-            Ok(pot)
-        } else {
-            Err(Error::NoIntersection)
-        }
-    }
-
-    pub(crate) fn turn_radians<S: Spherical, P: SurfacePos<S>>(
-        from: P,
-        at: P,
-        to: P,
-    ) -> Result<f64, Error> {
-        let nfa = arc_normal(from, at)?;
-        let nat = arc_normal(at, to)?;
-        Ok(signed_radians_between(
-            nfa.unit(),
-            nat.unit(),
-            Some(at.to_nvector()),
-        ))
-    }
-
-
-}
-*/

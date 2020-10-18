@@ -1,7 +1,7 @@
 mod places;
-pub use places::*;
 use jord::models::S84;
 use jord::{GreatCircle, HorizontalPos, Side};
+pub use places::*;
 
 #[test]
 fn side_of_none() {
