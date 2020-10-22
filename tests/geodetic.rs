@@ -42,6 +42,7 @@ mod pole {
 
 mod wrap {
 
+    use jord::models::SMARS_2000;
     use jord::{Angle, HorizontalPos, Microarcsecond};
 
     #[test]
@@ -157,6 +158,25 @@ mod wrap {
     #[test]
     fn negative_lon_wrapping_721_degrees() {
         test(0.0, -721.0, 0.0, -1.0);
+    }
+
+    #[test]
+    fn longitude_range_l360_wrapping_neg_1_degree() {
+        // -1 degree (1 degree west) is 359 degrees east on mars.
+        let actual = HorizontalPos::from_decimal_lat_long(54.0, -1.0, SMARS_2000)
+            .to_lat_long()
+            .round(Microarcsecond);
+        assert_eq!(Angle::from_decimal_degrees(54.0), actual.latitude());
+        assert_eq!(Angle::from_decimal_degrees(359.0), actual.longitude());
+    }
+
+    #[test]
+    fn longitude_range_l360_no_wrapping() {
+        let actual = HorizontalPos::from_decimal_lat_long(54.0, 181.0, SMARS_2000)
+            .to_lat_long()
+            .round(Microarcsecond);
+        assert_eq!(Angle::from_decimal_degrees(54.0), actual.latitude());
+        assert_eq!(Angle::from_decimal_degrees(181.0), actual.longitude());
     }
 
     fn test(lat: f64, lon: f64, expected_lat: f64, expected_lon: f64) {

@@ -153,20 +153,13 @@ fn eq_lat_pole(lat: f64) -> bool {
     eq_lat_north_pole(lat.abs())
 }
 
+// lon is guaranteed to be within [-180, 180]
 fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
     if eq_lat_pole(lat) {
         0.0
-    } else if lr == LongitudeRange::L180 || is_valid_lon(lon, lr) {
+    } else if lr == LongitudeRange::L180 {
         lon
     } else {
-        lon + 360.0
-    }
-}
-
-fn is_valid_lon(lon: f64, lr: LongitudeRange) -> bool {
-    if lr == LongitudeRange::L360 {
-        lon >= 0.0 && lon <= 360.0
-    } else {
-        lon >= -180.0 && lon <= 180.0
+        ((lon % 360.0) + 360.0) % 360.0
     }
 }
