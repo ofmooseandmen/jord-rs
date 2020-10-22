@@ -264,12 +264,18 @@ impl<S: Spherical> HorizontalPos<S> {
     }
 
     pub fn projection_onto(&self, minor_arc: MinorArc<S>) -> Result<HorizontalPos<S>, Error> {
-        let atd = self.along_track_distance_to(minor_arc);
-        let d = minor_arc.start_pos.distance_to(minor_arc.end_pos);
-        let f = atd / d;
-        minor_arc
-            .start_pos
-            .intermediate_pos_to(minor_arc.end_pos, f)
+        if *self == minor_arc.start_pos {
+            Ok(minor_arc.start_pos)
+        } else if *self == minor_arc.end_pos {
+            Ok(minor_arc.end_pos)
+        } else {
+            let atd = self.along_track_distance_to(minor_arc);
+            let d = minor_arc.start_pos.distance_to(minor_arc.end_pos);
+            let f = atd / d;
+            minor_arc
+                .start_pos
+                .intermediate_pos_to(minor_arc.end_pos, f)
+        }
     }
 
     pub fn side_of(&self, great_circle: GreatCircle<S>) -> Side {
