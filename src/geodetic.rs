@@ -160,6 +160,10 @@ fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
     } else if lr == LongitudeRange::L180 {
         lon
     } else {
-        ((lon % 360.0) + 360.0) % 360.0
+        if lon < 0.0 {
+            lon + 360.0
+        } else {
+            lon
+        }
     }
 }
