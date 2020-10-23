@@ -54,6 +54,9 @@ pub use crate::model::Spherical;
 
 pub mod models;
 
+pub mod rotation;
+pub use crate::rotation::*;
+
 pub mod surface;
 pub use crate::surface::{Ellipsoid, Sphere, Surface};
 
