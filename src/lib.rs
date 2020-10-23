@@ -29,8 +29,11 @@ pub use crate::error::Error;
 pub mod great_circle;
 pub use crate::great_circle::{GreatCircle, MinorArc, Side};
 
+pub mod geocentric;
+pub use crate::geocentric::GeocentricPos;
+
 pub mod geodetic;
-pub use crate::geodetic::{HorizontalPos, LatLong};
+pub use crate::geodetic::{GeodeticPos, HorizontalPos, LatLong};
 
 pub mod length;
 pub use crate::length::Length;

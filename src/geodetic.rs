@@ -1,5 +1,5 @@
 use crate::models::{S84Model, S84};
-use crate::{Angle, AngleResolution, LongitudeRange, Model, Vec3};
+use crate::{Angle, AngleResolution, Length, LongitudeRange, Model, Vec3};
 use std::convert::From;
 
 // FIXME Display
@@ -119,6 +119,46 @@ impl<M: Model> From<(f64, f64, M)> for HorizontalPos<M> {
 impl<M: Model> From<(Vec3, M)> for HorizontalPos<M> {
     fn from(nvm: (Vec3, M)) -> Self {
         HorizontalPos::new(nvm.0, nvm.1)
+    }
+}
+
+// FIXME Display
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GeodeticPos<M>(Vec3, Length, M);
+
+impl<M: Model> GeodeticPos<M> {
+    pub fn new(nvector: Vec3, height: Length, model: M) -> Self {
+        GeodeticPos(nvector, height, model)
+    }
+
+    pub fn at_height(hp: HorizontalPos<M>, height: Length) -> Self {
+        GeodeticPos(hp.nvector(), height, hp.model())
+    }
+
+    pub fn from_decimal_lat_long(latitude: f64, longitude: f64, height: Length, model: M) -> Self {
+        GeodeticPos::at_height(
+            HorizontalPos::from_decimal_lat_long(latitude, longitude, model),
+            height,
+        )
+    }
+
+    pub fn from_lat_long(latitude: Angle, longitude: Angle, height: Length, model: M) -> Self {
+        GeodeticPos::at_height(
+            HorizontalPos::from_lat_long(latitude, longitude, model),
+            height,
+        )
+    }
+
+    pub fn nvector(&self) -> Vec3 {
+        self.0
+    }
+
+    pub fn height(&self) -> Length {
+        self.1
+    }
+
+    pub fn model(&self) -> M {
+        self.2
     }
 }
 
