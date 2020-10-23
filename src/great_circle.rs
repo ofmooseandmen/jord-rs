@@ -210,6 +210,10 @@ impl<S: Spherical> HorizontalPos<S> {
     pub fn intermediate_pos_to(&self, to: Self, fraction: f64) -> Result<Self, Error> {
         if fraction < 0.0 || fraction > 1.0 {
             Err(Error::OutOfRange)
+        } else if fraction == 0.0 {
+            Ok(*self)
+        } else if eq_one(fraction) {
+            Ok(to)
         } else {
             let v1 = self.nvector();
             let v2 = to.nvector();
@@ -373,4 +377,8 @@ fn normal_intersection(n1: Vec3, n2: Vec3) -> Result<Vec3, Error> {
 fn is_on_minor_arc(v: Vec3, mas: Vec3, mae: Vec3) -> bool {
     let l = mas.square_distance_to(mae);
     v.square_distance_to(mas) <= l && v.square_distance_to(mae) <= l
+}
+
+fn eq_one(f: f64) -> bool {
+    f == 1.0
 }
