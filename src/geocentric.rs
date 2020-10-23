@@ -125,6 +125,7 @@ fn nvector_to_geocentric_s(nvector: Vec3, height: Length, radius: Length) -> Vec
     nvector * (height + radius).metres()
 }
 
+#[allow(clippy::many_single_char_names)]
 fn nvector_to_geocentric_e<S>(nvector: Vec3, height: Length, surface: S) -> Vec3
 where
     S: Surface,
@@ -159,6 +160,7 @@ fn nvector_from_geocentric_s(geoc_metres: Vec3, radius: Length) -> (Vec3, Length
     (geoc_metres.unit(), height)
 }
 
+#[allow(clippy::many_single_char_names)]
 fn nvector_from_geocentric_e<S>(geoc_metres: Vec3, surface: S) -> (Vec3, Length)
 where
     S: Surface,

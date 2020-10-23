@@ -149,6 +149,14 @@ impl<M: Model> GeodeticPos<M> {
         )
     }
 
+    pub fn north_pole(model: M) -> Self {
+        GeodeticPos::at_height(HorizontalPos::north_pole(model), Length::zero())
+    }
+
+    pub fn south_pole(model: M) -> Self {
+        GeodeticPos::at_height(HorizontalPos::south_pole(model), Length::zero())
+    }
+
     pub fn nvector(&self) -> Vec3 {
         self.0
     }
@@ -199,11 +207,9 @@ fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
         0.0
     } else if lr == LongitudeRange::L180 {
         lon
+    } else if lon < 0.0 {
+        lon + 360.0
     } else {
-        if lon < 0.0 {
-            lon + 360.0
-        } else {
-            lon
-        }
+        lon
     }
 }

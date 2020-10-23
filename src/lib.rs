@@ -1,6 +1,5 @@
 #![forbid(
     anonymous_parameters,
-    clippy::all,
     const_err,
     illegal_floating_point_literal_pattern,
     late_bound_lifetime_arguments,
@@ -14,6 +13,7 @@
     unused_extern_crates,
     missing_debug_implementations
 )]
+#![deny(clippy::all)]
 
 #[macro_use]
 mod measurement;
