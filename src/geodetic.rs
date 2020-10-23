@@ -1,5 +1,5 @@
 use crate::models::{S84Model, S84};
-use crate::{Angle, AngleResolution, Length, LongitudeRange, Model, Vec3};
+use crate::{Angle, AngleResolution, Length, LengthResolution, LongitudeRange, Model, Vec3};
 use std::convert::From;
 
 // FIXME Display
@@ -155,6 +155,20 @@ impl<M: Model> GeodeticPos<M> {
 
     pub fn south_pole(model: M) -> Self {
         GeodeticPos::at_height(HorizontalPos::south_pole(model), Length::zero())
+    }
+
+    pub fn round(
+        &self,
+        angle_resolution: AngleResolution,
+        length_resolution: LengthResolution,
+    ) -> Self {
+        let ll = HorizontalPos::new(self.nvector(), self.model())
+            .to_lat_long()
+            .round(angle_resolution);
+        GeodeticPos::at_height(
+            HorizontalPos::from_lat_long(ll.0, ll.1, self.model()),
+            self.height().round(length_resolution),
+        )
     }
 
     pub fn nvector(&self) -> Vec3 {
