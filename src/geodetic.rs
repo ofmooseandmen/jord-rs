@@ -65,19 +65,7 @@ impl<M: Model> HorizontalPos<M> {
     }
 
     pub fn to_lat_long(&self) -> LatLong {
-        if self.0 == Vec3::unit_z() {
-            LatLong::north_pole()
-        } else if self.0 == Vec3::neg_unit_z() {
-            LatLong::south_pole()
-        } else {
-            let ll = nvector_to_lat_long_degrees(self.0);
-            let lat = ll.0;
-            let lon = ll.1;
-            LatLong(
-                Angle::from_decimal_degrees(lat),
-                Angle::from_decimal_degrees(convert_lon(lat, lon, self.1.longitude_range())),
-            )
-        }
+        nvector_to_lat_long(self.0, self.1.longitude_range())
     }
 
     pub fn round(&self, resolution: AngleResolution) -> Self {
@@ -157,6 +145,10 @@ impl<M: Model> GeodeticPos<M> {
         GeodeticPos::at_height(HorizontalPos::south_pole(model), Length::zero())
     }
 
+    pub fn at_surface(&self) -> HorizontalPos<M> {
+        HorizontalPos::new(self.nvector(), self.model())
+    }
+
     pub fn round(
         &self,
         angle_resolution: AngleResolution,
@@ -169,6 +161,10 @@ impl<M: Model> GeodeticPos<M> {
             HorizontalPos::from_lat_long(ll.0, ll.1, self.model()),
             self.height().round(length_resolution),
         )
+    }
+
+    pub fn to_lat_long(&self) -> LatLong {
+        nvector_to_lat_long(self.0, self.2.longitude_range())
     }
 
     pub fn nvector(&self) -> Vec3 {
@@ -184,7 +180,7 @@ impl<M: Model> GeodeticPos<M> {
     }
 }
 
-fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
+pub fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
     let lat = latitude.to_radians();
     let lon = longitude.to_radians();
     let cl = lat.cos();
@@ -194,13 +190,22 @@ fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-fn nvector_to_lat_long_degrees(nv: Vec3) -> (f64, f64) {
-    let x = nv.x();
-    let y = nv.y();
-    let z = nv.z();
-    let lat = z.atan2((x * x + y * y).sqrt());
-    let lon = y.atan2(x);
-    (lat.to_degrees(), lon.to_degrees())
+pub fn nvector_to_lat_long(nvector: Vec3, longitude_range: LongitudeRange) -> LatLong {
+    if nvector == Vec3::unit_z() {
+        LatLong::north_pole()
+    } else if nvector == Vec3::neg_unit_z() {
+        LatLong::south_pole()
+    } else {
+        let x = nvector.x();
+        let y = nvector.y();
+        let z = nvector.z();
+        let lat = z.atan2((x * x + y * y).sqrt());
+        let lon = y.atan2(x);
+        LatLong(
+            Angle::from_decimal_degrees(lat),
+            Angle::from_decimal_degrees(convert_lon(lat, lon, longitude_range)),
+        )
+    }
 }
 
 fn eq_lat_north_pole(lat: f64) -> bool {

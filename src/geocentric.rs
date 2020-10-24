@@ -19,6 +19,10 @@ impl<M: Model> GeocentricPos<M> {
         )
     }
 
+    pub fn from_vec3_metres(v: Vec3, model: M) -> Self {
+        GeocentricPos::from_metres(v.x(), v.y(), v.z(), model)
+    }
+
     pub fn north_pole(model: M) -> Self {
         let pr = model.surface().polar_radius();
         GeocentricPos::new(Length::zero(), Length::zero(), pr, model)
@@ -56,6 +60,10 @@ impl<M: Model> GeocentricPos<M> {
         let geoc_metres = self.as_vec3_metres();
         let (nv, h) = nvector_from_geocentric(geoc_metres, self.model().surface());
         GeodeticPos::new(nv, h, self.model())
+    }
+
+    pub fn as_metres(&self) -> Vec3 {
+        Vec3::new(self.x().metres(), self.y().metres(), self.z().metres())
     }
 
     pub fn x(&self) -> Length {
