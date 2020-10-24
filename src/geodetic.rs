@@ -1,4 +1,4 @@
-use crate::models::{S84Model, S84};
+use crate::models::{S84Model, WGS84Model, S84, WGS84};
 use crate::{Angle, AngleResolution, Length, LengthResolution, LongitudeRange, Model, Vec3};
 use std::convert::From;
 
@@ -92,6 +92,12 @@ impl HorizontalPos<S84Model> {
     }
 }
 
+impl HorizontalPos<WGS84Model> {
+    pub fn from_wgs84(latitude: f64, longitude: f64) -> Self {
+        HorizontalPos::from_decimal_lat_long(latitude, longitude, WGS84)
+    }
+}
+
 impl<M: Model> From<(Angle, Angle, M)> for HorizontalPos<M> {
     fn from(llm: (Angle, Angle, M)) -> Self {
         HorizontalPos::from_lat_long(llm.0, llm.1, llm.2)
@@ -180,6 +186,18 @@ impl<M: Model> GeodeticPos<M> {
     }
 }
 
+impl GeodeticPos<S84Model> {
+    pub fn from_s84(latitude: f64, longitude: f64, height: Length) -> Self {
+        GeodeticPos::from_decimal_lat_long(latitude, longitude, height, S84)
+    }
+}
+
+impl GeodeticPos<WGS84Model> {
+    pub fn from_wgs84(latitude: f64, longitude: f64, height: Length) -> Self {
+        GeodeticPos::from_decimal_lat_long(latitude, longitude, height, WGS84)
+    }
+}
+
 pub fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
     let lat = latitude.to_radians();
     let lon = longitude.to_radians();
@@ -199,8 +217,8 @@ pub fn nvector_to_lat_long(nvector: Vec3, longitude_range: LongitudeRange) -> La
         let x = nvector.x();
         let y = nvector.y();
         let z = nvector.z();
-        let lat = z.atan2((x * x + y * y).sqrt());
-        let lon = y.atan2(x);
+        let lat = z.atan2((x * x + y * y).sqrt()).to_degrees();
+        let lon = y.atan2(x).to_degrees();
         LatLong(
             Angle::from_decimal_degrees(lat),
             Angle::from_decimal_degrees(convert_lon(lat, lon, longitude_range)),
