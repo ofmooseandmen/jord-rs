@@ -169,7 +169,7 @@ pub fn n_e2_r_en<M: Model>(p_e: GeodeticPos<M>) -> Mat33 {
     }
     // x-axis of N (North): found by right hand rule
     let nx_e = ny_e.cross(nz_e);
-    Mat33::new(nx_e, ny_e, nz_e)
+    Mat33::new(nx_e, ny_e, nz_e).transpose()
 }
 
 pub fn n_e_and_wa2_r_el<M: Model>(p_e: GeodeticPos<M>, wander_azimuth: Angle) -> Mat33 {
