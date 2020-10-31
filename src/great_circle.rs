@@ -192,12 +192,9 @@ impl<S: Spherical> HorizontalPos<S> {
             // great circle through p1 & p2
             let gc1 = v1.cross(v2);
             let gc2;
-            if v1 == NORTH_POLE {
-                // great circle through null-island & p1
-                gc2 = NULL_ISLAND.cross(v1)
-            } else if v1 == SOUTH_POLE {
-                // great circle through south pole & null-island
-                gc2 = v1.cross(NULL_ISLAND)
+            if v1 == NORTH_POLE || v1 == SOUTH_POLE {
+                // select y axis (west)
+                gc2 = Vec3::neg_unit_y()
             } else {
                 // great circle through p1 & north pole
                 gc2 = v1.cross(NORTH_POLE)
@@ -305,8 +302,6 @@ const NORTH_POLE: Vec3 = Vec3::unit_z();
 
 const SOUTH_POLE: Vec3 = Vec3::neg_unit_z();
 
-const NULL_ISLAND: Vec3 = Vec3::unit_x();
-
 fn arc_normal<S: Spherical>(p1: HorizontalPos<S>, p2: HorizontalPos<S>) -> Result<Vec3, Error> {
     if p1 == p2 {
         Err(Error::CoincidentalPositions)
@@ -330,10 +325,8 @@ fn arc_normal_bearing<S: Spherical>(pos: HorizontalPos<S>, bearing: Angle) -> Ve
 }
 
 fn easting(v: Vec3) -> Vec3 {
-    if v == NORTH_POLE {
-        v.cross(NULL_ISLAND).unit()
-    } else if v == SOUTH_POLE {
-        NULL_ISLAND.cross(v).unit()
+    if v == NORTH_POLE || v == SOUTH_POLE {
+        Vec3::unit_y()
     } else {
         NORTH_POLE.cross(v).unit()
     }

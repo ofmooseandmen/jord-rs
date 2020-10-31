@@ -1,4 +1,7 @@
-use crate::{xyz2r, zyx2r, Angle, GeocentricPos, GeodeticPos, Length, Mat33, Model, Vec3};
+use crate::{
+    nvector_to_lat_long, xyz2r, zyx2r, Angle, GeocentricPos, GeodeticPos, Length, LongitudeRange,
+    Mat33, Model, Vec3,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Delta(Length, Length, Length);
@@ -24,6 +27,8 @@ impl Delta {
         Vec3::new(self.x().metres(), self.y().metres(), self.z().metres())
     }
 
+    // FIXME: from_length_azimuth_elevation
+
     pub fn x(&self) -> Length {
         self.0
     }
@@ -47,114 +52,95 @@ impl Delta {
 
     pub fn elevation(&self) -> Angle {
         let degs = (self.z() / self.length()).asin().to_degrees();
-        Angle::from_decimal_degrees(-degs)
+        Angle::from_decimal_degrees(degs)
     }
 }
 
-pub trait LocalFrame<M: Model> {
-    fn origin(&self) -> GeodeticPos<M>;
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BodyOrientation(Angle, Angle, Angle);
+impl BodyOrientation {
+    pub fn new(yaw: Angle, pitch: Angle, roll: Angle) -> Self {
+        BodyOrientation(yaw, pitch, roll)
+    }
 
-    fn r_ef(&self) -> Mat33;
+    pub fn from_decimal_degrees(yaw: f64, pitch: f64, roll: f64) -> Self {
+        BodyOrientation::new(
+            Angle::from_decimal_degrees(yaw),
+            Angle::from_decimal_degrees(pitch),
+            Angle::from_decimal_degrees(roll),
+        )
+    }
 
-    fn delta_to(&self, to: GeodeticPos<M>) -> Delta {
-        let po = self.origin().to_geocentric().as_metres();
+    pub fn yaw(&self) -> Angle {
+        self.0
+    }
+
+    pub fn pitch(&self) -> Angle {
+        self.1
+    }
+
+    pub fn roll(&self) -> Angle {
+        self.2
+    }
+}
+
+impl<M: Model> GeodeticPos<M> {
+    pub fn delta_b_to(&self, orientation: BodyOrientation, to: GeodeticPos<M>) -> Delta {
+        let rotation = n_e_and_ypr2_r_eb(self.nvector(), orientation);
+        self.delta_to(to, rotation)
+    }
+
+    pub fn delta_n_to(&self, to: GeodeticPos<M>) -> Delta {
+        self.delta_to(to, n_e2_r_en(self.nvector()))
+    }
+
+    pub fn delta_w_to(&self, wander_azimuth: Angle, to: GeodeticPos<M>) -> Delta {
+        let rotation = n_e_and_wa2_r_el(self.nvector(), wander_azimuth);
+        self.delta_to(to, rotation)
+    }
+
+    pub fn destination_pos_from_delta_b(
+        &self,
+        orientation: BodyOrientation,
+        delta: Delta,
+    ) -> GeodeticPos<M> {
+        let rotation = n_e_and_ypr2_r_eb(self.nvector(), orientation);
+        self.destination_pos(delta, rotation)
+    }
+
+    pub fn destination_pos_from_delta_n(&self, delta: Delta) -> GeodeticPos<M> {
+        self.destination_pos(delta, n_e2_r_en(self.nvector()))
+    }
+
+    pub fn destination_pos_from_delta_w(
+        &self,
+        wander_azimuth: Angle,
+        delta: Delta,
+    ) -> GeodeticPos<M> {
+        let rotation = n_e_and_wa2_r_el(self.nvector(), wander_azimuth);
+        self.destination_pos(delta, rotation)
+    }
+
+    fn delta_to(&self, to: GeodeticPos<M>, r_ef: Mat33) -> Delta {
+        let po = self.to_geocentric().as_metres();
         let pt = to.to_geocentric().as_metres();
         // delta in Earth Frame.
         let delta_e = pt - po;
-        // rotation matrix to go from Earth Frame to this Frame at origin.
-        let rm = self.r_ef().transpose();
+        let rm = r_ef.transpose();
         let delta_f = rm * delta_e;
         Delta::from_vec3_metres(delta_f)
     }
 
-    fn destination_pos(&self, delta: Delta) -> GeodeticPos<M> {
-        let po = self.origin().to_geocentric().as_metres();
-        // rotation matrix to go from Earth Frame to this Frame at origin.
-        let rm = self.r_ef().transpose();
-        let c = rm * delta.as_metres();
+    fn destination_pos(&self, delta: Delta, r_ef: Mat33) -> GeodeticPos<M> {
+        let po = self.to_geocentric().as_metres();
+        let c = r_ef * delta.as_metres();
         let v = po + c;
-        GeocentricPos::from_vec3_metres(v, self.origin().model()).to_geodetic()
+        GeocentricPos::from_vec3_metres(v, self.model()).to_geodetic()
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BodyFrame<M>(GeodeticPos<M>, Angle, Angle, Angle);
-
-impl<M: Model> BodyFrame<M> {
-    pub fn new(origin: GeodeticPos<M>, yaw: Angle, pitch: Angle, roll: Angle) -> Self {
-        BodyFrame(origin, yaw, pitch, roll)
-    }
-
-    pub fn yaw(&self) -> Angle {
-        self.1
-    }
-
-    pub fn pitch(&self) -> Angle {
-        self.2
-    }
-
-    pub fn roll(&self) -> Angle {
-        self.3
-    }
-}
-
-impl<M: Model> LocalFrame<M> for BodyFrame<M> {
-    fn origin(&self) -> GeodeticPos<M> {
-        self.0
-    }
-
-    fn r_ef(&self) -> Mat33 {
-        let r_nb = zyx2r(self.yaw(), self.pitch(), self.roll());
-        let r_en = n_e2_r_en(self.origin());
-        // closest frames cancel: N
-        r_en * r_nb
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LocalLevelFrame<M>(GeodeticPos<M>, Angle);
-
-impl<M: Model> LocalLevelFrame<M> {
-    pub fn new(origin: GeodeticPos<M>, wander_azimuth: Angle) -> Self {
-        LocalLevelFrame(origin, wander_azimuth)
-    }
-
-    pub fn wander_azimuth(&self) -> Angle {
-        self.1
-    }
-}
-
-impl<M: Model> LocalFrame<M> for LocalLevelFrame<M> {
-    fn origin(&self) -> GeodeticPos<M> {
-        self.0
-    }
-
-    fn r_ef(&self) -> Mat33 {
-        n_e_and_wa2_r_el(self.origin(), self.wander_azimuth())
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NedFrame<M>(GeodeticPos<M>);
-
-impl<M: Model> NedFrame<M> {
-    pub fn new(origin: GeodeticPos<M>) -> Self {
-        NedFrame(origin)
-    }
-}
-
-impl<M: Model> LocalFrame<M> for NedFrame<M> {
-    fn origin(&self) -> GeodeticPos<M> {
-        self.0
-    }
-
-    fn r_ef(&self) -> Mat33 {
-        n_e2_r_en(self.origin())
-    }
-}
-
-pub fn n_e2_r_en<M: Model>(p_e: GeodeticPos<M>) -> Mat33 {
-    let n_e = p_e.nvector();
+// FIXME: explain why not r_ee (or use it)
+pub fn n_e2_r_en(n_e: Vec3) -> Mat33 {
     // down (pointing opposite to n-vector)
     let nz_e = -1.0 * n_e;
     // east (pointing perpendicular to the plane)
@@ -162,7 +148,7 @@ pub fn n_e2_r_en<M: Model>(p_e: GeodeticPos<M>) -> Mat33 {
     let ny_e;
     if ny_e_direction == Vec3::zero() {
         // selected y-axis direction
-        ny_e = Vec3::new(0.0, 1.0, 0.0);
+        ny_e = Vec3::unit_y();
     } else {
         // outside poles
         ny_e = ny_e_direction.unit();
@@ -172,15 +158,22 @@ pub fn n_e2_r_en<M: Model>(p_e: GeodeticPos<M>) -> Mat33 {
     Mat33::new(nx_e, ny_e, nz_e).transpose()
 }
 
-pub fn n_e_and_wa2_r_el<M: Model>(p_e: GeodeticPos<M>, wander_azimuth: Angle) -> Mat33 {
-    let ll = p_e.to_lat_long();
+pub fn n_e_and_wa2_r_el(n_e: Vec3, wander_azimuth: Angle) -> Mat33 {
+    // longitude range does not affect rotation matrix. (FIMXE confirm)
+    let ll = nvector_to_lat_long(n_e, LongitudeRange::L180);
     let lat = ll.latitude();
     let lon = ll.longitude();
     let r = xyz2r(lon, -lat, wander_azimuth);
-    let r_ee = Mat33::new(
-        Vec3::new(0.0, 0.0, -1.0),
-        Vec3::new(0.0, 1.0, 0.0),
-        Vec3::new(1.0, 0.0, 0.0),
-    );
-    r_ee * r
+    r_ee_t() * r
+}
+
+pub fn n_e_and_ypr2_r_eb(n_e: Vec3, orientation: BodyOrientation) -> Mat33 {
+    let r_nb = zyx2r(orientation.yaw(), orientation.pitch(), orientation.roll());
+    let r_en = n_e2_r_en(n_e);
+    // closest frames cancel: N
+    r_en * r_nb
+}
+
+const fn r_ee_t() -> Mat33 {
+    Mat33::new(Vec3::neg_unit_z(), Vec3::unit_y(), Vec3::unit_x())
 }

@@ -43,7 +43,7 @@ pub use crate::length::LengthResolution::{self, Metre, Micrometre, Millimetre};
 
 pub mod local_frames;
 pub use crate::local_frames::{
-    n_e2_r_en, n_e_and_wa2_r_el, BodyFrame, Delta, LocalFrame, LocalLevelFrame, NedFrame,
+    n_e2_r_en, n_e_and_wa2_r_el, n_e_and_ypr2_r_eb, BodyOrientation, Delta,
 };
 
 pub mod math3d;
