@@ -1,8 +1,16 @@
+use std::fmt;
+
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Vec3 {
     x: f64,
     y: f64,
     z: f64,
+}
+
+impl fmt::Display for Vec3 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}, {}]", self.x, self.y, self.z)
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -13,7 +21,38 @@ pub struct Mat33 {
 }
 
 impl Vec3 {
-    pub(crate) const fn unit_z() -> Vec3 {
+    pub const fn neg_unit_x() -> Vec3 {
+        Vec3 {
+            x: -1.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }
+    pub const fn unit_x() -> Vec3 {
+        Vec3 {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }
+
+    pub const fn unit_y() -> Vec3 {
+        Vec3 {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        }
+    }
+
+    pub const fn neg_unit_y() -> Vec3 {
+        Vec3 {
+            x: 0.0,
+            y: -1.0,
+            z: 0.0,
+        }
+    }
+
+    pub const fn unit_z() -> Vec3 {
         Vec3 {
             x: 0.0,
             y: 0.0,
@@ -21,7 +60,7 @@ impl Vec3 {
         }
     }
 
-    pub(crate) const fn neg_unit_z() -> Vec3 {
+    pub const fn neg_unit_z() -> Vec3 {
         Vec3 {
             x: 0.0,
             y: 0.0,
@@ -137,7 +176,7 @@ impl ::std::ops::Div<f64> for Vec3 {
 }
 
 impl Mat33 {
-    pub fn new(r0: Vec3, r1: Vec3, r2: Vec3) -> Mat33 {
+    pub const fn new(r0: Vec3, r1: Vec3, r2: Vec3) -> Mat33 {
         Mat33 {
             row0: r0,
             row1: r1,

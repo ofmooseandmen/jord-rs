@@ -1,224 +1,206 @@
+use crate::models::{S84Model, WGS84Model, S84, WGS84};
+use crate::{Angle, AngleResolution, Length, LengthResolution, LongitudeRange, Model, Vec3};
 use std::convert::From;
-use std::f64::consts::PI;
 
-use crate::models::{S84Model, S84};
-use crate::{Angle, LongitudeRange, Model, Vec3};
+// FIXME Display
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LatLong(Angle, Angle);
 
-pub trait SurfacePos<M: Model>: Clone + Copy + PartialEq {
-    fn from_nvector(nv: Vec3, model: M) -> Self;
-    fn to_nvector(&self) -> Vec3;
-    fn antipode(&self) -> Self;
-    fn model(&self) -> M;
-    fn north_pole() -> Vec3;
+impl LatLong {
+    pub const fn latitude(&self) -> Angle {
+        self.0
+    }
+
+    pub const fn longitude(&self) -> Angle {
+        self.1
+    }
+
+    pub fn round(&self, resolution: AngleResolution) -> Self {
+        LatLong(self.0.round(resolution), self.1.round(resolution))
+    }
+
+    pub const fn north_pole() -> Self {
+        LatLong(Angle::from_decimal_degrees(90.0), Angle::zero())
+    }
+
+    pub const fn south_pole() -> Self {
+        LatLong(Angle::from_decimal_degrees(-90.0), Angle::zero())
+    }
 }
 
 // FIXME Display
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct NvectorPos<M: Model> {
-    nvector: Vec3,
-    model: M,
-}
+pub struct HorizontalPos<M>(Vec3, M);
 
-impl<M: Model> NvectorPos<M> {
+impl<M: Model> HorizontalPos<M> {
     pub fn new(nvector: Vec3, model: M) -> Self {
-        NvectorPos { nvector, model }
+        HorizontalPos(nvector, model)
     }
 
-    // FIXME from_decimal_lat_long and add from_lat_long accepts Angle?
-    pub fn from_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
-        NvectorPos::from_radians(latitude.to_radians(), longitude.to_radians(), model)
+    pub fn from_decimal_lat_long(latitude: f64, longitude: f64, model: M) -> Self {
+        if eq_lat_north_pole(latitude) {
+            HorizontalPos::north_pole(model)
+        } else if eq_lat_south_pole(latitude) {
+            HorizontalPos::south_pole(model)
+        } else {
+            let nvector = nvector_from_lat_long_degrees(latitude, longitude);
+            HorizontalPos(nvector, model)
+        }
     }
 
-    fn from_radians(latitude: f64, longitude: f64, model: M) -> Self {
-        let nvector = nvector_from_lat_long_radians(latitude, longitude);
-        NvectorPos { nvector, model }
+    pub fn from_lat_long(latitude: Angle, longitude: Angle, model: M) -> Self {
+        HorizontalPos::from_decimal_lat_long(
+            latitude.decimal_degrees(),
+            longitude.decimal_degrees(),
+            model,
+        )
     }
 
     pub fn north_pole(model: M) -> Self {
-        NvectorPos::new(Vec3::unit_z(), model)
+        HorizontalPos::new(Vec3::unit_z(), model)
     }
 
     pub fn south_pole(model: M) -> Self {
-        NvectorPos::new(Vec3::neg_unit_z(), model)
+        HorizontalPos::new(Vec3::neg_unit_z(), model)
     }
 
-    pub fn to_lat_long(&self) -> (f64, f64) {
-        let ll = nvector_to_lat_long_radians(self.nvector);
-        let lat = ll.0.to_degrees();
-        let lon = ll.1.to_degrees();
-        (lat, convert_lon(lat, lon, &self.model.longitude_range()))
+    pub fn to_lat_long(&self) -> LatLong {
+        nvector_to_lat_long(self.0, self.1.longitude_range())
+    }
+
+    pub fn round(&self, resolution: AngleResolution) -> Self {
+        let ll = self.to_lat_long().round(resolution);
+        HorizontalPos::from_lat_long(ll.0, ll.1, self.1)
     }
 
     pub fn nvector(&self) -> Vec3 {
-        self.nvector
+        self.0
+    }
+
+    pub fn model(&self) -> M {
+        self.1
+    }
+
+    pub fn antipode(&self) -> Self {
+        HorizontalPos(-1.0 * self.0, self.1)
     }
 }
 
-impl<M: Model> SurfacePos<M> for NvectorPos<M> {
-    fn from_nvector(nv: Vec3, model: M) -> Self {
-        NvectorPos::new(nv, model)
-    }
-
-    fn to_nvector(&self) -> Vec3 {
-        self.nvector()
-    }
-
-    fn antipode(&self) -> Self {
-        let anti = antipode(self.nvector);
-        NvectorPos {
-            nvector: anti,
-            model: self.model,
-        }
-    }
-
-    fn model(&self) -> M {
-        self.model
-    }
-
-    fn north_pole() -> Vec3 {
-        Vec3::unit_z()
+impl HorizontalPos<S84Model> {
+    pub fn from_s84(latitude: f64, longitude: f64) -> Self {
+        HorizontalPos::from_decimal_lat_long(latitude, longitude, S84)
     }
 }
 
-impl<M: Model> From<(Vec3, M)> for NvectorPos<M> {
+impl HorizontalPos<WGS84Model> {
+    pub fn from_wgs84(latitude: f64, longitude: f64) -> Self {
+        HorizontalPos::from_decimal_lat_long(latitude, longitude, WGS84)
+    }
+}
+
+impl<M: Model> From<(Angle, Angle, M)> for HorizontalPos<M> {
+    fn from(llm: (Angle, Angle, M)) -> Self {
+        HorizontalPos::from_lat_long(llm.0, llm.1, llm.2)
+    }
+}
+
+impl<M: Model> From<(f64, f64, M)> for HorizontalPos<M> {
+    fn from(llm: (f64, f64, M)) -> Self {
+        HorizontalPos::from_decimal_lat_long(llm.0, llm.1, llm.2)
+    }
+}
+
+impl<M: Model> From<(Vec3, M)> for HorizontalPos<M> {
     fn from(nvm: (Vec3, M)) -> Self {
-        NvectorPos::new(nvm.0, nvm.1)
+        HorizontalPos::new(nvm.0, nvm.1)
     }
 }
 
-impl<M: Model> From<([f64; 3], M)> for NvectorPos<M> {
-    fn from(nvm: ([f64; 3], M)) -> Self {
-        NvectorPos::new(nvm.0.into(), nvm.1)
-    }
-}
+// FIXME Display
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GeodeticPos<M>(Vec3, Length, M);
 
-impl<M: Model> From<LatLongPos<M>> for NvectorPos<M> {
-    fn from(llp: LatLongPos<M>) -> Self {
-        NvectorPos::from_radians(
-            llp.latitude.as_radians(),
-            llp.longitude.as_radians(),
-            llp.model,
+impl<M: Model> GeodeticPos<M> {
+    pub fn new(nvector: Vec3, height: Length, model: M) -> Self {
+        GeodeticPos(nvector, height, model)
+    }
+
+    pub fn at_height(hp: HorizontalPos<M>, height: Length) -> Self {
+        GeodeticPos(hp.nvector(), height, hp.model())
+    }
+
+    pub fn from_decimal_lat_long(latitude: f64, longitude: f64, height: Length, model: M) -> Self {
+        GeodeticPos::at_height(
+            HorizontalPos::from_decimal_lat_long(latitude, longitude, model),
+            height,
         )
     }
-}
 
-// FIXME Display & FromStr
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LatLongPos<M: Model> {
-    latitude: Angle,
-    longitude: Angle,
-    model: M,
-}
-
-// FIXME: parse
-impl<M: Model> LatLongPos<M> {
-    pub fn new(latitude: Angle, longitude: Angle, model: M) -> Self {
-        let (lat, lon) = wrap(
-            latitude.as_decimal_degrees(),
-            longitude.as_decimal_degrees(),
-            &model.longitude_range(),
-        );
-        LatLongPos {
-            latitude: Angle::from_decimal_degrees(lat),
-            longitude: Angle::from_decimal_degrees(lon),
-            model,
-        }
-    }
-
-    pub fn from_decimal_degrees(latitude: f64, longitude: f64, model: M) -> Self {
-        LatLongPos::new(
-            Angle::from_decimal_degrees(latitude),
-            Angle::from_decimal_degrees(longitude),
-            model,
+    pub fn from_lat_long(latitude: Angle, longitude: Angle, height: Length, model: M) -> Self {
+        GeodeticPos::at_height(
+            HorizontalPos::from_lat_long(latitude, longitude, model),
+            height,
         )
     }
 
     pub fn north_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(90.0, 0.0, model)
+        GeodeticPos::at_height(HorizontalPos::north_pole(model), Length::zero())
     }
 
     pub fn south_pole(model: M) -> Self {
-        LatLongPos::from_decimal_degrees(-90.0, 0.0, model)
+        GeodeticPos::at_height(HorizontalPos::south_pole(model), Length::zero())
     }
 
-    pub fn latitude(&self) -> Angle {
-        self.latitude
+    pub fn at_surface(&self) -> HorizontalPos<M> {
+        HorizontalPos::new(self.nvector(), self.model())
     }
 
-    pub fn longitude(&self) -> Angle {
-        self.longitude
-    }
-}
-
-impl<M: Model> SurfacePos<M> for LatLongPos<M> {
-    fn from_nvector(nv: Vec3, model: M) -> Self {
-        let ll = nvector_to_lat_long_radians(nv);
-        let lat = Angle::from_radians(ll.0);
-        let lon = Angle::from_radians(ll.1);
-        let clon = convert_lon(
-            lat.as_decimal_degrees(),
-            lon.as_decimal_degrees(),
-            &model.longitude_range(),
-        );
-        LatLongPos {
-            latitude: lat,
-            longitude: Angle::from_decimal_degrees(clon),
-            model,
-        }
-    }
-    fn to_nvector(&self) -> Vec3 {
-        nvector_from_lat_long_radians(self.latitude.as_radians(), self.longitude.as_radians())
+    pub fn round(
+        &self,
+        angle_resolution: AngleResolution,
+        length_resolution: LengthResolution,
+    ) -> Self {
+        let ll = HorizontalPos::new(self.nvector(), self.model())
+            .to_lat_long()
+            .round(angle_resolution);
+        GeodeticPos::at_height(
+            HorizontalPos::from_lat_long(ll.0, ll.1, self.model()),
+            self.height().round(length_resolution),
+        )
     }
 
-    fn antipode(&self) -> Self {
-        let anti = antipode(self.to_nvector());
-        LatLongPos::from_nvector(anti, self.model)
+    pub fn to_lat_long(&self) -> LatLong {
+        nvector_to_lat_long(self.0, self.2.longitude_range())
     }
 
-    fn model(&self) -> M {
-        self.model
+    pub fn nvector(&self) -> Vec3 {
+        self.0
     }
 
-    fn north_pole() -> Vec3 {
-        nvector_from_lat_long_radians(PI / 2.0, 0.0)
+    pub fn height(&self) -> Length {
+        self.1
+    }
+
+    pub fn model(&self) -> M {
+        self.2
     }
 }
 
-pub(crate) fn antipode(v: Vec3) -> Vec3 {
-    -1.0 * v
-}
-
-impl LatLongPos<S84Model> {
-    pub fn from_s84(latitude: f64, longitude: f64) -> Self {
-        LatLongPos::from_decimal_degrees(latitude, longitude, S84)
+impl GeodeticPos<S84Model> {
+    pub fn from_s84(latitude: f64, longitude: f64, height: Length) -> Self {
+        GeodeticPos::from_decimal_lat_long(latitude, longitude, height, S84)
     }
 }
 
-impl NvectorPos<S84Model> {
-    pub fn from_s84(latitude: f64, longitude: f64) -> Self {
-        NvectorPos::from_lat_long(latitude, longitude, S84)
+impl GeodeticPos<WGS84Model> {
+    pub fn from_wgs84(latitude: f64, longitude: f64, height: Length) -> Self {
+        GeodeticPos::from_decimal_lat_long(latitude, longitude, height, WGS84)
     }
 }
 
-impl<M: Model> From<(Angle, Angle, M)> for LatLongPos<M> {
-    fn from(llm: (Angle, Angle, M)) -> Self {
-        LatLongPos::new(llm.0, llm.1, llm.2)
-    }
-}
-
-impl<M: Model> From<(f64, f64, M)> for LatLongPos<M> {
-    fn from(llm: (f64, f64, M)) -> Self {
-        LatLongPos::from_decimal_degrees(llm.0, llm.1, llm.2)
-    }
-}
-
-impl<M: Model> From<NvectorPos<M>> for LatLongPos<M> {
-    fn from(nvp: NvectorPos<M>) -> Self {
-        LatLongPos::from_nvector(nvp.nvector, nvp.model)
-    }
-}
-
-pub(crate) fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
+pub fn nvector_from_lat_long_degrees(latitude: f64, longitude: f64) -> Vec3 {
+    let lat = latitude.to_radians();
+    let lon = longitude.to_radians();
     let cl = lat.cos();
     let x = cl * lon.cos();
     let y = cl * lon.sin();
@@ -226,84 +208,45 @@ pub(crate) fn nvector_from_lat_long_radians(lat: f64, lon: f64) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
-pub(crate) fn nvector_to_lat_long_radians(nv: Vec3) -> (f64, f64) {
-    let x = nv.x();
-    let y = nv.y();
-    let z = nv.z();
-    let lat = z.atan2((x * x + y * y).sqrt());
-    let lon = y.atan2(x);
-    (lat, lon)
+pub fn nvector_to_lat_long(nvector: Vec3, longitude_range: LongitudeRange) -> LatLong {
+    if nvector == Vec3::unit_z() {
+        LatLong::north_pole()
+    } else if nvector == Vec3::neg_unit_z() {
+        LatLong::south_pole()
+    } else {
+        let x = nvector.x();
+        let y = nvector.y();
+        let z = nvector.z();
+        let lat = z.atan2((x * x + y * y).sqrt()).to_degrees();
+        let lon = y.atan2(x).to_degrees();
+        LatLong(
+            Angle::from_decimal_degrees(lat),
+            Angle::from_decimal_degrees(convert_lon(lat, lon, longitude_range)),
+        )
+    }
+}
+
+fn eq_lat_north_pole(lat: f64) -> bool {
+    lat == 90.0
+}
+
+fn eq_lat_south_pole(lat: f64) -> bool {
+    lat == -90.0
 }
 
 fn eq_lat_pole(lat: f64) -> bool {
-    lat.abs() == 90.0
+    eq_lat_north_pole(lat.abs())
 }
 
-fn check_pole(lat: f64, lon: f64) -> f64 {
+// lon is guaranteed to be within [-180, 180]
+fn convert_lon(lat: f64, lon: f64, lr: LongitudeRange) -> f64 {
     if eq_lat_pole(lat) {
         0.0
-    } else {
+    } else if lr == LongitudeRange::L180 {
         lon
-    }
-}
-
-fn convert_lon(lat: f64, lon: f64, lr: &LongitudeRange) -> f64 {
-    if eq_lat_pole(lat) {
-        0.0
-    } else if *lr == LongitudeRange::L180 || is_valid_lon(lon, lr) {
-        lon
-    } else {
+    } else if lon < 0.0 {
         lon + 360.0
-    }
-}
-
-// https://gist.github.com/missinglink/d0a085188a8eab2ca66db385bb7c023a
-fn wrap(lat: f64, lon: f64, lr: &LongitudeRange) -> (f64, f64) {
-    if is_valid_lat(lat) && is_valid_lon(lon, lr) {
-        (lat, check_pole(lat, lon))
     } else {
-        let quadrant = ((lat.abs() / 90.0).floor() % 4.0) as u8;
-        let pole;
-        if lat > 0.0 {
-            pole = 90.0;
-        } else {
-            pole = -90.0;
-        }
-        let offset = lat % 90.0;
-        println!("offset {}", offset);
-
-        let wlat;
-        let mut wlon = lon;
-        match quadrant {
-            0 => wlat = offset,
-            1 => {
-                wlat = pole - offset;
-                wlon += 180.0;
-            }
-            2 => {
-                wlat = -offset;
-                wlon += 180.0;
-            }
-            3 => wlat = -pole + offset,
-            _ => panic!("invalid quadrant {}", quadrant),
-        }
-
-        if wlon > 180.0 || wlon < -180.0 {
-            wlon = wlon - ((wlon + 180.0) / 360.0).floor() * 360.0;
-        }
-
-        (wlat, convert_lon(wlat, wlon, lr))
-    }
-}
-
-fn is_valid_lat(lat: f64) -> bool {
-    lat >= -90.0 && lat <= 90.0
-}
-
-fn is_valid_lon(lon: f64, lr: &LongitudeRange) -> bool {
-    if *lr == LongitudeRange::L360 {
-        lon >= 0.0 && lon <= 360.0
-    } else {
-        lon >= -180.0 && lon <= 180.0
+        lon
     }
 }

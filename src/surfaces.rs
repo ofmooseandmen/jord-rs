@@ -8,113 +8,113 @@ use crate::{Ellipsoid, Length, Sphere};
 
 /// World Geodetic 84 Ellipsoid.
 pub const WGS84_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378137000000),
-    Length::from_micrometres(6356752314245),
-    0.08181919084262157,
-    0.0033528106647474805,
+    Length::from_metres(6378137f64),
+    Length::from_metres(6356752.314245179f64),
+    0.08181919084262157f64,
+    0.0033528106647474805f64,
 );
 
 /// Sphere derived from: World Geodetic 84 Ellipsoid.
-pub const WGS84_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6371008771415));
+pub const WGS84_SPHERE: Sphere = Sphere::new(Length::from_metres(6371008.771415059f64));
 
 /// Geodetic Reference System 1980 Ellipsoid.
 pub const GRS80_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378137000000),
-    Length::from_micrometres(6356752314140),
-    0.08181919104281514,
-    0.003352810681182319,
+    Length::from_metres(6378137f64),
+    Length::from_metres(6356752.314140356f64),
+    0.08181919104281514f64,
+    0.003352810681182319f64,
 );
 
 /// Sphere derived from: Geodetic Reference System 1980 Ellipsoid.
-pub const GRS80_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6371008771380));
+pub const GRS80_SPHERE: Sphere = Sphere::new(Length::from_metres(6371008.771380119f64));
 
 /// World Geodetic 72 Ellipsoid.
 pub const WGS72_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378135000000),
-    Length::from_micrometres(6356750520016),
-    0.08181881066274845,
-    0.003352779454167505,
+    Length::from_metres(6378135f64),
+    Length::from_metres(6356750.520016094f64),
+    0.08181881066274845f64,
+    0.003352779454167505f64,
 );
 
 /// Sphere derived from: World Geodetic 72 Ellipsoid.
-pub const WGS72_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6371006840005));
+pub const WGS72_SPHERE: Sphere = Sphere::new(Length::from_metres(6371006.840005364f64));
 
 /// IUGG 1924 Ellipsoid (aka Hayford).
 pub const INTL_1924_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378388000000),
-    Length::from_micrometres(6356911946128),
-    0.08199188997902888,
-    0.003367003367003367,
+    Length::from_metres(6378388f64),
+    Length::from_metres(6356911.9461279465f64),
+    0.08199188997902888f64,
+    0.003367003367003367f64,
 );
 
 /// Sphere derived from: IUGG 1924 Ellipsoid (aka Hayford).
-pub const INTL_1924_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6371229315376));
+pub const INTL_1924_SPHERE: Sphere = Sphere::new(Length::from_metres(6371229.315375983f64));
 
 /// Original definition Ellipsoid (1796).
 pub const AIRY_1830_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6377563396000),
-    Length::from_micrometres(6356256909237),
-    0.08167337387414043,
-    0.0033408506414970775,
+    Length::from_metres(6377563.396f64),
+    Length::from_metres(6356256.909237285f64),
+    0.08167337387414043f64,
+    0.0033408506414970775f64,
 );
 
 /// Sphere derived from: Original definition Ellipsoid (1796).
-pub const AIRY_1830_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6370461233746));
+pub const AIRY_1830_SPHERE: Sphere = Sphere::new(Length::from_metres(6370461.233745761f64));
 
 /// Not specified, use only in cases where geodetic datum is unknown.
 pub const AIRY_MODIFIED_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6377340189000),
-    Length::from_micrometres(6356034447939),
-    0.08167337387414247,
-    0.0033408506414970775,
+    Length::from_metres(6377340.189f64),
+    Length::from_metres(6356034.447938534f64),
+    0.08167337387414247f64,
+    0.0033408506414970775f64,
 );
 
 /// Sphere derived from: Not specified, use only in cases where geodetic datum is unknown.
-pub const AIRY_MODIFIED_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6370238275313));
+pub const AIRY_MODIFIED_SPHERE: Sphere = Sphere::new(Length::from_metres(6370238.275312845f64));
 
 /// Bessel 1841 Ellipsoid.
 pub const BESSEL_1841_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6377397155000),
-    Length::from_micrometres(6356078962818),
-    0.08169683122252666,
-    0.003342773182174806,
+    Length::from_metres(6377397.155f64),
+    Length::from_metres(6356078.962818189f64),
+    0.08169683122252666f64,
+    0.003342773182174806f64,
 );
 
 /// Sphere derived from: Bessel 1841 Ellipsoid.
-pub const BESSEL_1841_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6370291090939));
+pub const BESSEL_1841_SPHERE: Sphere = Sphere::new(Length::from_metres(6370291.090939396f64));
 
 /// Clarke (1866) Ellipsoid.
 pub const CLARKE_1866_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378206400000),
-    Length::from_micrometres(6356583800000),
-    0.08227185422298973,
-    0.0033900753039276207,
+    Length::from_metres(6378206.4f64),
+    Length::from_metres(6356583.800000007f64),
+    0.08227185422298973f64,
+    0.0033900753039276207f64,
 );
 
 /// Sphere derived from: Clarke (1866) Ellipsoid.
-pub const CLARKE_1866_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6370998866667));
+pub const CLARKE_1866_SPHERE: Sphere = Sphere::new(Length::from_metres(6370998.86666667f64));
 
 ///  Clarke (1880) Ellipsoid.
 pub const CLARKE_1880_IGN_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(6378249200000),
-    Length::from_micrometres(6356515000000),
-    0.08248325676336525,
-    0.003407549520011315,
+    Length::from_metres(6378249.2f64),
+    Length::from_metres(6356515.000000028f64),
+    0.08248325676336525f64,
+    0.003407549520011315f64,
 );
 
 /// Sphere derived from:  Clarke (1880) Ellipsoid.
-pub const CLARKE_1880_IGN_SPHERE: Sphere = Sphere::new(Length::from_micrometres(6371004466667));
+pub const CLARKE_1880_IGN_SPHERE: Sphere = Sphere::new(Length::from_metres(6371004.466666676f64));
 
 /// Mars Orbiter Laser Altimeter Ellipsoid.
 pub const MARS_2000_ELLIPSOID: Ellipsoid = Ellipsoid::from_all(
-    Length::from_micrometres(3398627000000),
-    Length::from_micrometres(3378611528857),
-    0.10836918094474898,
-    0.005889281507656065,
+    Length::from_metres(3398627f64),
+    Length::from_metres(3378611.5288574793f64),
+    0.10836918094474898f64,
+    0.005889281507656065f64,
 );
 
 /// Sphere derived from: Mars Orbiter Laser Altimeter Ellipsoid.
-pub const MARS_2000_SPHERE: Sphere = Sphere::new(Length::from_micrometres(3391955176286));
+pub const MARS_2000_SPHERE: Sphere = Sphere::new(Length::from_metres(3391955.176285826f64));
 
 /// Moon IAU/IAG Sphere.
-pub const MOON_SPHERE: Sphere = Sphere::new(Length::from_micrometres(1737400000000));
+pub const MOON_SPHERE: Sphere = Sphere::new(Length::from_metres(1737400f64));
