@@ -1,18 +1,25 @@
 // Copyright: (c) 2020 Cedric Liegeois
 // License: BSD3
+
+//! Types and impl for working with angles.
+//!
+
 use crate::Measurement;
 
+/// Resolution for [`rounding`] angles.
+///
+/// [`rounding`]: struct.Angle.html#method.round
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AngleResolution {
+    /// Resolution of 1 arcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 30 metres at the equator.
     Arcsecond,
+    /// Resolution of 1 milliarcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 0.03 metres at the equator.
     Milliarcsecond,
+    /// Resolution of 1 microarcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 0.03 millimetres at the equator.
     Microarcsecond,
 }
 
 /// A signed angle.
-///
-/// * `Resolution::Milli`: milliarcsecond, when used as a latitude/longitude this roughly translate to a precision of 0.03 metres at the equator
-/// * `Resolution::Micro` to microarcsecond, when used as a latitude/longitude this roughly translate to a precision of 0.03 millimetres at the equator
 ///
 /// `Angle` implements many traits, including [`Add`], [`Sub`], [`Mul`], and
 /// [`Div`], among others.
@@ -72,6 +79,17 @@ impl Angle {
         Angle::from_decimal_degrees(dd).round(AngleResolution::Milliarcsecond)
     }
 
+    /// Returns a new `Angle` from the [decimal degrees] of this `Angle` rounded to the given [resolution].
+    ///
+    ///  ```rust
+    /// # use jord::{AngleResolution, Angle, Arcsecond, Milliarcsecond, Microarcsecond};
+    /// assert_eq!(154.55, Angle::from_decimal_degrees(154.54987654321).round(Arcsecond).decimal_degrees());
+    /// assert_eq!(154.54987666666668, Angle::from_decimal_degrees(154.54987654321).round(Milliarcsecond).decimal_degrees());
+    /// assert_eq!(154.54987654333334, Angle::from_decimal_degrees(154.54987654321).round(Microarcsecond).decimal_degrees());
+    /// ```
+    ///
+    /// [decimal degrees]: ../angle/struct.Angle.html#method.decimal_degrees
+    /// [resolution]: ../angle/enum.AngleResolution.html
     pub fn round(self, resolution: AngleResolution) -> Self {
         let scale = match resolution {
             AngleResolution::Arcsecond => DG_TO_SECS,
