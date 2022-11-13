@@ -69,7 +69,6 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     /// Determines if this position is the antipode of the given position.
     fn is_antipode(&self, other: Self) -> bool;
 
-
     /// Rounds both the latitude and longitude of this position to the nearest decimal
     /// degrees with 5 decimal places - when representing an Earth latitude/longtiude this
     /// is approximately 1.11 metres at the equator.
@@ -277,4 +276,34 @@ fn eq_lat_rads_north_pole(latitude_rads: f64) -> bool {
 /// Is given latitude in radians at the south pole?
 fn eq_lat_rads_south_pole(latitude_rads: f64) -> bool {
     latitude_rads == -PI / 2.0
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{HorizontalPosition, Point, Vec3};
+
+    #[test]
+    fn point_antipode() {
+        assert_eq!(
+            Point::from_lat_long_degrees(-45.0, -26.0),
+            Point::from_lat_long_degrees(45.0, 154.0)
+                .antipode()
+                .round_d7()
+        );
+        assert_eq!(Point::NORTH_POLE, Point::SOUTH_POLE.antipode());
+        assert_eq!(Point::SOUTH_POLE, Point::NORTH_POLE.antipode());
+    }
+
+    #[test]
+    fn vec3_antipode() {
+        assert_eq!(
+            Vec3::from_lat_long_degrees(-45.0, -26.0),
+            Vec3::from_lat_long_degrees(45.0, 154.0)
+                .antipode()
+                .round_d7()
+        );
+        assert_eq!(Vec3::UNIT_Z, Vec3::NEG_UNIT_Z.antipode());
+        assert_eq!(Vec3::NEG_UNIT_Z, Vec3::UNIT_Z.antipode());
+    }
 }

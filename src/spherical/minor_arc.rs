@@ -48,7 +48,7 @@ impl<T: HorizontalPosition> MinorArc<T> {
     /// let start = Point::from_lat_long_degrees(53.3206, -1.7297);
     /// let end = Point::from_lat_long_degrees(53.1887, 0.1334);
     /// let d = MinorArc::new(start, end).along_track_distance(p, IUGG_EARTH_RADIUS);
-    /// assert_eq!(d, Length::from_metres(62331.501112343634));
+    /// assert_eq!(d.round_mm(), Length::from_metres(62331.501));
     ///
     /// // or alternatively with Vec3:
     ///
@@ -56,7 +56,7 @@ impl<T: HorizontalPosition> MinorArc<T> {
     /// let start = Vec3::from_lat_long_degrees(53.3206, -1.7297);
     /// let end = Vec3::from_lat_long_degrees(53.1887, 0.1334);
     /// let d = MinorArc::new(start, end).along_track_distance(p, IUGG_EARTH_RADIUS);
-    /// assert_eq!(d, Length::from_metres(62331.501112343634));
+    /// assert_eq!(d.round_mm(), Length::from_metres(62331.501));
     /// ```
     ///
     /// See also [crate::spherical::Navigation::along_track_distance]
@@ -254,11 +254,7 @@ mod tests {
             Point::from_lat_long_degrees(-34.0, 143.0),
             Point::from_lat_long_degrees(-36.0, 145.0),
         );
-        assert_intersection(
-            Point::from_lat_long_degrees(-35.0163245, 144.0),
-            arc1,
-            arc2,
-        );
+        assert_intersection(Point::from_lat_long_degrees(-35.0163245, 144.0), arc1, arc2);
     }
 
     #[test]
