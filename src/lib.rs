@@ -1,3 +1,14 @@
+//! The `jord` crate implements various geographical position calculations.
+//!
+//! # Literature
+//!
+//! The following reference provide the theoretical basis of most of the algorithms:
+//!
+//! - [Non-singular Horizontal Position Representation; Gade, K.; 2010](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
+//! - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
+//! - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
+//! - [STR: A Simple and Efficient Algorithm for R-Tree Packing](https://apps.dtic.mil/sti/pdfs/ADA324493.pdf)
+//!
 #![forbid(
     anonymous_parameters,
     const_err,
@@ -13,7 +24,10 @@
     unused_extern_crates,
     missing_debug_implementations
 )]
+#![warn(missing_docs)]
 #![deny(clippy::all)]
+
+/// Base modules.
 
 #[macro_use]
 mod measurement;
@@ -21,50 +35,18 @@ pub use crate::measurement::Measurement;
 
 mod angle;
 pub use crate::angle::Angle;
-pub use crate::angle::AngleResolution::{self, Arcsecond, Microarcsecond, Milliarcsecond};
-
-mod error;
-pub use crate::error::Error;
-
-mod great_circle;
-pub use crate::great_circle::{GreatCircle, MinorArc, Side};
-
-mod geocentric;
-pub use crate::geocentric::GeocentricPos;
-
-mod geodetic;
-pub use crate::geodetic::{
-    nvector_from_lat_long_degrees, nvector_to_lat_long, GeodeticPos, HorizontalPos, LatLong,
-};
 
 mod length;
 pub use crate::length::Length;
-pub use crate::length::LengthResolution::{self, Metre, Micrometre, Millimetre};
-
-mod local_frames;
-pub use crate::local_frames::{
-    n_e2_r_en, n_e_and_wa2_r_el, n_e_and_ypr2_r_eb, BodyOrientation, Delta,
-};
-
-mod math3d;
-pub use crate::math3d::Mat33;
-pub use crate::math3d::Vec3;
-
-mod model;
-pub use crate::model::Ellipsoidal;
-pub use crate::model::EllipsoidalT0;
-pub use crate::model::Epoch;
-pub use crate::model::LongitudeRange;
-pub use crate::model::Model;
-pub use crate::model::ModelId;
-pub use crate::model::Spherical;
-
-pub mod models;
-
-mod rotation;
-pub use crate::rotation::*;
 
 mod surface;
-pub use crate::surface::{Ellipsoid, Sphere, Surface};
+pub use crate::surface::{Ellipsoid, IUGG_EARTH_RADIUS, MOON_RADIUS};
 
-pub mod surfaces;
+mod position;
+pub use crate::position::{HorizontalPosition, Point};
+
+mod vec3;
+pub use crate::vec3::Vec3;
+
+/// Geographical position assuming a spherical model.
+pub mod spherical;

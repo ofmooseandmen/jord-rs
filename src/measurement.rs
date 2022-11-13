@@ -1,14 +1,12 @@
-// Copyright: (c) 2020 Cedric Liegeois
-// License: BSD3
-
 /// Trait implemented by all measurable quantities.
 pub trait Measurement {
     /// Creates a new quantity from the given amount expressed in the default unit.
     fn from_default_unit(amount: f64) -> Self;
     /// Returns this quantity in the default unit.
-    fn as_default_unit(self) -> f64;
+    fn as_default_unit(&self) -> f64;
 }
 
+/// Macro that creates the code to implement operator overrides.
 #[macro_export]
 macro_rules! impl_measurement {
     ($($t:ty)*) => ($(
