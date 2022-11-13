@@ -70,24 +70,27 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     fn is_antipode(&self, other: Self) -> bool;
 
     /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 5 decimal places - when representing an Earth latitude/longtiude this
-    /// is approximately 1.11 metres at the equator.
+    /// degrees with 5 decimal places.
+    ///
+    /// See also: [Angle::round_d5](crate::Angle::round_d5).
     fn round_d5(&self) -> Self {
         let (lat, lng) = self.to_lat_long();
         Self::from_lat_long(lat.round_d5(), lng.round_d5())
     }
 
     /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 6 decimal places - when representing an Earth latitude/longtiude this
-    /// is approximately 0.111 metres at the equator.
+    /// degrees with 6 decimal places.
+    ///
+    /// See also: [Angle::round_d6](crate::Angle::round_d6).
     fn round_d6(&self) -> Self {
         let (lat, lng) = self.to_lat_long();
         Self::from_lat_long(lat.round_d6(), lng.round_d6())
     }
 
     /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 7 decimal places - when representing an Earth latitude/longtiude this
-    /// is approximately 1.11 centimetres at the equator.
+    /// degrees with 7 decimal places.
+    ///
+    /// See also: [Angle::round_d7](crate::Angle::round_d7).
     fn round_d7(&self) -> Self {
         let (lat, lng) = self.to_lat_long();
         Self::from_lat_long(lat.round_d7(), lng.round_d7())

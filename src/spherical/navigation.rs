@@ -282,8 +282,10 @@ mod tests {
 
     use super::Navigation;
 
+    /// destination.
+
     #[test]
-    fn destination_across_idl() {
+    fn destination_across_date_line() {
         let p = Point::from_lat_long_degrees(0.0, 154.0);
         let d = p
             .destination(
@@ -352,6 +354,112 @@ mod tests {
                 Length::ZERO,
                 IUGG_EARTH_RADIUS
             )
+        );
+    }
+
+    /// distance.
+
+    #[test]
+    fn distance_accross_date_line() {
+        let p1 = Point::from_lat_long_degrees(50.066389, -179.999722);
+        let p2 = Point::from_lat_long_degrees(50.066389, 179.999722);
+        assert_eq!(
+            Length::from_metres(39.685),
+            p1.distance(p2, IUGG_EARTH_RADIUS).round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_between_poles() {
+        assert_eq!(
+            Length::from_metres(20_015_089.309),
+            Point::NORTH_POLE
+                .distance(Point::SOUTH_POLE, IUGG_EARTH_RADIUS)
+                .round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_test() {
+        let p1 = Point::from_lat_long_degrees(50.066389, -5.714722);
+        let p2 = Point::from_lat_long_degrees(58.643889, -3.07);
+        assert_eq!(
+            Length::from_metres(968_853.666),
+            p1.distance(p2, IUGG_EARTH_RADIUS).round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_transitivity() {
+        let p1 = Point::from_lat_long_degrees(0.0, 0.0);
+        let p2 = Point::from_lat_long_degrees(0.0, 10.0);
+        let p3 = Point::from_lat_long_degrees(0.0, 20.0);
+        let d1 = p1.distance(p2, IUGG_EARTH_RADIUS);
+        let d2 = p2.distance(p3, IUGG_EARTH_RADIUS);
+        let actual = (d1 + d2).round_mm();
+        assert_eq!(actual, p1.distance(p3, IUGG_EARTH_RADIUS).round_mm());
+    }
+
+    #[test]
+    fn distance_zero() {
+        let p = Point::from_lat_long_degrees(50.066389, -5.714722);
+        assert_eq!(Length::ZERO, p.distance(p, IUGG_EARTH_RADIUS));
+    }
+
+    #[test]
+    fn distance_at_equator_going_east() {
+        let p1 = Point::from_lat_long_degrees(0.0, 0.0);
+        let p2 = Point::from_lat_long_degrees(0.0, 1.0);
+        assert_eq!(Angle::from_degrees(90.0), p1.final_bearing(p2));
+    }
+
+    #[test]
+    fn distance_at_equator_going_west() {
+        let p1 = Point::from_lat_long_degrees(0.0, 1.0);
+        let p2 = Point::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Angle::from_degrees(270.0), p1.final_bearing(p2));
+    }
+
+    #[test]
+    fn distance_coincidental() {
+        let p = Point::from_lat_long_degrees(50.0, -18.0);
+        assert_eq!(Angle::ZERO, p.final_bearing(p));
+    }
+
+    #[test]
+    fn distance_same_longitude_going_north() {
+        let p1 = Point::from_lat_long_degrees(50.0, -5.0);
+        let p2 = Point::from_lat_long_degrees(58.0, -5.0);
+        assert_eq!(Angle::ZERO, p1.final_bearing(p2));
+    }
+
+    /// final_bearing.
+
+    #[test]
+    fn final_bearing_same_longitude_going_south() {
+        let p1 = Point::from_lat_long_degrees(58.0, -5.0);
+        let p2 = Point::from_lat_long_degrees(50.0, -5.0);
+        assert_eq!(Angle::from_degrees(180.0), p1.final_bearing(p2));
+    }
+
+    #[test]
+    fn final_bearing_test() {
+        let p1 = Point::from_lat_long_degrees(50.06638889, -5.71472222);
+        let p2 = Point::from_lat_long_degrees(58.64388889, -3.07);
+        assert_eq!(
+            Angle::from_degrees(11.2752013),
+            p1.final_bearing(p2).round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(189.1198181),
+            p2.final_bearing(p1).round_d7()
+        );
+
+        let p1 = Point::from_lat_long_degrees(-53.99472222, -25.9875);
+        let p2 = Point::from_lat_long_degrees(54.0, 154.0);
+        assert_eq!(
+            Angle::from_degrees(125.6839551),
+            p1.final_bearing(p2).round_d7()
         );
     }
 }
