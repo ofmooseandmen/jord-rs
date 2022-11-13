@@ -59,10 +59,61 @@ impl GreatCircle {
     ///     Vec3::from_lat_long_degrees(53.3206, -1.7297),
     ///     Angle::from_degrees(96.0)
     /// );
-    /// assert_eq!(gc.cross_track_distance(p, IUGG_EARTH_RADIUS), Length::from_metres(-305.66489915731603));
+    /// assert_eq!(Length::from_metres(-305.665), gc.cross_track_distance(p, IUGG_EARTH_RADIUS).round_mm());
     /// ```
     pub fn cross_track_distance<T: HorizontalPosition>(&self, other: T, radius: Length) -> Length {
         let angle = angle_radians_between(self.normal, other.as_nvector(), None);
         (angle - (PI / 2.0)) * radius
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{
+        spherical::{GreatCircle, Navigation},
+        HorizontalPosition, Length, Point, IUGG_EARTH_RADIUS,
+    };
+
+    #[test]
+    fn cross_track_distance_left() {
+        let p = Point::from_lat_long_degrees(53.2611, -0.7972);
+        let gc1 = Point::from_lat_long_degrees(53.3206, -1.7297);
+        let gc2 = Point::from_lat_long_degrees(53.1887, 0.1334);
+        assert_eq!(
+            Length::from_metres(-307.55),
+            GreatCircle::new(gc1, gc2)
+                .cross_track_distance(p, IUGG_EARTH_RADIUS)
+                .round_mm()
+        );
+    }
+
+    #[test]
+    fn cross_track_distance_right() {
+        let p = Point::from_lat_long_degrees(53.2611, -0.7972).antipode();
+        let gc1 = Point::from_lat_long_degrees(53.3206, -1.7297);
+        let gc2 = Point::from_lat_long_degrees(53.1887, 0.1334);
+        assert_eq!(
+            Length::from_metres(307.55),
+            GreatCircle::new(gc1, gc2)
+                .cross_track_distance(p, IUGG_EARTH_RADIUS)
+                .round_mm()
+        );
+    }
+
+    #[test]
+    fn cross_track_distance_zero() {
+        let gc1 = Point::from_lat_long_degrees(53.3206, -1.7297);
+        let gc2 = Point::from_lat_long_degrees(53.1887, 0.1334);
+        let gct = GreatCircle::new(gc1, gc2);
+        let ib = gc1.initial_bearing(gc2);
+        let gch = GreatCircle::from_heading(gc1, ib);
+        let mut f = 0.0;
+        while f <= 1.0 {
+            let p = gc1.interpolated(gc2, 0.5).unwrap();
+            assert_eq!(Length::ZERO, gct.cross_track_distance(p, IUGG_EARTH_RADIUS));
+            assert_eq!(Length::ZERO, gch.cross_track_distance(p, IUGG_EARTH_RADIUS));
+            f = f + 0.1;
+        }
     }
 }
