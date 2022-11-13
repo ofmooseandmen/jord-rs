@@ -111,8 +111,14 @@ mod tests {
         let mut f = 0.0;
         while f <= 1.0 {
             let p = gc1.interpolated(gc2, 0.5).unwrap();
-            assert_eq!(Length::ZERO, gct.cross_track_distance(p, IUGG_EARTH_RADIUS));
-            assert_eq!(Length::ZERO, gch.cross_track_distance(p, IUGG_EARTH_RADIUS));
+            assert_eq!(
+                Length::ZERO,
+                gct.cross_track_distance(p, IUGG_EARTH_RADIUS).round_mm()
+            );
+            assert_eq!(
+                Length::ZERO,
+                gch.cross_track_distance(p, IUGG_EARTH_RADIUS).round_mm()
+            );
             f = f + 0.1;
         }
     }

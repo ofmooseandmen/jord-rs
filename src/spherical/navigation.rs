@@ -268,3 +268,90 @@ fn unchecked_interpolated<T: HorizontalPosition>(p0: T, p1: T, f: f64) -> T {
         T::from_nvector(v0.lerp_unit(v1, f))
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use std::f64::consts::PI;
+
+    use crate::Angle;
+    use crate::HorizontalPosition;
+    use crate::Length;
+    use crate::Point;
+    use crate::IUGG_EARTH_RADIUS;
+
+    use super::Navigation;
+
+    #[test]
+    fn destination_across_idl() {
+        let p = Point::from_lat_long_degrees(0.0, 154.0);
+        let d = p
+            .destination(
+                Angle::from_degrees(90.0),
+                Length::from_kilometres(5000.0),
+                IUGG_EARTH_RADIUS,
+            )
+            .round_d7();
+        let e = Point::from_lat_long_degrees(0.0, -161.0339254);
+        assert_eq!(e, d);
+    }
+
+    #[test]
+    fn destination_from_north_pole() {
+        let expected = Point::from_lat_long_degrees(45.0, 0.0);
+        let distance = IUGG_EARTH_RADIUS * (PI / 4.0);
+        let actual = Point::NORTH_POLE
+            .destination(Angle::from_degrees(180.0), distance, IUGG_EARTH_RADIUS)
+            .round_d7();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn destination_from_south_pole() {
+        let expected = Point::from_lat_long_degrees(-45.0, 0.0);
+        let distance = IUGG_EARTH_RADIUS * (PI / 4.0);
+        let actual = Point::SOUTH_POLE
+            .destination(Angle::ZERO, distance, IUGG_EARTH_RADIUS)
+            .round_d7();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn destination_negative_distance() {
+        let p = Point::from_lat_long_degrees(0.0, 0.0);
+        // equivalent of -10 degree of longitude.
+        let d = IUGG_EARTH_RADIUS * (-2.0 * PI / 36.0);
+        let actual = p
+            .destination(Angle::from_degrees(90.0), d, IUGG_EARTH_RADIUS)
+            .round_d7();
+        let expected = Point::from_lat_long_degrees(0.0, -10.0);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn destination_travelled_longitude_greater_than_90() {
+        let p = Point::from_lat_long_degrees(60.2, 11.1);
+        let d = p
+            .destination(
+                Angle::from_degrees(12.4),
+                Length::from_nautical_miles(2000.0),
+                IUGG_EARTH_RADIUS,
+            )
+            .round_d7();
+        let e = Point::from_lat_long_degrees(82.6380125, 124.1259551);
+        assert_eq!(e, d);
+    }
+
+    #[test]
+    fn destination_zero_distance() {
+        let p = Point::from_lat_long_degrees(55.6050, 13.0038);
+        assert_eq!(
+            p,
+            p.destination(
+                Angle::from_degrees(96.0217),
+                Length::ZERO,
+                IUGG_EARTH_RADIUS
+            )
+        );
+    }
+}
