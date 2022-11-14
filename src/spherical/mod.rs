@@ -1,8 +1,8 @@
 /// Various "low-level" algorithms for spherical geometry.
 mod base;
 pub use base::{
-    angle_radians_between, are_clockwise, are_concave, are_ordered, easting, is_great_circle,
-    mean_position, orthogonal, side, side_exact, turn_radians,
+    angle_radians_between, are_ordered, easting, in_clockwise_order, is_convex_polygon,
+    is_great_circle, mean_position, orthogonal, side, side_exact, turn_radians,
 };
 
 pub(crate) use base::along_track_distance;

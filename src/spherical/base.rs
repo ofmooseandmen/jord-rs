@@ -30,7 +30,7 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
 ///
 /// ```
 /// use jord::{Length, HorizontalPosition, Vec3};
-/// use jord::spherical::are_clockwise;
+/// use jord::spherical::in_clockwise_order;
 ///
 /// let ps = vec![
 ///     Vec3::from_lat_long_degrees(40.0, 40.0),
@@ -39,15 +39,15 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
 ///     Vec3::from_lat_long_degrees(40.0, 40.0)
 /// ];
 ///
-/// assert!(are_clockwise(&ps));
+/// assert!(in_clockwise_order(&ps));
 ///
 /// ```
-pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
+pub fn in_clockwise_order<T: HorizontalPosition>(ps: &[T]) -> bool {
     if ps.is_empty() {
         false
     } else if ps.first() == ps.last() {
         // unwrap is safe, ps is not empty
-        are_clockwise(ps.split_last().unwrap().1)
+        in_clockwise_order(ps.split_last().unwrap().1)
     } else if ps.len() < 3 {
         false
     } else if ps.len() == 3 {
@@ -64,17 +64,17 @@ pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
     }
 }
 
-/// Determines whether the given positions define a concave path/shape.
+/// Determines whether the given vertices define a convex polygon.
 ///
 /// Notes:
-/// - array of positions can be opened (first != last) or closed (first == last)
-/// - returns false if less than 3 positions are given
+/// - array of vertices can be opened (first != last) or closed (first == last)
+/// - returns false if less than 3 vertices are given
 ///
 /// # Examples:
 ///
 /// ```
 /// use jord::{Length, HorizontalPosition, Vec3};
-/// use jord::spherical::are_concave;
+/// use jord::spherical::is_convex_polygon;
 ///
 /// let ps = vec![
 ///     Vec3::from_lat_long_degrees(40.0, 40.0),
@@ -83,34 +83,35 @@ pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
 ///     Vec3::from_lat_long_degrees(40.0, 40.0)
 /// ];
 ///
-/// assert_eq!(false, are_concave(&ps));
+/// assert!(is_convex_polygon(&ps));
 ///
 /// ```
-pub fn are_concave<T: HorizontalPosition>(ps: &[T]) -> bool {
-    if ps.is_empty() {
+pub fn is_convex_polygon<T: HorizontalPosition>(vs: &[T]) -> bool {
+    if vs.is_empty() {
         false
-    } else if ps.first() == ps.last() {
+    } else if vs.first() == vs.last() {
         // unwrap is safe, ps is not empty
-        are_concave(ps.split_last().unwrap().1)
-    } else if ps.len() < 3 {
+        is_convex_polygon(vs.split_last().unwrap().1)
+    } else if vs.len() < 3 {
         false
     } else {
         let mut cur_side = i8::MIN;
-        let len = ps.len();
+        let len = vs.len();
         for i in 0..len {
-            let p = prev(i, ps);
-            let n = next(i, ps);
-            let side = side(ps[p].as_nvector(), ps[i].as_nvector(), ps[n].as_nvector());
+            let p = prev(i, vs);
+            let n = next(i, vs);
+            let side = side(vs[p].as_nvector(), vs[i].as_nvector(), vs[n].as_nvector());
             if i == 0 {
                 cur_side = side;
             } else if cur_side != side {
                 // side changed -> concave
-                return true;
+                // TODO: need to account for collinear vertices
+                return false;
             } else {
                 // still same side.
             }
         }
-        false
+        true
     }
 }
 
@@ -288,7 +289,7 @@ mod tests {
     use crate::{Angle, HorizontalPosition, Vec3};
 
     use crate::spherical::{
-        angle_radians_between, are_clockwise, mean_position, side, turn_radians,
+        angle_radians_between, in_clockwise_order, mean_position, side, turn_radians,
     };
 
     // angle_radians_between
@@ -326,10 +327,10 @@ mod tests {
         );
     }
 
-    // are_clockwise
+    // in_clockwise_order
 
     #[test]
-    fn are_clockwise_3() {
+    fn in_clockwise_order_3() {
         let ps = vec![
             Vec3::from_lat_long_degrees(40.0, 40.0),
             Vec3::from_lat_long_degrees(10.0, 30.0),
@@ -351,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn are_clockwise_equal_left_right_turns() {
+    fn in_clockwise_order_equal_left_right_turns() {
         let ps = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, -1.0),
@@ -394,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn are_clockwise_more_right_turns() {
+    fn in_clockwise_order_more_right_turns() {
         let ps = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, -1.0),
@@ -407,23 +408,23 @@ mod tests {
     }
 
     #[test]
-    fn are_clockwise_less_than_3() {
+    fn in_clockwise_order_less_than_3() {
         let mut ps: Vec<Vec3> = Vec::new();
-        assert_eq!(false, are_clockwise(&ps));
+        assert_eq!(false, in_clockwise_order(&ps));
 
         ps = vec![Vec3::from_lat_long_degrees(0.0, 0.0)];
-        assert_eq!(false, are_clockwise(&ps));
+        assert_eq!(false, in_clockwise_order(&ps));
 
         ps = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, 1.0),
         ];
-        assert_eq!(false, are_clockwise(&ps));
+        assert_eq!(false, in_clockwise_order(&ps));
     }
 
     fn test_clockwise<T: HorizontalPosition>(ps: &[T], expected: bool) {
-        assert_eq!(expected, are_clockwise(ps.split_last().unwrap().1));
-        assert_eq!(expected, are_clockwise(&ps));
+        assert_eq!(expected, in_clockwise_order(ps.split_last().unwrap().1));
+        assert_eq!(expected, in_clockwise_order(&ps));
     }
 
     // mean

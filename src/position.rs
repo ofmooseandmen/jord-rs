@@ -99,7 +99,7 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
     /// forcibly sets the longitude to 0 if the latitude is at either pole.
     ///
-    /// The precision of the returned position corresponds to the neqr limit of what GPS-based
+    /// The precision of the returned position corresponds to the near limit of GPS-based
     /// techniques; it allows to distinguish 2 positions about 11 millimetres apart.
     ///
     /// See also: [Angle::round_d7](crate::Angle::round_d7).
