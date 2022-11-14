@@ -8,16 +8,16 @@ use crate::{Angle, Vec3};
 /// at latitudes +/- 90, where longitude is undefined. In addition, when getting close to the singularities, the
 /// representation exhibits considerable non-linearities and extreme latitude dependency, leading to reduced
 /// accuracy in many algorithms. In order to overcome these limitation any horizontal position is also represented by
-/// a /n/-vector: a unit length 3-dimensional vector normal to the surface (note that the model choosen to represent the
+/// a *n*-vector: a unit length 3-dimensional vector normal to the surface (note that the model choosen to represent the
 /// surface is irrelevant here; it can be an ellipsoid or a sphere).
 ///
-/// /n/-vector orientation:
+/// *n*-vector orientation:
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the point where latitude = longitude = 0
 ///
-/// Every implementation of this trait shall at least store the /n/-vector as a [Vec3].
+/// Every implementation of this trait shall at least store the *n*-vector as a [Vec3].
 pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized {
-    /// Creates a global horizontal position (/n/-vector) from the given latitude and longitude.
+    /// Creates a global horizontal position (*n*-vector) from the given latitude and longitude.
     ///
     /// # Examples
     ///
@@ -38,12 +38,12 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
         Self::from_lat_long_radians(latitude.as_radians(), longitude.as_radians())
     }
 
-    /// Creates a global horizontal position (/n/-vector) from the given latitude and longitude in degrees.
+    /// Creates a global horizontal position (*n*-vector) from the given latitude and longitude in degrees.
     fn from_lat_long_degrees(latitude: f64, longitude: f64) -> Self {
         Self::from_lat_long_radians(latitude.to_radians(), longitude.to_radians())
     }
 
-    /// Creates a global horizontal position (/n/-vector) from the given latitude and longitude in radians.
+    /// Creates a global horizontal position (*n*-vector) from the given latitude and longitude in radians.
     fn from_lat_long_radians(latitude: f64, longitude: f64) -> Self;
 
     /// Returns the latitude and longitude of this horizontal position (may require conversion).
@@ -55,11 +55,11 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     /// Returns the latitude and longitude in radians of this horizontal position (may require conversion).
     fn to_lat_long_radians(&self) -> (f64, f64);
 
-    /// Wraps the given /n/-vector to a global horizontal position (may perform additional conversion
-    /// to latitude/longitude). The given [Vec3] must be unit-length (i.e. effectively a /n/-vector).
+    /// Wraps the given *n*-vector to a global horizontal position (may perform additional conversion
+    /// to latitude/longitude). The given [Vec3] must be unit-length (i.e. effectively a *n*-vector).
     fn from_nvector(nvector: Vec3) -> Self;
 
-    /// Returns the /n/-vector representing this horizontal position.
+    /// Returns the *n*-vector representing this horizontal position.
     fn as_nvector(&self) -> Vec3;
 
     /// Returns the antipode of this position: the position which is diametrically opposite to this
@@ -71,7 +71,7 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
 
     /// Normalises any input data supplied at construction and returns a new global position with
     /// the latitude and longitude of this position to the nearest decimal degrees with 5 decimal places.
-    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// This guarantees that the returned global position's latitude, longitude and *n*-vector are all
     /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
     /// forcibly sets the longitude to 0 if the latitude is at either pole.
     ///
@@ -83,7 +83,7 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
 
     /// Normalises any input data supplied at construction and returns a new global position with
     /// the latitude and longitude of this position to the nearest decimal degrees with 6 decimal places.
-    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// This guarantees that the returned global position's latitude, longitude and *n*-vector are all
     /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
     /// forcibly sets the longitude to 0 if the latitude is at either pole.
     ///
@@ -95,7 +95,7 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
 
     // Normalises any input data supplied at construction and returns a new global position with
     /// the latitude and longitude of this position to the nearest decimal degrees with 7 decimal places.
-    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// This guarantees that the returned global position's latitude, longitude and *n*-vector are all
     /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
     /// forcibly sets the longitude to 0 if the latitude is at either pole.
     ///
@@ -106,11 +106,11 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     fn normalised_d7(&self) -> Self;
 }
 
-/// An horizontal position that stores the latitude, longitude and equivalent /n/-vector.
-/// This struct is usefull for algorithms that rely both on the latitude/longitude and the /n/-vector
+/// An horizontal position that stores the latitude, longitude and equivalent *n*-vector.
+/// This struct is usefull for algorithms that rely both on the latitude/longitude and the *n*-vector
 /// representation (such as point-in-polygon) or when the user always needs access to the latitude/longitude.
 /// However when the latitude/longitude is not required prefer using `Vec3` directly as it saves the somewhat
-/// costly conversion /n/-vector to latitude/longitude.
+/// costly conversion *n*-vector to latitude/longitude.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Point {
     latitude: Angle,

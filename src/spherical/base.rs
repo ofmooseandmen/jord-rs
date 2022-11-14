@@ -1,6 +1,7 @@
 use crate::{numbers::eq_zero, HorizontalPosition, Length, Vec3};
 
 /// Computes the signed angle in radians between the given vectors.
+///
 /// - if vn is `None; the angle is always in [0..PI],
 /// - otherwise, the angle is positive if v1 is clockzise looking along vn,
 /// - and negative if anti-clockwise looking along vn
@@ -20,6 +21,7 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
 }
 
 /// Determines whether the given positions are given in clockwise order.
+///
 /// Notes:
 /// - array of positions can be opened (first != last) or closed (first == last)
 /// - returns false if less than 3 positions are given
@@ -44,6 +46,7 @@ pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
     if ps.is_empty() {
         false
     } else if ps.first() == ps.last() {
+        // unwrap is safe, ps is not empty
         are_clockwise(ps.split_last().unwrap().1)
     } else if ps.len() < 3 {
         false
@@ -61,6 +64,56 @@ pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
     }
 }
 
+/// Determines whether the given positions define a concave path/shape.
+///
+/// Notes:
+/// - array of positions can be opened (first != last) or closed (first == last)
+/// - returns false if less than 3 positions are given
+///
+/// # Examples:
+///
+/// ```
+/// use jord::{Length, HorizontalPosition, Vec3};
+/// use jord::spherical::are_concave;
+///
+/// let ps = vec![
+///     Vec3::from_lat_long_degrees(40.0, 40.0),
+///     Vec3::from_lat_long_degrees(10.0, 30.0),
+///     Vec3::from_lat_long_degrees(20.0, 20.0),
+///     Vec3::from_lat_long_degrees(40.0, 40.0)
+/// ];
+///
+/// assert_eq!(false, are_concave(&ps));
+///
+/// ```
+pub fn are_concave<T: HorizontalPosition>(ps: &[T]) -> bool {
+    if ps.is_empty() {
+        false
+    } else if ps.first() == ps.last() {
+        // unwrap is safe, ps is not empty
+        are_concave(ps.split_last().unwrap().1)
+    } else if ps.len() < 3 {
+        false
+    } else {
+        let mut cur_side = i8::MIN;
+        let len = ps.len();
+        for i in 0..len {
+            let p = prev(i, ps);
+            let n = next(i, ps);
+            let side = side(ps[p].as_nvector(), ps[i].as_nvector(), ps[n].as_nvector());
+            if i == 0 {
+                cur_side = side;
+            } else if cur_side != side {
+                // side changed -> concave
+                return true;
+            } else {
+                // still same side.
+            }
+        }
+        false
+    }
+}
+
 /// Determines whether the three points a, b and c occur in this order along the minor arc (a, c).
 /// This effectively determines whether b is located within the minor arc (a, c).
 ///
@@ -70,7 +123,7 @@ pub fn are_ordered(a: Vec3, b: Vec3, c: Vec3) -> bool {
     side(b, n, a) >= 0 && side(c, n, b) >= 0
 }
 
-/// Easting at given /n</-vector.
+/// Easting at given *n*-vector.
 pub fn easting(v: Vec3) -> Vec3 {
     // north pole = (0, 0, 1), south pole = (0, 0, -1)
     // if v.z() == 1 or -1, then v is either north or south pole, easting is therefore (0, 1, 0)
@@ -89,6 +142,7 @@ pub fn is_great_circle<T: HorizontalPosition>(p1: T, p2: T) -> bool {
 
 /// Computes the mean position of the given positions: the “center of gravity” of the given positions,
 /// which and can be compared to the centroid of a geometrical shape (n.b. other definitions of mean exist).
+///
 /// The mean position is undefined if either the given vector is empty or some of the given positions are
 /// antipodals.
 ///
@@ -124,7 +178,8 @@ pub fn mean_position<T: HorizontalPosition>(ps: &[T]) -> Option<T> {
     }
 }
 
-/// Returns a unit-length vector that is orthogonal to both given unit length vectors
+/// Returns a unit-length vector that is orthogonal to both given unit length vectors.
+///
 /// This function is similar to {@code v1 x v2} except that it does a better job of ensuring
 /// orthogonality when both vectors are nearly parallel and it returns a non-zero result even when
 /// both vectors are equal or opposite.
@@ -172,6 +227,7 @@ pub fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
 
 /// Similar to `side` but returns the value of the dot product between v0 and the orthogonal
 /// unit-length vector to v1 and v2.
+///
 /// - if the dot product is nearly-zero or zero, the 3 positions are collinear
 /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
 /// - otherwise, v0 is left of (v1, v2)

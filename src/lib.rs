@@ -48,7 +48,7 @@ pub use crate::position::{HorizontalPosition, Point};
 mod vec3;
 pub use crate::vec3::Vec3;
 
-/// Geographical position assuming a spherical model.
+/// Geographical position calculations assuming a spherical model.
 pub mod spherical;
 
 mod numbers;
