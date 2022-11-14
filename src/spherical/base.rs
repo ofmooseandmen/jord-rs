@@ -1,4 +1,4 @@
-use crate::{HorizontalPosition, Length, Vec3};
+use crate::{numbers::eq_zero, HorizontalPosition, Length, Vec3};
 
 /// Computes the signed angle in radians between the given vectors.
 /// - if vn is `None; the angle is always in [0..PI],
@@ -67,7 +67,7 @@ pub fn is_great_circle<T: HorizontalPosition>(p1: T, p2: T) -> bool {
 /// assert!(o_m.is_some());
 /// assert_eq!(
 ///     Vec3::from_lat_long_degrees(0.0, 0.0),
-///     o_m.unwrap().round_d7()
+///     o_m.unwrap().normalised_d7()
 /// );
 /// ```
 pub fn mean_position<T: HorizontalPosition>(ps: &[T]) -> Option<T> {
@@ -131,7 +131,7 @@ pub fn orthogonal(v1: Vec3, v2: Vec3) -> Vec3 {
 /// ```
 pub fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
     let side = side_exact(v0, v1, v2);
-    if side.abs() <= f64::EPSILON {
+    if eq_zero(side) {
         0
     } else if side < 0.0 {
         -1
@@ -236,7 +236,7 @@ mod tests {
         assert!(o_m.is_some());
         assert_eq!(
             Vec3::from_lat_long_degrees(0.0, 0.0),
-            o_m.unwrap().round_d7()
+            o_m.unwrap().normalised_d7()
         );
     }
 

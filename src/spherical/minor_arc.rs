@@ -408,7 +408,7 @@ mod tests {
         let i = arc1.intersection(arc2);
 
         assert!(i.is_some());
-        assert_eq!(expected.round_d7(), i.unwrap().round_d7());
+        assert_eq!(expected.normalised_d7(), i.unwrap().normalised_d7());
 
         // intersection is on both minor arc
         let v = i.unwrap().as_nvector();

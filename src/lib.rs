@@ -50,3 +50,5 @@ pub use crate::vec3::Vec3;
 
 /// Geographical position assuming a spherical model.
 pub mod spherical;
+
+mod numbers;

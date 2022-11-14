@@ -34,8 +34,6 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     /// assert_eq!(lat.as_degrees(), 90.0);
     /// assert_eq!(lon.as_degrees(), 0.0);
     /// ```
-    ///
-    /// Note: if the given latitude is a pole (+/- 90) then the longitudde is set to 0.
     fn from_lat_long(latitude: Angle, longitude: Angle) -> Self {
         Self::from_lat_long_radians(latitude.as_radians(), longitude.as_radians())
     }
@@ -57,44 +55,55 @@ pub trait HorizontalPosition: Clone + Copy + std::fmt::Debug + PartialEq + Sized
     /// Returns the latitude and longitude in radians of this horizontal position (may require conversion).
     fn to_lat_long_radians(&self) -> (f64, f64);
 
-    /// Wraps the given /n/-vector to an global horizontal position (may perform additional conversion to latitude/longitude).
+    /// Wraps the given /n/-vector to a global horizontal position (may perform additional conversion
+    /// to latitude/longitude). The given [Vec3] must be unit-length (i.e. effectively a /n/-vector).
     fn from_nvector(nvector: Vec3) -> Self;
 
     /// Returns the /n/-vector representing this horizontal position.
     fn as_nvector(&self) -> Vec3;
 
-    /// Returns the antipode of this position: the position which is diametrically opposite to this position.
+    /// Returns the antipode of this position: the position which is diametrically opposite to this
+    /// position.
     fn antipode(&self) -> Self;
 
     /// Determines if this position is the antipode of the given position.
     fn is_antipode(&self, other: Self) -> bool;
 
-    /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 5 decimal places.
+    /// Normalises any input data supplied at construction and returns a new global position with
+    /// the latitude and longitude of this position to the nearest decimal degrees with 5 decimal places.
+    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
+    /// forcibly sets the longitude to 0 if the latitude is at either pole.
+    ///
+    /// The precision of the returned position corresponds to the accuracy achieved by commercial GPS
+    /// units with differential correction; it allows to distinguish 2 positions about 1.1 metres apart.
     ///
     /// See also: [Angle::round_d5](crate::Angle::round_d5).
-    fn round_d5(&self) -> Self {
-        let (lat, lng) = self.to_lat_long();
-        Self::from_lat_long(lat.round_d5(), lng.round_d5())
-    }
+    fn normalised_d5(&self) -> Self;
 
-    /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 6 decimal places.
+    /// Normalises any input data supplied at construction and returns a new global position with
+    /// the latitude and longitude of this position to the nearest decimal degrees with 6 decimal places.
+    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
+    /// forcibly sets the longitude to 0 if the latitude is at either pole.
+    ///
+    /// The precision of the returned position corresponds to the accuracy achieved by
+    /// differentially corrected GPS; it allows to distinguish 2 positions about 0.11 metres apart.
     ///
     /// See also: [Angle::round_d6](crate::Angle::round_d6).
-    fn round_d6(&self) -> Self {
-        let (lat, lng) = self.to_lat_long();
-        Self::from_lat_long(lat.round_d6(), lng.round_d6())
-    }
+    fn normalised_d6(&self) -> Self;
 
-    /// Rounds both the latitude and longitude of this position to the nearest decimal
-    /// degrees with 7 decimal places.
+    // Normalises any input data supplied at construction and returns a new global position with
+    /// the latitude and longitude of this position to the nearest decimal degrees with 7 decimal places.
+    /// This guarantees that the returned global position's latitude, longitude and /n/-vector are all
+    /// in their nominal range (respectively [-90, 90], [-180, 180] and unit-length vector), it also
+    /// forcibly sets the longitude to 0 if the latitude is at either pole.
+    ///
+    /// The precision of the returned position corresponds to the neqr limit of what GPS-based
+    /// techniques; it allows to distinguish 2 positions about 11 millimetres apart.
     ///
     /// See also: [Angle::round_d7](crate::Angle::round_d7).
-    fn round_d7(&self) -> Self {
-        let (lat, lng) = self.to_lat_long();
-        Self::from_lat_long(lat.round_d7(), lng.round_d7())
-    }
+    fn normalised_d7(&self) -> Self;
 }
 
 /// An horizontal position that stores the latitude, longitude and equivalent /n/-vector.
@@ -137,17 +146,11 @@ impl Point {
 
 impl HorizontalPosition for Point {
     fn from_lat_long_radians(latitude: f64, longitude: f64) -> Self {
-        if eq_lat_rads_north_pole(latitude) {
-            Point::NORTH_POLE
-        } else if eq_lat_rads_south_pole(latitude) {
-            Point::SOUTH_POLE
-        } else {
-            let nvector = nvector_from_lat_long_radians(latitude, longitude);
-            Point {
-                latitude: Angle::from_radians(latitude),
-                longitude: Angle::from_radians(longitude),
-                nvector,
-            }
+        let nvector = nvector_from_lat_long_radians(latitude, longitude);
+        Point {
+            latitude: Angle::from_radians(latitude),
+            longitude: Angle::from_radians(longitude),
+            nvector,
         }
     }
 
@@ -164,18 +167,24 @@ impl HorizontalPosition for Point {
     }
 
     fn from_nvector(nvector: Vec3) -> Self {
-        if nvector.z() == 1.0 {
-            Point::NORTH_POLE
-        } else if nvector.z() == -1.0 {
-            Point::SOUTH_POLE
-        } else {
-            let (latitude, longitude) = nvector_to_lat_long_radians(nvector);
-            Point {
-                latitude: Angle::from_radians(latitude),
-                longitude: Angle::from_radians(longitude),
-                nvector,
-            }
+        let (latitude, longitude) = nvector_to_lat_long_radians(nvector);
+        Point {
+            latitude: Angle::from_radians(latitude),
+            longitude: Angle::from_radians(longitude),
+            nvector,
         }
+    }
+
+    fn normalised_d5(&self) -> Self {
+        normalised_point(self, |a| a.round_d5())
+    }
+
+    fn normalised_d6(&self) -> Self {
+        normalised_point(self, |a| a.round_d6())
+    }
+
+    fn normalised_d7(&self) -> Self {
+        normalised_point(self, |a| a.round_d7())
     }
 
     fn as_nvector(&self) -> Vec3 {
@@ -212,13 +221,7 @@ impl PartialEq for Point {
 
 impl HorizontalPosition for Vec3 {
     fn from_lat_long_radians(latitude: f64, longitude: f64) -> Self {
-        if eq_lat_rads_north_pole(latitude) {
-            Vec3::UNIT_Z
-        } else if eq_lat_rads_south_pole(latitude) {
-            Vec3::NEG_UNIT_Z
-        } else {
-            nvector_from_lat_long_radians(latitude, longitude)
-        }
+        nvector_from_lat_long_radians(latitude, longitude)
     }
 
     fn to_lat_long(&self) -> (Angle, Angle) {
@@ -237,6 +240,18 @@ impl HorizontalPosition for Vec3 {
 
     fn from_nvector(nvector: Vec3) -> Self {
         nvector
+    }
+
+    fn normalised_d5(&self) -> Self {
+        normalised_vec3(self, |a| a.round_d5())
+    }
+
+    fn normalised_d6(&self) -> Self {
+        normalised_vec3(self, |a| a.round_d6())
+    }
+
+    fn normalised_d7(&self) -> Self {
+        normalised_vec3(self, |a| a.round_d7())
     }
 
     fn as_nvector(&self) -> Vec3 {
@@ -271,14 +286,54 @@ fn nvector_to_lat_long_radians(nvector: Vec3) -> (f64, f64) {
     (lat, lon)
 }
 
-/// Is given latitude in radians at the north pole?
-fn eq_lat_rads_north_pole(latitude_rads: f64) -> bool {
-    latitude_rads == PI / 2.0
+/// Is given latitude in degrees at the north pole?
+fn eq_lat_north_pole(lat_degs: f64) -> bool {
+    lat_degs == 90.0
 }
 
-/// Is given latitude in radians at the south pole?
-fn eq_lat_rads_south_pole(latitude_rads: f64) -> bool {
-    latitude_rads == -PI / 2.0
+/// Is given latitude in degrees at the south pole?
+fn eq_lat_south_pole(lat_degs: f64) -> bool {
+    lat_degs == -90.0
+}
+
+fn normalised_point<F>(point: &Point, round: F) -> Point
+where
+    F: Fn(Angle) -> Angle,
+{
+    // make sure n-vector is unit-length.
+    let nvector = point.nvector.unit();
+    // convert to rounded latitude/longitude.
+    let (lat_rads, lng_rads) = nvector_to_lat_long_radians(nvector);
+    let latitude = round(Angle::from_radians(lat_rads));
+    let longitude = round(Angle::from_radians(lng_rads));
+    let lat_degs = latitude.as_degrees();
+    if eq_lat_north_pole(lat_degs) {
+        Point::NORTH_POLE
+    } else if eq_lat_south_pole(lat_degs) {
+        Point::SOUTH_POLE
+    } else {
+        Point::from_lat_long(latitude, longitude)
+    }
+}
+
+fn normalised_vec3<F>(nv: &Vec3, round: F) -> Vec3
+where
+    F: Fn(Angle) -> Angle,
+{
+    // make sure n-vector is unit-length.
+    let nvector = nv.unit();
+    // convert to rounded latitude/longitude.
+    let (lat_rads, lng_rads) = nvector_to_lat_long_radians(nvector);
+    let latitude = round(Angle::from_radians(lat_rads));
+    let longitude = round(Angle::from_radians(lng_rads));
+    let lat_degs = latitude.as_degrees();
+    if eq_lat_north_pole(lat_degs) {
+        Vec3::UNIT_Z
+    } else if eq_lat_south_pole(lat_degs) {
+        Vec3::NEG_UNIT_Z
+    } else {
+        Vec3::from_lat_long(latitude, longitude)
+    }
 }
 
 #[cfg(test)]
@@ -292,10 +347,16 @@ mod tests {
             Point::from_lat_long_degrees(-45.0, -26.0),
             Point::from_lat_long_degrees(45.0, 154.0)
                 .antipode()
-                .round_d7()
+                .normalised_d7()
         );
-        assert_eq!(Point::NORTH_POLE, Point::SOUTH_POLE.antipode());
-        assert_eq!(Point::SOUTH_POLE, Point::NORTH_POLE.antipode());
+        assert_eq!(
+            Point::from_lat_long_degrees(90.0, 180.0),
+            Point::SOUTH_POLE.antipode()
+        );
+        assert_eq!(
+            Point::from_lat_long_degrees(-90.0, 180.0),
+            Point::NORTH_POLE.antipode()
+        );
     }
 
     #[test]
@@ -304,9 +365,99 @@ mod tests {
             Vec3::from_lat_long_degrees(-45.0, -26.0),
             Vec3::from_lat_long_degrees(45.0, 154.0)
                 .antipode()
-                .round_d7()
+                .normalised_d7()
         );
         assert_eq!(Vec3::UNIT_Z, Vec3::NEG_UNIT_Z.antipode());
         assert_eq!(Vec3::NEG_UNIT_Z, Vec3::UNIT_Z.antipode());
+    }
+
+    #[test]
+    fn point_normalised_d7() {
+        // inside range.
+        assert_eq!(
+            Point::from_lat_long_degrees(-45.0, -26.0),
+            Point::from_lat_long_degrees(-45.0, -26.0).normalised_d7()
+        );
+
+        // north pole.
+        assert_eq!(
+            Point::NORTH_POLE,
+            Point::from_lat_long_degrees(90.0, -26.0).normalised_d7()
+        );
+
+        // south pole.
+        assert_eq!(
+            Point::SOUTH_POLE,
+            Point::from_lat_long_degrees(-90.0, -26.0).normalised_d7()
+        );
+
+        // latitude oustide range.
+        assert_eq!(
+            Point::from_lat_long_degrees(89.0, 154.0),
+            Point::from_lat_long_degrees(91.0, -26.0).normalised_d7()
+        );
+
+        // longitude oustide range.
+        assert_eq!(
+            Point::from_lat_long_degrees(89.0, 178.0),
+            Point::from_lat_long_degrees(89.0, -182.0).normalised_d7()
+        );
+
+        // both latitude and longitude outside range.
+        assert_eq!(
+            Point::from_lat_long_degrees(89.0, -2.0),
+            Point::from_lat_long_degrees(91.0, -182.0).normalised_d7()
+        );
+
+        // non-unit vector.
+        assert_eq!(
+            Point::from_lat_long_degrees(0.0, 0.0),
+            Point::from_nvector(Vec3::new(2.0, 0.0, 0.0)).normalised_d7()
+        );
+    }
+
+    #[test]
+    fn vec3_normalised_d7() {
+        // inside range.
+        assert_eq!(
+            Vec3::from_lat_long_degrees(-45.0, -26.0),
+            Vec3::from_lat_long_degrees(-45.0, -26.0).normalised_d7()
+        );
+
+        // north pole.
+        assert_eq!(
+            Vec3::UNIT_Z,
+            Vec3::from_lat_long_degrees(90.0, -26.0).normalised_d7()
+        );
+
+        // south pole.
+        assert_eq!(
+            Vec3::NEG_UNIT_Z,
+            Vec3::from_lat_long_degrees(-90.0, -26.0).normalised_d7()
+        );
+
+        // latitude oustide range.
+        assert_eq!(
+            Vec3::from_lat_long_degrees(89.0, 154.0),
+            Vec3::from_lat_long_degrees(91.0, -26.0).normalised_d7()
+        );
+
+        // longitude oustide range.
+        assert_eq!(
+            Vec3::from_lat_long_degrees(89.0, 178.0),
+            Vec3::from_lat_long_degrees(89.0, -182.0).normalised_d7()
+        );
+
+        // both latitude and longitude outside range.
+        assert_eq!(
+            Vec3::from_lat_long_degrees(89.0, -2.0),
+            Vec3::from_lat_long_degrees(91.0, -182.0).normalised_d7()
+        );
+
+        // non-unit vector.
+        assert_eq!(
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_nvector(Vec3::new(2.0, 0.0, 0.0)).normalised_d7()
+        );
     }
 }

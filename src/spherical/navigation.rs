@@ -67,7 +67,7 @@ pub trait Navigation: HorizontalPosition {
     /// let p = Point::from_lat_long_degrees(90.0, 0.0);
     /// let dest = p.destination(Angle::from_degrees(180.0), distance, IUGG_EARTH_RADIUS);
     ///
-    /// assert_eq!(Point::from_lat_long_degrees(45.0, 0.0), dest.round_d7());
+    /// assert_eq!(Point::from_lat_long_degrees(45.0, 0.0), dest.normalised_d7());
     /// ```
     fn destination(&self, bearing: Angle, distance: Length, radius: Length) -> Self {
         if distance == Length::ZERO {
@@ -207,7 +207,7 @@ pub trait Navigation: HorizontalPosition {
     ///
     /// let o_p = Point::from_lat_long_degrees(1.0, 0.0).projection(ma);
     /// assert!(o_p.is_some());
-    /// assert_eq!(Point::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().round_d7());
+    /// assert_eq!(Point::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
     ///
     /// // or alternatively with Vec3:
     ///
@@ -218,7 +218,7 @@ pub trait Navigation: HorizontalPosition {
     ///
     /// let o_p = Vec3::from_lat_long_degrees(1.0, 0.0).projection(ma);
     /// assert!(o_p.is_some());
-    /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().round_d7());
+    /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
     /// ```
     fn projection(&self, arc: MinorArc<Self>) -> Option<Self> {
         let s = *self;
@@ -303,7 +303,7 @@ mod tests {
                 Length::from_kilometres(5000.0),
                 IUGG_EARTH_RADIUS,
             )
-            .round_d7();
+            .normalised_d7();
         let e = Point::from_lat_long_degrees(0.0, -161.0339254);
         assert_eq!(e, d);
     }
@@ -314,7 +314,7 @@ mod tests {
         let distance = IUGG_EARTH_RADIUS * (PI / 4.0);
         let actual = Point::NORTH_POLE
             .destination(Angle::from_degrees(180.0), distance, IUGG_EARTH_RADIUS)
-            .round_d7();
+            .normalised_d7();
         assert_eq!(expected, actual);
     }
 
@@ -324,7 +324,7 @@ mod tests {
         let distance = IUGG_EARTH_RADIUS * (PI / 4.0);
         let actual = Point::SOUTH_POLE
             .destination(Angle::ZERO, distance, IUGG_EARTH_RADIUS)
-            .round_d7();
+            .normalised_d7();
         assert_eq!(expected, actual);
     }
 
@@ -335,7 +335,7 @@ mod tests {
         let d = IUGG_EARTH_RADIUS * (-2.0 * PI / 36.0);
         let actual = p
             .destination(Angle::from_degrees(90.0), d, IUGG_EARTH_RADIUS)
-            .round_d7();
+            .normalised_d7();
         let expected = Point::from_lat_long_degrees(0.0, -10.0);
         assert_eq!(expected, actual);
     }
@@ -349,7 +349,7 @@ mod tests {
                 Length::from_nautical_miles(2000.0),
                 IUGG_EARTH_RADIUS,
             )
-            .round_d7();
+            .normalised_d7();
         let e = Point::from_lat_long_degrees(82.6380125, 124.1259551);
         assert_eq!(e, d);
     }
@@ -634,7 +634,7 @@ mod tests {
         let p = o_p.unwrap();
         assert_eq!(
             Point::from_lat_long_degrees(53.2583533, -0.7977434),
-            p.round_d7()
+            p.normalised_d7()
         );
         assert_eq!(
             GreatCircle::new(end, start)
