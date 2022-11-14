@@ -19,6 +19,48 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
     sin_o.atan2(cos_o)
 }
 
+/// Determines whether the given positions are given in clockwise order.
+/// Notes:
+/// - array of positions can be opened (first != last) or closed (first == last)
+/// - returns false if less than 3 positions are given
+///
+/// # Examples:
+///
+/// ```
+/// use jord::{Length, HorizontalPosition, Vec3};
+/// use jord::spherical::are_clockwise;
+///
+/// let ps = vec![
+///     Vec3::from_lat_long_degrees(40.0, 40.0),
+///     Vec3::from_lat_long_degrees(10.0, 30.0),
+///     Vec3::from_lat_long_degrees(20.0, 20.0),
+///     Vec3::from_lat_long_degrees(40.0, 40.0)
+/// ];
+///
+/// assert!(are_clockwise(&ps));
+///
+/// ```
+pub fn are_clockwise<T: HorizontalPosition>(ps: &[T]) -> bool {
+    if ps.is_empty() {
+        false
+    } else if ps.first() == ps.last() {
+        are_clockwise(ps.split_last().unwrap().1)
+    } else if ps.len() < 3 {
+        false
+    } else if ps.len() == 3 {
+        side(ps[0].as_nvector(), ps[1].as_nvector(), ps[2].as_nvector()) < 0
+    } else {
+        let mut angle_rads = 0.0;
+        let len = ps.len();
+        for i in 0..len {
+            let p = prev(i, ps);
+            let n = next(i, ps);
+            angle_rads += turn_radians(ps[p].as_nvector(), ps[i].as_nvector(), ps[n].as_nvector());
+        }
+        angle_rads < 0.0
+    }
+}
+
 /// Determines whether the three points a, b and c occur in this order along the minor arc (a, c).
 /// This effectively determines whether b is located within the minor arc (a, c).
 ///
@@ -80,18 +122,6 @@ pub fn mean_position<T: HorizontalPosition>(ps: &[T]) -> Option<T> {
         let m = Vec3::mean(&vs);
         Some(T::from_nvector(m))
     }
-}
-
-/// Determines if the given vector contains antipodal positions.
-fn contains_antipodal<T: HorizontalPosition>(ps: &[T]) -> bool {
-    for p in ps {
-        let a = p.antipode();
-        let found = ps.iter().any(|&o| o == a);
-        if found {
-            return true;
-        }
-    }
-    false
 }
 
 /// Returns a unit-length vector that is orthogonal to both given unit length vectors
@@ -167,13 +197,43 @@ pub(crate) fn along_track_distance(pos: Vec3, start: Vec3, normal: Vec3, radius:
     angle * radius
 }
 
+/// Determines if the given vector contains antipodal positions.
+fn contains_antipodal<T: HorizontalPosition>(ps: &[T]) -> bool {
+    for p in ps {
+        let a = p.antipode();
+        let found = ps.iter().any(|&o| o == a);
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+fn prev<T>(i: usize, v: &[T]) -> usize {
+    if i == 0 {
+        v.len() - 1
+    } else {
+        i - 1
+    }
+}
+
+fn next<T>(i: usize, v: &[T]) -> usize {
+    if i == v.len() - 1 {
+        0
+    } else {
+        i + 1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f64::consts::PI;
 
     use crate::{Angle, HorizontalPosition, Vec3};
 
-    use crate::spherical::{angle_radians_between, mean_position, side, turn_radians};
+    use crate::spherical::{
+        angle_radians_between, are_clockwise, mean_position, side, turn_radians,
+    };
 
     // angle_radians_between
 
@@ -208,6 +268,106 @@ mod tests {
             angle_radians_between(Vec3::new(1.0, 0.0, 0.0), Vec3::new(1.0, 1.0, 0.0), None),
             PI / 4.0
         );
+    }
+
+    // are_clockwise
+
+    #[test]
+    fn are_clockwise_3() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(40.0, 40.0),
+            Vec3::from_lat_long_degrees(10.0, 30.0),
+            Vec3::from_lat_long_degrees(20.0, 20.0),
+            Vec3::from_lat_long_degrees(40.0, 40.0),
+        ];
+        test_clockwise(&ps, true);
+    }
+
+    #[test]
+    fn are_anti_clockwise_3() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(20.0, 20.0),
+            Vec3::from_lat_long_degrees(10.0, 30.0),
+            Vec3::from_lat_long_degrees(40.0, 40.0),
+            Vec3::from_lat_long_degrees(20.0, 20.0),
+        ];
+        test_clockwise(&ps, false);
+    }
+
+    #[test]
+    fn are_clockwise_equal_left_right_turns() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, -1.0),
+            Vec3::from_lat_long_degrees(2.0, -5.0),
+            Vec3::from_lat_long_degrees(1.5, 0.0),
+            Vec3::from_lat_long_degrees(2.0, 5.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+
+        test_clockwise(&ps, true);
+    }
+
+    #[test]
+    fn are_anti_clockwise_equal_left_right_turns() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(2.0, 5.0),
+            Vec3::from_lat_long_degrees(1.5, 0.0),
+            Vec3::from_lat_long_degrees(2.0, -5.0),
+            Vec3::from_lat_long_degrees(1.0, -1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+
+        test_clockwise(&ps, false);
+    }
+
+    #[test]
+    fn are_anti_clockwise_more_left_turns() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(2.0, 5.0),
+            Vec3::from_lat_long_degrees(2.0, -5.0),
+            Vec3::from_lat_long_degrees(1.0, -1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_clockwise(&ps, false);
+    }
+
+    #[test]
+    fn are_clockwise_more_right_turns() {
+        let ps = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, -1.0),
+            Vec3::from_lat_long_degrees(2.0, -5.0),
+            Vec3::from_lat_long_degrees(2.0, 5.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_clockwise(&ps, true);
+    }
+
+    #[test]
+    fn are_clockwise_less_than_3() {
+        let mut ps: Vec<Vec3> = Vec::new();
+        assert_eq!(false, are_clockwise(&ps));
+
+        ps = vec![Vec3::from_lat_long_degrees(0.0, 0.0)];
+        assert_eq!(false, are_clockwise(&ps));
+
+        ps = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+        ];
+        assert_eq!(false, are_clockwise(&ps));
+    }
+
+    fn test_clockwise<T: HorizontalPosition>(ps: &[T], expected: bool) {
+        assert_eq!(expected, are_clockwise(ps.split_last().unwrap().1));
+        assert_eq!(expected, are_clockwise(&ps));
     }
 
     // mean
