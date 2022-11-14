@@ -221,16 +221,24 @@ pub trait Navigation: HorizontalPosition {
     /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().round_d7());
     /// ```
     fn projection(&self, arc: MinorArc<Self>) -> Option<Self> {
-        // we need the ratio of along track distance over distance, so we can use
-        // an arbitrary radius.
-        let radius = Length::from_metres(1.0);
-        let dist = arc.start().distance(arc.end(), radius);
-        let along = arc.along_track_distance(*self, radius);
-        let ratio = along / dist;
-        if !(0.0..=1.0).contains(&ratio) {
-            None
+        let s = *self;
+        if s == arc.start() || s == arc.end() {
+            Some(s)
         } else {
-            Some(unchecked_interpolated(arc.start(), arc.end(), ratio))
+            // we need the ratio of along track distance over distance, so we can use
+            // an arbitrary radius.
+            let radius = Length::from_metres(1.0);
+            let dist = arc.start().distance(arc.end(), radius);
+            let along = arc.along_track_distance(*self, radius);
+            let ratio = along / dist;
+            if !(0.0..=1.0).contains(&ratio) {
+                println!("{}", ratio);
+                println!("{}", dist.as_metres());
+                println!("{}", along.as_metres());
+                None
+            } else {
+                Some(unchecked_interpolated(arc.start(), arc.end(), ratio))
+            }
         }
     }
 }
@@ -274,6 +282,8 @@ mod tests {
 
     use std::f64::consts::PI;
 
+    use crate::spherical::GreatCircle;
+    use crate::spherical::MinorArc;
     use crate::Angle;
     use crate::HorizontalPosition;
     use crate::Length;
@@ -460,6 +470,227 @@ mod tests {
         assert_eq!(
             Angle::from_degrees(125.6839551),
             p1.final_bearing(p2).round_d7()
+        );
+    }
+
+    // initial_bearing
+
+    #[test]
+    fn initial_bearing_antipodal() {
+        assert_eq!(
+            Angle::ZERO,
+            Point::NORTH_POLE.initial_bearing(Point::SOUTH_POLE)
+        );
+        assert_eq!(
+            Angle::ZERO,
+            Point::SOUTH_POLE.initial_bearing(Point::NORTH_POLE)
+        );
+    }
+
+    #[test]
+    fn initial_bearing_at_equator_going_east() {
+        let p1 = Point::from_lat_long_degrees(0.0, 0.0);
+        let p2 = Point::from_lat_long_degrees(0.0, 1.0);
+        assert_eq!(Angle::from_degrees(90.0), p1.initial_bearing(p2));
+    }
+
+    #[test]
+    fn initial_bearing_at_equator_going_west() {
+        let p1 = Point::from_lat_long_degrees(0.0, 1.0);
+        let p2 = Point::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Angle::from_degrees(270.0), p1.initial_bearing(p2));
+    }
+
+    #[test]
+    fn initial_bearing_coincidental() {
+        let p = Point::from_lat_long_degrees(50.0, -18.0);
+        assert_eq!(Angle::ZERO, p.initial_bearing(p));
+    }
+
+    #[test]
+    fn initial_bearing_from_north_pole() {
+        assert_eq!(
+            Angle::from_degrees(26.0),
+            Point::NORTH_POLE
+                .initial_bearing(Point::from_lat_long_degrees(50.0, 154.0))
+                .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_north_pole_to_date_line() {
+        assert_eq!(
+            Angle::ZERO,
+            Point::NORTH_POLE
+                .initial_bearing(Point::from_lat_long_degrees(50.0, 180.0))
+                .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_same_longitude_going_north() {
+        let p1 = Point::from_lat_long_degrees(50.0, -5.0);
+        let p2 = Point::from_lat_long_degrees(58.0, -5.0);
+        assert_eq!(Angle::ZERO, p1.initial_bearing(p2).round_d7());
+    }
+
+    #[test]
+    fn initial_bearing_same_longitude_going_south() {
+        let p1 = Point::from_lat_long_degrees(58.0, -5.0);
+        let p2 = Point::from_lat_long_degrees(50.0, -5.0);
+        assert_eq!(
+            Angle::from_degrees(180.0),
+            p1.initial_bearing(p2).round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_from_south_pole() {
+        assert_eq!(
+            Angle::from_degrees(154.0),
+            Point::SOUTH_POLE
+                .initial_bearing(Point::from_lat_long_degrees(50.0, 154.0))
+                .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_south_pole_to_date_line() {
+        assert_eq!(
+            Angle::from_degrees(180.0),
+            Point::SOUTH_POLE
+                .initial_bearing(Point::from_lat_long_degrees(50.0, 180.0))
+                .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_test() {
+        let p1 = Point::from_lat_long_degrees(50.06638889, -5.71472222);
+        let p2 = Point::from_lat_long_degrees(58.64388889, -3.07);
+        assert_eq!(
+            Angle::from_degrees(9.1198181),
+            p1.initial_bearing(p2).round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(191.2752013),
+            p2.initial_bearing(p1).round_d7()
+        );
+    }
+
+    // interpolated
+
+    #[test]
+    fn interpolated_antipodal() {
+        assert!(Point::NORTH_POLE
+            .interpolated(Point::SOUTH_POLE, 0.0)
+            .is_none());
+    }
+
+    #[test]
+    fn interpolated_f0() {
+        assert_eq!(
+            Some(Point::NORTH_POLE),
+            Point::NORTH_POLE.interpolated(Point::from_lat_long_degrees(0.0, 0.0), 0.0)
+        );
+    }
+
+    #[test]
+    fn interpolated_f1() {
+        assert_eq!(
+            Some(Point::from_lat_long_degrees(0.0, 0.0)),
+            Point::NORTH_POLE.interpolated(Point::from_lat_long_degrees(0.0, 0.0), 1.0)
+        );
+    }
+
+    #[test]
+    fn interpolated_invalid_f() {
+        assert!(Point::NORTH_POLE
+            .interpolated(Point::SOUTH_POLE, -0.1)
+            .is_none());
+        assert!(Point::NORTH_POLE
+            .interpolated(Point::SOUTH_POLE, 1.1)
+            .is_none());
+    }
+
+    #[test]
+    fn interpolated_test() {
+        assert_eq!(
+            Some(Point::from_lat_long_degrees(0.0, 0.0)),
+            Point::from_lat_long_degrees(10.0, 0.0)
+                .interpolated(Point::from_lat_long_degrees(-10.0, 0.0), 0.5)
+        );
+    }
+
+    // projection
+
+    #[test]
+    fn projection_inside_minor_arc() {
+        let start = Point::from_lat_long_degrees(53.3206, -1.7297);
+        let end = Point::from_lat_long_degrees(53.1887, 0.1334);
+        let pt = Point::from_lat_long_degrees(53.2611, -0.7972);
+        let o_p = pt.projection(MinorArc::new(start, end));
+        assert!(o_p.is_some());
+        let p = o_p.unwrap();
+        assert_eq!(
+            Point::from_lat_long_degrees(53.2583533, -0.7977434),
+            p.round_d7()
+        );
+        assert_eq!(
+            GreatCircle::new(end, start)
+                .cross_track_distance(p, IUGG_EARTH_RADIUS)
+                .round_mm(),
+            p.distance(p, IUGG_EARTH_RADIUS).round_mm()
+        );
+    }
+
+    #[test]
+    fn projection_north_pole() {
+        let start = Point::from_lat_long_degrees(0.0, -10.0);
+        let end = Point::from_lat_long_degrees(0.0, 10.0);
+        assert_eq!(
+            Some(start),
+            Point::NORTH_POLE.projection(MinorArc::new(start, end))
+        );
+    }
+
+    #[test]
+    fn projection_on_end() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        assert_eq!(Some(end), end.projection(MinorArc::new(start, end)));
+    }
+
+    #[test]
+    fn projection_on_start() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        assert_eq!(Some(start), start.projection(MinorArc::new(start, end)));
+    }
+
+    #[test]
+    fn projection_outside_minor_arc_after() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        let p = Point::from_lat_long_degrees(54.0, 25.0);
+        assert!(p.projection(MinorArc::new(start, end)).is_none());
+    }
+
+    #[test]
+    fn projection_outside_minor_arc_before() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        let p = Point::from_lat_long_degrees(54.0, 10.0);
+        assert!(p.projection(MinorArc::new(start, end)).is_none());
+    }
+
+    #[test]
+    fn projection_south_pole() {
+        let start = Point::from_lat_long_degrees(0.0, -10.0);
+        let end = Point::from_lat_long_degrees(0.0, 10.0);
+        assert_eq!(
+            Some(start),
+            Point::SOUTH_POLE.projection(MinorArc::new(start, end))
         );
     }
 }

@@ -140,7 +140,7 @@ pub fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
     }
 }
 
-/// Similar to `side`but returns the value of the dot product between v0 and the orthogonal
+/// Similar to `side` but returns the value of the dot product between v0 and the orthogonal
 /// unit-length vector to v1 and v2.
 /// - if the dot product is nearly-zero or zero, the 3 positions are collinear
 /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
@@ -161,7 +161,7 @@ pub fn turn_radians(a: Vec3, b: Vec3, c: Vec3) -> f64 {
 pub(crate) fn along_track_distance(pos: Vec3, start: Vec3, normal: Vec3, radius: Length) -> Length {
     let angle = angle_radians_between(
         start,
-        (normal.cross_prod(pos)).cross_prod(normal),
+        normal.cross_prod(pos).cross_prod(normal),
         Some(normal),
     );
     angle * radius
@@ -173,7 +173,9 @@ mod tests {
 
     use crate::{Angle, HorizontalPosition, Vec3};
 
-    use crate::spherical::{angle_radians_between, side, turn_radians};
+    use crate::spherical::{angle_radians_between, mean_position, side, turn_radians};
+
+    // angle_radians_between
 
     #[test]
     fn angle_radians_between_signed() {
@@ -207,6 +209,43 @@ mod tests {
             PI / 4.0
         );
     }
+
+    // mean
+
+    #[test]
+    fn mean_antipodal() {
+        assert!(mean_position(&vec!(Vec3::UNIT_Z, Vec3::NEG_UNIT_Z)).is_none());
+    }
+
+    #[test]
+    fn mean_empty() {
+        let vs: Vec<Vec3> = Vec::new();
+        assert!(mean_position(&vs).is_none());
+    }
+
+    #[test]
+    fn mean_test() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(10.0, 10.0),
+            Vec3::from_lat_long_degrees(10.0, -10.0),
+            Vec3::from_lat_long_degrees(-10.0, -10.0),
+            Vec3::from_lat_long_degrees(-10.0, 10.0),
+        ];
+
+        let o_m = mean_position(&vs);
+        assert!(o_m.is_some());
+        assert_eq!(
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            o_m.unwrap().round_d7()
+        );
+    }
+
+    #[test]
+    fn mean_one() {
+        assert_eq!(Some(Vec3::UNIT_X), mean_position(&vec!(Vec3::UNIT_X)));
+    }
+
+    // side
 
     #[test]
     fn side_collinear() {
@@ -261,6 +300,8 @@ mod tests {
         let left = Vec3::from_lat_long(Angle::from_degrees(-78.0), lng - one_mas);
         assert_eq!(1, side(left, v1, v2));
     }
+
+    // turn_radians
 
     #[test]
 
