@@ -20,95 +20,102 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
     sin_o.atan2(cos_o)
 }
 
-/// Determines whether the given positions are given in clockwise order.
+/// Determines whether the given *loop* is defined in clockwise order. A *loop* is a single chain of
+/// vertices where the first vertex is implicitly connected to the last.
 ///
-/// Notes:
-/// - array of positions can be opened (first != last) or closed (first == last)
+/// - the loop can be explicity close (first == last) or not (first != last)
 /// - returns false if less than 3 positions are given
 ///
 /// # Examples:
 ///
 /// ```
 /// use jord::{Length, HorizontalPosition, Vec3};
-/// use jord::spherical::in_clockwise_order;
+/// use jord::spherical::is_loop_clockwise;
 ///
-/// let ps = vec![
+/// let vs = vec![
 ///     Vec3::from_lat_long_degrees(40.0, 40.0),
 ///     Vec3::from_lat_long_degrees(10.0, 30.0),
 ///     Vec3::from_lat_long_degrees(20.0, 20.0),
 ///     Vec3::from_lat_long_degrees(40.0, 40.0)
 /// ];
 ///
-/// assert!(in_clockwise_order(&ps));
-///
+/// assert!(is_loop_clockwise(&vs));
+/// // same if loop is not closed
+/// assert!(is_loop_clockwise(vs.split_last().unwrap().1));
 /// ```
-pub fn in_clockwise_order<T: HorizontalPosition>(ps: &[T]) -> bool {
-    if ps.is_empty() {
+pub fn is_loop_clockwise<T: HorizontalPosition>(vs: &[T]) -> bool {
+    if vs.is_empty() {
         false
-    } else if ps.first() == ps.last() {
+    } else if vs.first() == vs.last() {
         // unwrap is safe, ps is not empty
-        in_clockwise_order(ps.split_last().unwrap().1)
-    } else if ps.len() < 3 {
+        is_loop_clockwise(vs.split_last().unwrap().1)
+    } else if vs.len() < 3 {
         false
-    } else if ps.len() == 3 {
-        side(ps[0].as_nvector(), ps[1].as_nvector(), ps[2].as_nvector()) < 0
+    } else if vs.len() == 3 {
+        side(vs[0].as_nvector(), vs[1].as_nvector(), vs[2].as_nvector()) < 0
     } else {
         let mut angle_rads = 0.0;
-        let len = ps.len();
+        let len = vs.len();
         for i in 0..len {
-            let p = prev(i, ps);
-            let n = next(i, ps);
-            angle_rads += turn_radians(ps[p].as_nvector(), ps[i].as_nvector(), ps[n].as_nvector());
+            let p = prev(i, vs);
+            let n = next(i, vs);
+            angle_rads += turn_radians(vs[p].as_nvector(), vs[i].as_nvector(), vs[n].as_nvector());
         }
         angle_rads < 0.0
     }
 }
 
-/// Determines whether the given vertices define a convex polygon.
+/// Determines whether the given *loop* is convex. A *loop* is a single chain of vertices where the
+/// first vertex is implicitly connected to the last.
 ///
 /// Notes:
 /// - array of vertices can be opened (first != last) or closed (first == last)
 /// - returns false if less than 3 vertices are given
+/// - returns true if all vertices are collinear
 ///
 /// # Examples:
 ///
 /// ```
 /// use jord::{Length, HorizontalPosition, Vec3};
-/// use jord::spherical::is_convex_polygon;
+/// use jord::spherical::is_loop_convex;
 ///
-/// let ps = vec![
+/// let vs = vec![
 ///     Vec3::from_lat_long_degrees(40.0, 40.0),
 ///     Vec3::from_lat_long_degrees(10.0, 30.0),
 ///     Vec3::from_lat_long_degrees(20.0, 20.0),
 ///     Vec3::from_lat_long_degrees(40.0, 40.0)
 /// ];
 ///
-/// assert!(is_convex_polygon(&ps));
-///
+/// assert!(is_loop_convex(&vs));
+/// // same if loop is not closed
+/// assert!(is_loop_convex(vs.split_last().unwrap().1));
 /// ```
-pub fn is_convex_polygon<T: HorizontalPosition>(vs: &[T]) -> bool {
+pub fn is_loop_convex<T: HorizontalPosition>(vs: &[T]) -> bool {
     if vs.is_empty() {
         false
     } else if vs.first() == vs.last() {
         // unwrap is safe, ps is not empty
-        is_convex_polygon(vs.split_last().unwrap().1)
+        is_loop_convex(vs.split_last().unwrap().1)
     } else if vs.len() < 3 {
         false
     } else {
         let mut cur_side = i8::MIN;
+        let mut found_left_right = false;
         let len = vs.len();
         for i in 0..len {
             let p = prev(i, vs);
             let n = next(i, vs);
             let side = side(vs[p].as_nvector(), vs[i].as_nvector(), vs[n].as_nvector());
-            if i == 0 {
-                cur_side = side;
-            } else if cur_side != side {
-                // side changed -> concave
-                // TODO: need to account for collinear vertices
-                return false;
-            } else {
-                // still same side.
+            if side != 0 {
+                if !found_left_right {
+                    cur_side = side;
+                } else if cur_side != side {
+                    // side changed -> concave
+                    return false;
+                } else {
+                    // still same side.
+                }
+                found_left_right = true;
             }
         }
         true
@@ -289,7 +296,7 @@ mod tests {
     use crate::{Angle, HorizontalPosition, Vec3};
 
     use crate::spherical::{
-        angle_radians_between, in_clockwise_order, mean_position, side, turn_radians,
+        angle_radians_between, is_loop_clockwise, is_loop_convex, mean_position, side, turn_radians,
     };
 
     // angle_radians_between
@@ -327,33 +334,33 @@ mod tests {
         );
     }
 
-    // in_clockwise_order
+    // is_loop_clockwise
 
     #[test]
-    fn in_clockwise_order_3() {
-        let ps = vec![
+    fn clockwise_loop_3() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(40.0, 40.0),
             Vec3::from_lat_long_degrees(10.0, 30.0),
             Vec3::from_lat_long_degrees(20.0, 20.0),
             Vec3::from_lat_long_degrees(40.0, 40.0),
         ];
-        test_clockwise(&ps, true);
+        test_clockwise(&vs, true);
     }
 
     #[test]
-    fn are_anti_clockwise_3() {
-        let ps = vec![
+    fn anti_clockwise_loop_3() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(20.0, 20.0),
             Vec3::from_lat_long_degrees(10.0, 30.0),
             Vec3::from_lat_long_degrees(40.0, 40.0),
             Vec3::from_lat_long_degrees(20.0, 20.0),
         ];
-        test_clockwise(&ps, false);
+        test_clockwise(&vs, false);
     }
 
     #[test]
-    fn in_clockwise_order_equal_left_right_turns() {
-        let ps = vec![
+    fn clockwise_loop_equal_left_right_turns() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, -1.0),
             Vec3::from_lat_long_degrees(2.0, -5.0),
@@ -363,12 +370,12 @@ mod tests {
             Vec3::from_lat_long_degrees(0.0, 0.0),
         ];
 
-        test_clockwise(&ps, true);
+        test_clockwise(&vs, true);
     }
 
     #[test]
-    fn are_anti_clockwise_equal_left_right_turns() {
-        let ps = vec![
+    fn anti_clockwise_loop_equal_left_right_turns() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, 1.0),
             Vec3::from_lat_long_degrees(2.0, 5.0),
@@ -378,12 +385,12 @@ mod tests {
             Vec3::from_lat_long_degrees(0.0, 0.0),
         ];
 
-        test_clockwise(&ps, false);
+        test_clockwise(&vs, false);
     }
 
     #[test]
-    fn are_anti_clockwise_more_left_turns() {
-        let ps = vec![
+    fn anti_clockwise_loop_more_left_turns() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, 1.0),
             Vec3::from_lat_long_degrees(2.0, 5.0),
@@ -391,12 +398,12 @@ mod tests {
             Vec3::from_lat_long_degrees(1.0, -1.0),
             Vec3::from_lat_long_degrees(0.0, 0.0),
         ];
-        test_clockwise(&ps, false);
+        test_clockwise(&vs, false);
     }
 
     #[test]
-    fn in_clockwise_order_more_right_turns() {
-        let ps = vec![
+    fn clockwise_loop_more_right_turns() {
+        let vs = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, -1.0),
             Vec3::from_lat_long_degrees(2.0, -5.0),
@@ -404,27 +411,118 @@ mod tests {
             Vec3::from_lat_long_degrees(1.0, 1.0),
             Vec3::from_lat_long_degrees(0.0, 0.0),
         ];
-        test_clockwise(&ps, true);
+        test_clockwise(&vs, true);
     }
 
     #[test]
-    fn in_clockwise_order_less_than_3() {
-        let mut ps: Vec<Vec3> = Vec::new();
-        assert_eq!(false, in_clockwise_order(&ps));
+    fn is_loop_clockwise_less_than_3() {
+        let mut vs: Vec<Vec3> = Vec::new();
+        assert_eq!(false, is_loop_clockwise(&vs));
 
-        ps = vec![Vec3::from_lat_long_degrees(0.0, 0.0)];
-        assert_eq!(false, in_clockwise_order(&ps));
+        vs = vec![Vec3::from_lat_long_degrees(0.0, 0.0)];
+        assert_eq!(false, is_loop_clockwise(&vs));
 
-        ps = vec![
+        vs = vec![
             Vec3::from_lat_long_degrees(0.0, 0.0),
             Vec3::from_lat_long_degrees(1.0, 1.0),
         ];
-        assert_eq!(false, in_clockwise_order(&ps));
+        assert_eq!(false, is_loop_clockwise(&vs));
     }
 
-    fn test_clockwise<T: HorizontalPosition>(ps: &[T], expected: bool) {
-        assert_eq!(expected, in_clockwise_order(ps.split_last().unwrap().1));
-        assert_eq!(expected, in_clockwise_order(&ps));
+    fn test_clockwise<T: HorizontalPosition>(vs: &[T], expected: bool) {
+        assert_eq!(expected, is_loop_clockwise(vs.split_last().unwrap().1));
+        assert_eq!(expected, is_loop_clockwise(&vs));
+    }
+
+    // is_loop_convex
+
+    #[test]
+    fn convex() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_convex(&vs, true);
+    }
+
+    #[test]
+    fn convex_collinear() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(0.1, 0.0),
+            Vec3::from_lat_long_degrees(0.2, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_convex(&vs, true);
+    }
+
+    #[test]
+    fn concave() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.5, 0.5),
+            Vec3::from_lat_long_degrees(0.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_convex(&vs, false);
+    }
+
+    #[test]
+    fn concave_collinear() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(0.1, 0.0),
+            Vec3::from_lat_long_degrees(0.2, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+            Vec3::from_lat_long_degrees(0.5, 0.5),
+            Vec3::from_lat_long_degrees(0.0, 1.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_convex(&vs, false);
+    }
+
+    #[test]
+    fn convex_all_collinear() {
+        let vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(0.1, 0.0),
+            Vec3::from_lat_long_degrees(0.2, 0.0),
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+        ];
+        test_convex(&vs, true);
+    }
+
+    #[test]
+    fn is_loop_convex_less_than_3() {
+        let mut vs: Vec<Vec3> = Vec::new();
+        assert_eq!(false, is_loop_convex(&vs));
+
+        vs = vec![Vec3::from_lat_long_degrees(0.0, 0.0)];
+        assert_eq!(false, is_loop_convex(&vs));
+
+        vs = vec![
+            Vec3::from_lat_long_degrees(0.0, 0.0),
+            Vec3::from_lat_long_degrees(1.0, 1.0),
+        ];
+        assert_eq!(false, is_loop_convex(&vs));
+    }
+
+    fn test_convex<T: HorizontalPosition>(vs: &[T], expected: bool) {
+        assert_eq!(expected, is_loop_convex(vs.split_last().unwrap().1));
+        assert_eq!(expected, is_loop_convex(&vs));
+        let mut rvs = vs.to_vec();
+        rvs.reverse();
+        assert_eq!(expected, is_loop_convex(vs.split_last().unwrap().1));
+        assert_eq!(expected, is_loop_convex(&vs));
     }
 
     // mean
