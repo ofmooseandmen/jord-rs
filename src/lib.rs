@@ -11,7 +11,6 @@
 //!
 #![forbid(
     anonymous_parameters,
-    const_err,
     illegal_floating_point_literal_pattern,
     late_bound_lifetime_arguments,
     path_statements,
