@@ -23,7 +23,7 @@ pub fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
 /// Determines whether the given *loop* is defined in clockwise order. A *loop* is a single chain of
 /// vertices where the first vertex is implicitly connected to the last.
 ///
-/// - the loop can be explicity close (first == last) or not (first != last)
+/// - array of vertices can be opened (first != last) or closed (first == last)
 /// - returns false if less than 3 positions are given
 ///
 /// # Examples:
