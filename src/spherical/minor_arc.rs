@@ -550,4 +550,16 @@ mod tests {
             MinorArc::new(start, end).projection(Point::SOUTH_POLE)
         );
     }
+
+    #[test]
+    fn projection_nearly_perpendicular_null_island() {
+        let start = Point::from_lat_long_degrees(80.0, -90.0);
+        let end = Point::from_lat_long_degrees(80.0, 90.0);
+        // minor arc normal should be (-1, 0, 0) but due to floating point precision it is not exactly that
+        // value, hence (0, 0) is not exactly perpendicular.
+        assert_eq!(
+            Some(Point::NORTH_POLE),
+            MinorArc::new(start, end).projection(Point::from_lat_long_degrees(0.0, 0.0))
+        );
+    }
 }

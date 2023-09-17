@@ -145,7 +145,7 @@ impl Vec3 {
     }
 
     /// Returns the unit length vector perpendicular to this vector and the given vector (normalised cross product).
-    /// See also `Vec3::cross_prod` and `Vec3::unit`.
+    /// See also [crate::Vec3::cross_prod] and [crate::Vec3::unit].
     ///
     /// # Examples
     ///
@@ -220,7 +220,7 @@ impl Vec3 {
         self.squared_norm().sqrt()
     }
 
-    /// Similar to `Vec3::stable_cross_prod`, but returns a unit vector (without creating an intermediate
+    /// Similar to [crate::Vec3::stable_cross_prod], but returns a unit vector (without creating an intermediate
     /// [Vec3].
     ///
     /// #Examples:

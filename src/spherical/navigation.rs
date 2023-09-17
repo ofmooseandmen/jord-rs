@@ -230,6 +230,7 @@ mod tests {
 
     use std::f64::consts::PI;
 
+    use crate::spherical::side;
     use crate::Angle;
     use crate::HorizontalPosition;
     use crate::Length;
@@ -566,5 +567,35 @@ mod tests {
             Point::from_lat_long_degrees(10.0, 0.0)
                 .interpolated(Point::from_lat_long_degrees(-10.0, 0.0), 0.5)
         );
+    }
+
+    #[test]
+    fn interpolated_half() {
+        assert_eq!(
+            Some(Point::from_lat_long_degrees(0.0, 0.0)),
+            Point::from_lat_long_degrees(10.0, 0.0)
+                .interpolated(Point::from_lat_long_degrees(-10.0, 0.0), 0.5)
+        );
+    }
+
+    #[test]
+    fn interpolated_side() {
+        let p0 = Point::from_lat_long_degrees(154.0, 54.0);
+        let p1 = Point::from_lat_long_degrees(155.0, 55.0);
+        let i = p0.interpolated(p1, 0.25).unwrap();
+        assert_eq!(0, side(i.as_nvector(), p0.as_nvector(), p1.as_nvector()));
+    }
+
+    #[test]
+    fn interpolated_transitivity() {
+        let p0 = Point::from_lat_long_degrees(10.0, 0.0);
+        let p1 = Point::from_lat_long_degrees(-10.0, 0.0);
+        let expected = p0.interpolated(p1, 0.5).unwrap();
+        let actual = p0
+            .interpolated(p1, 0.25)
+            .unwrap()
+            .interpolated(p1, 1.0 / 3.0)
+            .unwrap();
+        assert_eq!(expected, actual.normalised_d7());
     }
 }
