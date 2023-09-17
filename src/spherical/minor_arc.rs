@@ -120,13 +120,58 @@ impl<T: HorizontalPosition> MinorArc<T> {
             None
         }
     }
+
+    /// Computes the projection of the given position on the given minor arc. Returns [None] if the projection is not
+    /// within the minor arc (including start and end). If the given position is strictly "perpendicular" to the
+    /// given minor arc, this method arbitrarily returns the start (p can be projected anywhere on the minor arc).
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use jord::{HorizontalPosition, Point, Vec3};
+    /// use jord::spherical::{MinorArc, Navigation};
+    ///
+    /// let ma = MinorArc::new(
+    ///     Point::from_lat_long_degrees(0.0, -10.0),
+    ///     Point::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o_p = ma.projection(Point::from_lat_long_degrees(1.0, 0.0));
+    /// assert!(o_p.is_some());
+    /// assert_eq!(Point::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
+    ///
+    /// // or alternatively with Vec3:
+    ///
+    /// let ma = MinorArc::new(
+    ///     Vec3::from_lat_long_degrees(0.0, -10.0),
+    ///     Vec3::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o_p = ma.projection(Vec3::from_lat_long_degrees(1.0, 0.0));
+    /// assert!(o_p.is_some());
+    /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
+    /// ```
+    pub fn projection(&self, pos: T) -> Option<T> {
+        let n1 = self.normal;
+        let n2 = pos.as_nvector().stable_cross_prod_unit(n1);
+        if n2 == Vec3::ZERO {
+            Some(self.start)
+        } else {
+            let proj = orthogonal(n1, n2);
+            if are_ordered(self.start.as_nvector(), proj, self.end.as_nvector()) {
+                Some(T::from_nvector(proj))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use crate::{
-        spherical::{side, MinorArc, Navigation},
+        spherical::{side, GreatCircle, MinorArc, Navigation},
         Angle, HorizontalPosition, Length, Point, Vec3, IUGG_EARTH_RADIUS,
     };
 
@@ -176,6 +221,8 @@ mod tests {
             ma.along_track_distance(p, IUGG_EARTH_RADIUS).round_mm()
         );
     }
+
+    // intersection
 
     #[test]
     fn intersection_arc_across_equator() {
@@ -419,6 +466,88 @@ mod tests {
         assert_eq!(
             0,
             side(v, arc2.start().as_nvector(), arc2.end().as_nvector())
+        );
+    }
+
+    // projection
+
+    #[test]
+    fn projection_inside_minor_arc() {
+        let start = Point::from_lat_long_degrees(53.3206, -1.7297);
+        let end = Point::from_lat_long_degrees(53.1887, 0.1334);
+        let pt = Point::from_lat_long_degrees(53.2611, -0.7972);
+        let o_p = MinorArc::new(start, end).projection(pt);
+        assert!(o_p.is_some());
+        let p = o_p.unwrap();
+        assert_eq!(
+            Point::from_lat_long_degrees(53.2583533, -0.7977434),
+            p.normalised_d7()
+        );
+        assert_eq!(
+            GreatCircle::new(end, start)
+                .cross_track_distance(pt, IUGG_EARTH_RADIUS)
+                .round_mm(),
+            p.distance(pt, IUGG_EARTH_RADIUS).round_mm()
+        );
+    }
+
+    #[test]
+    fn projection_north_pole() {
+        let start = Point::from_lat_long_degrees(0.0, -10.0);
+        let end = Point::from_lat_long_degrees(0.0, 10.0);
+        assert_eq!(
+            Some(start),
+            MinorArc::new(start, end).projection(Point::NORTH_POLE)
+        );
+    }
+
+    #[test]
+    fn projection_on_end() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        assert_eq!(
+            Some(end.normalised_d7()),
+            MinorArc::new(start, end)
+                .projection(end)
+                .map(|p| p.normalised_d7())
+        );
+    }
+
+    #[test]
+    fn projection_on_start() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        assert_eq!(
+            Some(start.normalised_d7()),
+            MinorArc::new(start, end)
+                .projection(start)
+                .map(|p| p.normalised_d7())
+        );
+    }
+
+    #[test]
+    fn projection_outside_minor_arc_after() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        let p = Point::from_lat_long_degrees(54.0, 25.0);
+        assert!(MinorArc::new(start, end).projection(p).is_none());
+    }
+
+    #[test]
+    fn projection_outside_minor_arc_before() {
+        let start = Point::from_lat_long_degrees(54.0, 15.0);
+        let end = Point::from_lat_long_degrees(54.0, 20.0);
+        let p = Point::from_lat_long_degrees(54.0, 10.0);
+        assert!(MinorArc::new(start, end).projection(p).is_none());
+    }
+
+    #[test]
+    fn projection_south_pole() {
+        let start = Point::from_lat_long_degrees(0.0, -10.0);
+        let end = Point::from_lat_long_degrees(0.0, 10.0);
+        assert_eq!(
+            Some(start),
+            MinorArc::new(start, end).projection(Point::SOUTH_POLE)
         );
     }
 }

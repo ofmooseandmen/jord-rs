@@ -1,4 +1,4 @@
-use super::{along_track_distance, angle_radians_between, easting, is_great_circle, MinorArc};
+use super::{along_track_distance, angle_radians_between, easting, is_great_circle};
 use crate::{Angle, HorizontalPosition, Length, Point, Vec3};
 use std::f64::consts::PI;
 
@@ -186,59 +186,19 @@ pub trait Navigation: HorizontalPosition {
     fn interpolated(&self, other: Self, f: f64) -> Option<Self> {
         if !(0.0..=1.0).contains(&f) || self.is_antipode(other) {
             None
+        } else if f == 0.0 {
+            Some(*self)
+        } else if f == 1.0 {
+            Some(other)
         } else {
-            Some(unchecked_interpolated(*self, other, f))
-        }
-    }
-
-    /// Computes the projection of the given position on the given minor arc. Returns [None] if the projection is not
-    /// within the minor arc (including start and end).
-    ///
-    /// # Examples:
-    ///
-    /// ```
-    /// use jord::{HorizontalPosition, Point, Vec3};
-    /// use jord::spherical::{MinorArc, Navigation};
-    ///
-    /// let ma = MinorArc::new(
-    ///     Point::from_lat_long_degrees(0.0, -10.0),
-    ///     Point::from_lat_long_degrees(0.0, 10.0)
-    /// );
-    ///
-    /// let o_p = Point::from_lat_long_degrees(1.0, 0.0).projection(ma);
-    /// assert!(o_p.is_some());
-    /// assert_eq!(Point::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
-    ///
-    /// // or alternatively with Vec3:
-    ///
-    /// let ma = MinorArc::new(
-    ///     Vec3::from_lat_long_degrees(0.0, -10.0),
-    ///     Vec3::from_lat_long_degrees(0.0, 10.0)
-    /// );
-    ///
-    /// let o_p = Vec3::from_lat_long_degrees(1.0, 0.0).projection(ma);
-    /// assert!(o_p.is_some());
-    /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
-    /// ```
-    fn projection(&self, arc: MinorArc<Self>) -> Option<Self> {
-        let s = *self;
-        if s == arc.start() || s == arc.end() {
-            Some(s)
-        } else {
-            // we need the ratio of along track distance over distance, so we can use
-            // an arbitrary radius.
-            let radius = Length::from_metres(1.0);
-            let dist = arc.start().distance(arc.end(), radius);
-            let along = arc.along_track_distance(*self, radius);
-            let ratio = along / dist;
-            if !(0.0..=1.0).contains(&ratio) {
-                println!("{}", ratio);
-                println!("{}", dist.as_metres());
-                println!("{}", along.as_metres());
-                None
-            } else {
-                Some(unchecked_interpolated(arc.start(), arc.end(), ratio))
-            }
+            let v0 = self.as_nvector();
+            let v1 = other.as_nvector();
+            // angular distance in radians multiplied by the fraction: how far from v0.
+            let distance_radians = f * angle_radians_between(v0, v1, None);
+            //  a vector representing the direction from v0 to v1.
+            let dir = (v0.stable_cross_prod(v1)).cross_prod_unit(v0);
+            let v = (v0 * distance_radians.cos() + dir * distance_radians.sin()).unit();
+            Some(Self::from_nvector(v))
         }
     }
 }
@@ -265,25 +225,11 @@ fn initial_bearing_radians(v1: Vec3, v2: Vec3) -> f64 {
     angle_radians_between(gc1, gc2, Some(v1))
 }
 
-fn unchecked_interpolated<T: HorizontalPosition>(p0: T, p1: T, f: f64) -> T {
-    if f == 0.0 {
-        p0
-    } else if f == 1.0 {
-        p1
-    } else {
-        let v0 = p0.as_nvector();
-        let v1 = p1.as_nvector();
-        T::from_nvector(v0.lerp_unit(v1, f))
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     use std::f64::consts::PI;
 
-    use crate::spherical::GreatCircle;
-    use crate::spherical::MinorArc;
     use crate::Angle;
     use crate::HorizontalPosition;
     use crate::Length;
@@ -619,78 +565,6 @@ mod tests {
             Some(Point::from_lat_long_degrees(0.0, 0.0)),
             Point::from_lat_long_degrees(10.0, 0.0)
                 .interpolated(Point::from_lat_long_degrees(-10.0, 0.0), 0.5)
-        );
-    }
-
-    // projection
-
-    #[test]
-    fn projection_inside_minor_arc() {
-        let start = Point::from_lat_long_degrees(53.3206, -1.7297);
-        let end = Point::from_lat_long_degrees(53.1887, 0.1334);
-        let pt = Point::from_lat_long_degrees(53.2611, -0.7972);
-        let o_p = pt.projection(MinorArc::new(start, end));
-        assert!(o_p.is_some());
-        let p = o_p.unwrap();
-        assert_eq!(
-            Point::from_lat_long_degrees(53.2583533, -0.7977434),
-            p.normalised_d7()
-        );
-        assert_eq!(
-            GreatCircle::new(end, start)
-                .cross_track_distance(p, IUGG_EARTH_RADIUS)
-                .round_mm(),
-            p.distance(p, IUGG_EARTH_RADIUS).round_mm()
-        );
-    }
-
-    #[test]
-    fn projection_north_pole() {
-        let start = Point::from_lat_long_degrees(0.0, -10.0);
-        let end = Point::from_lat_long_degrees(0.0, 10.0);
-        assert_eq!(
-            Some(start),
-            Point::NORTH_POLE.projection(MinorArc::new(start, end))
-        );
-    }
-
-    #[test]
-    fn projection_on_end() {
-        let start = Point::from_lat_long_degrees(54.0, 15.0);
-        let end = Point::from_lat_long_degrees(54.0, 20.0);
-        assert_eq!(Some(end), end.projection(MinorArc::new(start, end)));
-    }
-
-    #[test]
-    fn projection_on_start() {
-        let start = Point::from_lat_long_degrees(54.0, 15.0);
-        let end = Point::from_lat_long_degrees(54.0, 20.0);
-        assert_eq!(Some(start), start.projection(MinorArc::new(start, end)));
-    }
-
-    #[test]
-    fn projection_outside_minor_arc_after() {
-        let start = Point::from_lat_long_degrees(54.0, 15.0);
-        let end = Point::from_lat_long_degrees(54.0, 20.0);
-        let p = Point::from_lat_long_degrees(54.0, 25.0);
-        assert!(p.projection(MinorArc::new(start, end)).is_none());
-    }
-
-    #[test]
-    fn projection_outside_minor_arc_before() {
-        let start = Point::from_lat_long_degrees(54.0, 15.0);
-        let end = Point::from_lat_long_degrees(54.0, 20.0);
-        let p = Point::from_lat_long_degrees(54.0, 10.0);
-        assert!(p.projection(MinorArc::new(start, end)).is_none());
-    }
-
-    #[test]
-    fn projection_south_pole() {
-        let start = Point::from_lat_long_degrees(0.0, -10.0);
-        let end = Point::from_lat_long_degrees(0.0, 10.0);
-        assert_eq!(
-            Some(start),
-            Point::SOUTH_POLE.projection(MinorArc::new(start, end))
         );
     }
 }

@@ -197,7 +197,7 @@ pub fn orthogonal(v1: Vec3, v2: Vec3) -> Vec3 {
     // The direction of v1 x v2 is unstable as v2 + v1 or v2 - v1 approaches 0. To avoid this,
     // we just compute (v2 + v1) x (v2 - v1) which is twice the cross product of v2 and v1, but
     // is always perpendicular (since both v1 and v2 are unit-length vectors).
-    let r = (v2 + v1).cross_prod_unit(v2 - v1);
+    let r = v1.stable_cross_prod_unit(v2);
     if r == Vec3::ZERO {
         // return an arbitrary orthogonal vector.
         v1.orthogonal()

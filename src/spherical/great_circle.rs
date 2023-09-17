@@ -65,6 +65,21 @@ impl GreatCircle {
         let angle = angle_radians_between(self.normal, other.as_nvector(), None);
         (angle - (PI / 2.0)) * radius
     }
+
+    /// Computes the projection of the given position on the given great circle. If the given position is strictly
+    /// "perpendicular" to the given great circle, this method arbitrarily returns a position on the great circle (p
+    /// can be projected anywhere on the great circle).
+    /// TODO(CL): examples + tests
+    pub fn projection<T: HorizontalPosition>(&self, pos: T) -> Option<T> {
+        let n1 = self.normal;
+        let n2 = pos.as_nvector().stable_cross_prod_unit(n1);
+        if n2 == Vec3::ZERO {
+            Some(T::from_nvector(pos.as_nvector().orthogonal()))
+        } else {
+            let proj = orthogonal(n1, n2);
+            Some(T::from_nvector(proj))
+        }
+    }
 }
 
 #[cfg(test)]

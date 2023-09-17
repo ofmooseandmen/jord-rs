@@ -181,24 +181,6 @@ impl Vec3 {
         self.x() * o.x() + self.y() * o.y() + self.z() * o.z()
     }
 
-    /// Performs a linear interpolation between the this vector and the given vector. Resulting vector is unit length.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jord::Vec3;
-    ///
-    /// let v1 = Vec3::UNIT_X;
-    /// let v2 = Vec3::UNIT_Z;
-    /// v1.lerp_unit(v2, 0.5);
-    /// ```
-    pub fn lerp_unit(self, o: Self, f: f64) -> Self {
-        let vx = self.x() + (o.x() - self.x()) * f;
-        let vy = self.y() + (o.y() - self.y()) * f;
-        let vz = self.z() + (o.z() - self.z()) * f;
-        Vec3::new_unit(vx, vy, vz)
-    }
-
     /// Returns a unit length vector orthogonal to this vector.
     ///
     /// # Examples:
@@ -236,6 +218,70 @@ impl Vec3 {
     /// Euclidean norm of this vector (square root of the dot product with itself).
     pub fn norm(self) -> f64 {
         self.squared_norm().sqrt()
+    }
+
+    /// Similar to `Vec3::stable_cross_prod`, but returns a unit vector (without creating an intermediate
+    /// [Vec3].
+    ///
+    /// #Examples:
+    ///
+    /// ```
+    /// use jord::Vec3;
+    ///
+    /// let v1 = Vec3::new(2.0, 0.0, 0.0);
+    /// let v2 = Vec3::new(0.0, 2.0, 0.0);
+    /// assert_eq!(Vec3::new(0.0, 0.0, 1.0), v1.stable_cross_prod_unit(v2));
+    /// ```
+    pub fn stable_cross_prod_unit(self, o: Self) -> Self {
+        // a = v2 + v1
+        let xa = o.x() + self.x();
+        let ya = o.y() + self.y();
+        let za = o.z() + self.z();
+
+        // b = v2 - v1
+        let xb = o.x() - self.x();
+        let yb = o.y() - self.y();
+        let zb = o.z() - self.z();
+
+        // a x b
+        let x = ya * zb - za * yb;
+        let y = za * xb - xa * zb;
+        let z = xa * yb - ya * xb;
+
+        Vec3::new_unit(x, y, z)
+    }
+
+    /// Calculates the vector perpendicular to given unit vectors in a numerically stable way. The direction of v1 x
+    /// v2 is unstable as v2 + v1 or v2 - v1 approaches 0. In order to workaround this, this method computes (v2 +
+    /// v1) x (v2 - v1) which is twice the cross product of v2 and v1, but is always perpendicular (since both v1
+    /// and v2 are unit-length vectors).
+    ///
+    /// #Examples:
+    ///
+    /// ```
+    /// use jord::Vec3;
+    ///
+    /// let v1 = Vec3::new(2.0, 0.0, 0.0);
+    /// let v2 = Vec3::new(0.0, 2.0, 0.0);
+    /// assert_eq!(Vec3::new(0.0, 0.0, 8.0), v1.stable_cross_prod(v2));
+    /// ```
+    pub fn stable_cross_prod(self, o: Self) -> Self {
+        // a = v2 + v1
+        let xa = o.x() + self.x();
+        let ya = o.y() + self.y();
+        let za = o.z() + self.z();
+
+        // b = v2 - v1
+        let xb = o.x() - self.x();
+        let yb = o.y() - self.y();
+        let zb = o.z() - self.z();
+
+        // a x b
+        let x = ya * zb - za * yb;
+        let y = za * xb - xa * zb;
+        let z = xa * yb - ya * xb;
+
+        Vec3::new(x, y, z)
     }
 
     /// Squared Euclidean norm of this vector (the dot product with itself).
