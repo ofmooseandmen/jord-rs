@@ -69,7 +69,33 @@ impl GreatCircle {
     /// Computes the projection of the given position on the given great circle. If the given position is strictly
     /// "perpendicular" to the given great circle, this method arbitrarily returns a position on the great circle (p
     /// can be projected anywhere on the great circle).
-    /// TODO(CL): examples + tests
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use jord::{HorizontalPosition, Point, Vec3};
+    /// use jord::spherical::{GreatCircle, Navigation};
+    ///
+    /// let gc = GreatCircle::new(
+    ///     Point::from_lat_long_degrees(0.0, -10.0),
+    ///     Point::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o_p = gc.projection(Point::from_lat_long_degrees(1.0, 0.0));
+    /// assert!(o_p.is_some());
+    /// assert_eq!(Point::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
+    ///
+    /// // or alternatively with Vec3:
+    ///
+    /// let gc = GreatCircle::new(
+    ///     Vec3::from_lat_long_degrees(0.0, -10.0),
+    ///     Vec3::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o_p = gc.projection(Vec3::from_lat_long_degrees(1.0, 0.0));
+    /// assert!(o_p.is_some());
+    /// assert_eq!(Vec3::from_lat_long_degrees(0.0, 0.0), o_p.unwrap().normalised_d7());
+    /// ```
     pub fn projection<T: HorizontalPosition>(&self, pos: T) -> Option<T> {
         let n1 = self.normal;
         let n2 = pos.as_nvector().stable_cross_prod_unit(n1);
@@ -89,6 +115,8 @@ mod tests {
         spherical::{GreatCircle, Navigation},
         HorizontalPosition, Length, Point, IUGG_EARTH_RADIUS,
     };
+
+    // cross_track_distance
 
     #[test]
     fn cross_track_distance_left() {
@@ -137,4 +165,19 @@ mod tests {
             f = f + 0.1;
         }
     }
+
+    // projection
+
+    #[test]
+    fn nearly_perpendicular_null_island() {
+        let start = Point::from_lat_long_degrees(80.0, -90.0);
+        let end = Point::from_lat_long_degrees(80.0, 90.0);
+        // great circle normal should be (-1, 0, 0) but due to floating point precision it is not exactly that
+        // value, hence (0, 0) is not exactly perpendicular.
+        assert_eq!(
+            Some(Point::NORTH_POLE),
+            GreatCircle::new(start, end).projection(Point::from_lat_long_degrees(0.0, 0.0))
+        );
+    }
+
 }
