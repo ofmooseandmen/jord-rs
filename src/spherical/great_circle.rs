@@ -179,5 +179,4 @@ mod tests {
             GreatCircle::new(start, end).projection(Point::from_lat_long_degrees(0.0, 0.0))
         );
     }
-
 }

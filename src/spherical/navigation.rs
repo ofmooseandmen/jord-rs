@@ -1,3 +1,4 @@
+//! Common geographical Position calculations assuming a spherical Earth model.
 use super::{along_track_distance, angle_radians_between, easting, is_great_circle};
 use crate::{Angle, HorizontalPosition, Length, Point, Vec3};
 use std::f64::consts::PI;

@@ -1,4 +1,5 @@
-/// Various "low-level" algorithms for spherical geometry.
+//! Geographical position calculations assuming a spherical model.
+
 mod base;
 pub use base::{
     angle_radians_between, are_ordered, easting, is_great_circle, is_loop_clockwise,

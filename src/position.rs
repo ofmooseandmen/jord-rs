@@ -3,7 +3,7 @@ use std::f64::consts::PI;
 use crate::{Angle, Vec3};
 
 /// Represents an horizontal position. This trait allows to abstract over the struct used to define a global
-/// position at at the surface of a celestial body (e.g. most likely the Earth). The most common representation
+/// position at the surface of a celestial body (e.g. most likely the Earth). The most common representation
 /// is to use latitude and longitude. However, this representation has a severe limitation; the two singularities
 /// at latitudes +/- 90, where longitude is undefined. In addition, when getting close to the singularities, the
 /// representation exhibits considerable non-linearities and extreme latitude dependency, leading to reduced
