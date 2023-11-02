@@ -26,7 +26,8 @@
 #![warn(missing_docs)]
 #![deny(clippy::all)]
 
-/// Base modules.
+mod mat33;
+pub use crate::mat33::Mat33;
 
 #[macro_use]
 mod measurement;
@@ -35,18 +36,22 @@ pub use crate::measurement::Measurement;
 mod angle;
 pub use crate::angle::Angle;
 
+pub mod ellipsoidal;
+
+mod local_frame;
+pub use crate::local_frame::{r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalPositionVector};
+
 mod length;
 pub use crate::length::Length;
 
-mod surface;
-pub use crate::surface::{Ellipsoid, IUGG_EARTH_RADIUS, MOON_RADIUS};
+mod numbers;
 
-mod position;
-pub use crate::position::{HorizontalPosition, Point};
-
-mod vec3;
-pub use crate::vec3::Vec3;
+mod positions;
+pub use crate::positions::{GeocentricPos, GeodeticPos, LatLong, NVector, PositionVector};
 
 pub mod spherical;
 
-mod numbers;
+mod surface;
+
+mod vec3;
+pub use crate::vec3::Vec3;

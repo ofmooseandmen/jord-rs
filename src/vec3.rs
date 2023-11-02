@@ -356,6 +356,12 @@ impl ::std::ops::Div<f64> for Vec3 {
     }
 }
 
+impl From<(f64, f64, f64)> for Vec3 {
+    fn from(tuple: (f64, f64, f64)) -> Self {
+        Vec3::new(tuple.0, tuple.1, tuple.2)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
