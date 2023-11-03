@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use crate::{
-    surface::Surface, Angle, GeocentricPos, GeodeticPos, Length, NVector, PositionVector, Vec3,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
 };
 
 use super::{
@@ -340,9 +340,366 @@ fn contains_antipodal(ps: &[NVector]) -> bool {
 
 #[cfg(test)]
 mod tests {
+
+    use std::f64::consts::PI;
+
+    /// destination.
+
+    #[test]
+    fn destination_across_date_line() {
+        let p = NVector::from_lat_long_degrees(0.0, 154.0);
+        let actual = Sphere::EARTH.destination_pos(
+            p,
+            Angle::from_degrees(90.0),
+            Length::from_kilometres(5000.0),
+        );
+        let expected = NVector::from_lat_long_degrees(0.0, -161.0339254);
+        assert_nv_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn destination_from_north_pole() {
+        let expected = NVector::from_lat_long_degrees(45.0, 0.0);
+        let distance = Sphere::EARTH.radius() * (PI / 4.0);
+        let actual = Sphere::EARTH.destination_pos(
+            NVector::from_lat_long_degrees(90.0, 0.0),
+            Angle::from_degrees(180.0),
+            distance,
+        );
+        assert_nv_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn destination_from_south_pole() {
+        let expected = NVector::from_lat_long_degrees(-45.0, 0.0);
+        let distance = Sphere::EARTH.radius() * (PI / 4.0);
+        let actual = Sphere::EARTH.destination_pos(
+            NVector::from_lat_long_degrees(-90.0, 0.0),
+            Angle::ZERO,
+            distance,
+        );
+        assert_nv_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn destination_negative_distance() {
+        let p = NVector::from_lat_long_degrees(0.0, 0.0);
+        // equivalent of -10 degree of longitude.
+        let d = Sphere::EARTH.radius() * (-2.0 * PI / 36.0);
+        let actual = Sphere::EARTH.destination_pos(p, Angle::from_degrees(90.0), d);
+        let expected = NVector::from_lat_long_degrees(0.0, -10.0);
+        assert_nv_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn destination_travelled_longitude_greater_than_90() {
+        let p = NVector::from_lat_long_degrees(60.2, 11.1);
+        let d = Sphere::EARTH.destination_pos(
+            p,
+            Angle::from_degrees(12.4),
+            Length::from_nautical_miles(2000.0),
+        );
+        let e = NVector::from_lat_long_degrees(82.6380125, 124.1259551);
+        assert_nv_eq_d7(e, d);
+    }
+
+    #[test]
+    fn destination_zero_distance() {
+        let p = NVector::from_lat_long_degrees(55.6050, 13.0038);
+        assert_eq!(
+            p,
+            Sphere::EARTH.destination_pos(p, Angle::from_degrees(96.0217), Length::ZERO,)
+        );
+    }
+
+    // distance.
+
+    #[test]
+    fn distance_accross_date_line() {
+        let p1 = NVector::from_lat_long_degrees(50.066389, -179.999722);
+        let p2 = NVector::from_lat_long_degrees(50.066389, 179.999722);
+        assert_eq!(
+            Length::from_metres(39.685),
+            Sphere::EARTH.distance(p1, p2).round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_between_poles() {
+        assert_eq!(
+            Length::from_metres(20_015_089.309),
+            Sphere::EARTH
+                .distance(
+                    NVector::from_lat_long_degrees(90.0, 0.0),
+                    NVector::from_lat_long_degrees(-90.0, 0.0)
+                )
+                .round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_test() {
+        let p1 = NVector::from_lat_long_degrees(50.066389, -5.714722);
+        let p2 = NVector::from_lat_long_degrees(58.643889, -3.07);
+        assert_eq!(
+            Length::from_metres(968_853.666),
+            Sphere::EARTH.distance(p1, p2).round_mm()
+        );
+    }
+
+    #[test]
+    fn distance_transitivity() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 10.0);
+        let p3 = NVector::from_lat_long_degrees(0.0, 20.0);
+        let d1 = Sphere::EARTH.distance(p1, p2);
+        let d2 = Sphere::EARTH.distance(p2, p3);
+        let actual = (d1 + d2).round_mm();
+        assert_eq!(actual, Sphere::EARTH.distance(p1, p3).round_mm());
+    }
+
+    #[test]
+    fn distance_zero() {
+        let p = NVector::from_lat_long_degrees(50.066389, -5.714722);
+        assert_eq!(Length::ZERO, Sphere::EARTH.distance(p, p));
+    }
+
+    /// final_bearing.
+
+    #[test]
+    fn final_bearing_at_equator_going_east() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 1.0);
+        assert_eq!(Angle::from_degrees(90.0), Sphere::final_bearing(p1, p2));
+    }
+
+    #[test]
+    fn final_bearing_at_equator_going_west() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 1.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Angle::from_degrees(270.0), Sphere::final_bearing(p1, p2));
+    }
+
+    #[test]
+    fn final_bearing_coincidental() {
+        let p = NVector::from_lat_long_degrees(50.0, -18.0);
+        assert_eq!(Angle::ZERO, Sphere::final_bearing(p, p));
+    }
+
+    #[test]
+    fn final_bearing_same_longitude_going_north() {
+        let p1 = NVector::from_lat_long_degrees(50.0, -5.0);
+        let p2 = NVector::from_lat_long_degrees(58.0, -5.0);
+        assert_eq!(Angle::ZERO, Sphere::final_bearing(p1, p2));
+    }
+
+    #[test]
+    fn final_bearing_same_longitude_going_south() {
+        let p1 = NVector::from_lat_long_degrees(58.0, -5.0);
+        let p2 = NVector::from_lat_long_degrees(50.0, -5.0);
+        assert_eq!(Angle::from_degrees(180.0), Sphere::final_bearing(p1, p2));
+    }
+
+    #[test]
+    fn final_bearing_test() {
+        let p1 = NVector::from_lat_long_degrees(50.06638889, -5.71472222);
+        let p2 = NVector::from_lat_long_degrees(58.64388889, -3.07);
+        assert_eq!(
+            Angle::from_degrees(11.2752013),
+            Sphere::final_bearing(p1, p2).round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(189.1198181),
+            Sphere::final_bearing(p2, p1).round_d7()
+        );
+
+        let p1 = NVector::from_lat_long_degrees(-53.99472222, -25.9875);
+        let p2 = NVector::from_lat_long_degrees(54.0, 154.0);
+        assert_eq!(
+            Angle::from_degrees(125.6839551),
+            Sphere::final_bearing(p1, p2).round_d7()
+        );
+    }
+
+    // initial_bearing
+
+    #[test]
+    fn initial_bearing_antipodal() {
+        let np = NVector::from_lat_long_degrees(90.0, 0.0);
+        let sp = NVector::from_lat_long_degrees(-90.0, 0.0);
+        assert_eq!(Angle::from_degrees(180.0), Sphere::initial_bearing(np, sp));
+        assert_eq!(Angle::ZERO, Sphere::initial_bearing(sp, np));
+    }
+
+    #[test]
+    fn initial_bearing_at_equator_going_east() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 1.0);
+        assert_eq!(Angle::from_degrees(90.0), Sphere::initial_bearing(p1, p2));
+    }
+
+    #[test]
+    fn initial_bearing_at_equator_going_west() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 1.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Angle::from_degrees(270.0), Sphere::initial_bearing(p1, p2));
+    }
+
+    #[test]
+    fn initial_bearing_coincidental() {
+        let p = NVector::from_lat_long_degrees(50.0, -18.0);
+        assert_eq!(Angle::ZERO, Sphere::initial_bearing(p, p));
+    }
+
+    #[test]
+    fn initial_bearing_from_north_pole() {
+        assert_eq!(
+            Angle::from_degrees(26.0),
+            Sphere::initial_bearing(
+                NVector::from_lat_long_degrees(90.0, 0.0),
+                NVector::from_lat_long_degrees(50.0, 154.0)
+            )
+            .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_north_pole_to_date_line() {
+        assert_eq!(
+            Angle::ZERO,
+            Sphere::initial_bearing(
+                NVector::from_lat_long_degrees(90.0, 0.0),
+                NVector::from_lat_long_degrees(50.0, 180.0)
+            )
+            .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_same_longitude_going_north() {
+        let p1 = NVector::from_lat_long_degrees(50.0, -5.0);
+        let p2 = NVector::from_lat_long_degrees(58.0, -5.0);
+        assert_eq!(Angle::ZERO, Sphere::initial_bearing(p1, p2).round_d7());
+    }
+
+    #[test]
+    fn initial_bearing_same_longitude_going_south() {
+        let p1 = NVector::from_lat_long_degrees(58.0, -5.0);
+        let p2 = NVector::from_lat_long_degrees(50.0, -5.0);
+        assert_eq!(
+            Angle::from_degrees(180.0),
+            Sphere::initial_bearing(p1, p2).round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_from_south_pole() {
+        assert_eq!(
+            Angle::from_degrees(154.0),
+            Sphere::initial_bearing(
+                NVector::from_lat_long_degrees(-90.0, 0.0),
+                NVector::from_lat_long_degrees(50.0, 154.0)
+            )
+            .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_south_pole_to_date_line() {
+        assert_eq!(
+            Angle::from_degrees(180.0),
+            Sphere::initial_bearing(
+                NVector::from_lat_long_degrees(-90.0, 0.0),
+                NVector::from_lat_long_degrees(50.0, 180.0)
+            )
+            .round_d7()
+        );
+    }
+
+    #[test]
+    fn initial_bearing_test() {
+        let p1 = NVector::from_lat_long_degrees(50.06638889, -5.71472222);
+        let p2 = NVector::from_lat_long_degrees(58.64388889, -3.07);
+        assert_eq!(
+            Angle::from_degrees(9.1198181),
+            Sphere::initial_bearing(p1, p2).round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(191.2752013),
+            Sphere::initial_bearing(p2, p1).round_d7()
+        );
+    }
+
+    // interpolated
+
+    #[test]
+    fn interpolated_antipodal() {
+        let p = NVector::from_lat_long_degrees(90.0, 0.0);
+        assert!(Sphere::interpolated_pos(p, p.antipode(), 0.5).is_none());
+    }
+
+    #[test]
+    fn interpolated_f0() {
+        let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Some(p1), Sphere::interpolated_pos(p1, p2, 0.0));
+    }
+
+    #[test]
+    fn interpolated_f1() {
+        let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
+        assert_eq!(Some(p2), Sphere::interpolated_pos(p1, p2, 1.0));
+    }
+
+    #[test]
+    fn interpolated_invalid_f() {
+        let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
+        let p2 = NVector::from_lat_long_degrees(1.0, 0.0);
+        assert!(Sphere::interpolated_pos(p1, p2, -0.1).is_none());
+        assert!(Sphere::interpolated_pos(p1, p2, 1.1).is_none());
+    }
+
+    #[test]
+    fn interpolated_half() {
+        assert_eq!(
+            Some(NVector::from_lat_long_degrees(0.0, 0.0)),
+            Sphere::interpolated_pos(
+                NVector::from_lat_long_degrees(10.0, 0.0),
+                NVector::from_lat_long_degrees(-10.0, 0.0),
+                0.5
+            )
+        );
+    }
+
+    #[test]
+    fn interpolated_side() {
+        let p0 = NVector::from_lat_long_degrees(154.0, 54.0);
+        let p1 = NVector::from_lat_long_degrees(155.0, 55.0);
+        let i = Sphere::interpolated_pos(p0, p1, 0.25).unwrap();
+        assert_eq!(0, Sphere::side(i, p0, p1));
+    }
+
+    #[test]
+    fn interpolated_transitivity() {
+        let p0 = NVector::from_lat_long_degrees(10.0, 0.0);
+        let p1 = NVector::from_lat_long_degrees(-10.0, 0.0);
+        let expected = Sphere::interpolated_pos(p0, p1, 0.5).unwrap();
+        let actual = Sphere::interpolated_pos(
+            Sphere::interpolated_pos(p0, p1, 0.25).unwrap(),
+            p1,
+            1.0 / 3.0,
+        );
+        assert_opt_nv_eq_d7(expected, actual);
+    }
+
     // mean
 
-    use crate::{spherical::Sphere, Angle, LatLong, NVector, Vec3};
+    use crate::{
+        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
+        spherical::Sphere,
+        Angle, LatLong, Length, NVector, Vec3,
+    };
 
     #[test]
     fn mean_antipodal() {
@@ -365,11 +722,9 @@ mod tests {
             NVector::from_lat_long_degrees(-10.0, 10.0),
         ];
 
-        let o_m = Sphere::mean_position(&vs);
-        assert!(o_m.is_some());
-        assert_eq!(
-            LatLong::from_degrees(0.0, 0.0),
-            LatLong::from_nvector(o_m.unwrap()).round_d7()
+        assert_opt_nv_eq_d7(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Sphere::mean_position(&vs),
         );
     }
 
@@ -452,7 +807,6 @@ mod tests {
     // turn
 
     #[test]
-
     fn turn_collinear() {
         let actual = Sphere::turn(
             NVector::from_lat_long_degrees(0.0, 0.0),

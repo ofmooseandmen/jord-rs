@@ -2,10 +2,13 @@ use crate::Length;
 
 use {crate::Angle, crate::Vec3};
 
-/// TODO: Cartesian 3D position vector
-pub trait PositionVector: Sized {
+/// Cartesian 3D position vector: allows to represent the position of a general coordinate frame B
+/// relative to a reference coordinate frame A as the position vector from A to B.
+pub trait Cartesian3DVector: Sized {
+    /// Creates a [Cartesian3DVector] from the given coordinates.
     fn new(x: Length, y: Length, z: Length) -> Self;
 
+    /// Creates a [Cartesian3DVector] from the given coordinates in metres.
     fn from_metres(v: Vec3) -> Self {
         Self::new(
             Length::from_metres(v.x()),
@@ -14,12 +17,16 @@ pub trait PositionVector: Sized {
         )
     }
 
+    /// Returns the x component of this vector.
     fn x(&self) -> Length;
 
+    /// Returns the y component of this vector.
     fn y(&self) -> Length;
 
+    /// Returns the z component of this vector.
     fn z(&self) -> Length;
 
+    /// Returns the (x, y, z) components of this vector in metres.
     fn as_metres(&self) -> Vec3 {
         Vec3::new(
             self.x().as_metres(),
@@ -28,22 +35,27 @@ pub trait PositionVector: Sized {
         )
     }
 
+    /// Rounds the (x, y, z) components of this vector to the nearest metre.
     fn round_m(&self) -> Self {
         self.round(|l| l.round_m())
     }
 
+    /// Rounds the (x, y, z) components of this vector to the nearest decimetre.
     fn round_dm(&self) -> Self {
         self.round(|l| l.round_dm())
     }
 
+    /// Rounds the (x, y, z) components of this vector to the nearest centimetre.
     fn round_cm(&self) -> Self {
         self.round(|l| l.round_cm())
     }
 
+    /// Rounds the (x, y, z) components of this vector to the nearest millimetre.
     fn round_mm(&self) -> Self {
         self.round(|l| l.round_mm())
     }
 
+    /// Rounds the (x, y, z) components of this vector using the given rounding function.
     fn round<F>(&self, round: F) -> Self
     where
         F: Fn(Length) -> Length,
@@ -52,6 +64,7 @@ pub trait PositionVector: Sized {
     }
 }
 
+/// A geocentric position or Earth Centred Earthy Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct GeocentricPos {
     x: Length,
@@ -59,7 +72,7 @@ pub struct GeocentricPos {
     z: Length,
 }
 
-impl PositionVector for GeocentricPos {
+impl Cartesian3DVector for GeocentricPos {
     fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
@@ -104,9 +117,7 @@ pub struct LatLong {
 }
 
 impl LatLong {
-    // TODO(CL): antipode + NORTH_POLE, SOUTH_POLE & NULL_ISLAND
     // TODO(CL): normalise?
-    // TODO(CL): round_d(5|6|7)?
 
     pub fn new(latitude: Angle, longitude: Angle) -> Self {
         Self {
@@ -123,22 +134,12 @@ impl LatLong {
     }
 
     pub fn from_nvector(nvector: NVector) -> Self {
-        let x = nvector.0.x();
-        let y = nvector.0.y();
-        let z = nvector.0.z();
-        let lat = z.atan2((x * x + y * y).sqrt());
-        let lon = y.atan2(x);
-        Self::new(Angle::from_radians(lat), Angle::from_radians(lon))
+        let (lat, lng) = nvector_to_latlong(nvector.0);
+        Self::new(lat, lng)
     }
 
     pub fn to_nvector(&self) -> NVector {
-        let latitude_rads = self.latitude.as_radians();
-        let longitude_rads = self.longitude.as_radians();
-        let cl = latitude_rads.cos();
-        let x = cl * longitude_rads.cos();
-        let y = cl * longitude_rads.sin();
-        let z = latitude_rads.sin();
-        NVector::new(Vec3::new(x, y, z))
+        NVector::new(latlong_to_nvector(self.latitude, self.longitude))
     }
 
     pub fn latitude(&self) -> Angle {
@@ -197,9 +198,11 @@ impl NVector {
         Self(v)
     }
 
-    pub fn from_lat_long_degrees(lat: f64, lng: f64) -> Self {
-        // TODO(CL): create a method and call it there & in LatLong
-        LatLong::from_degrees(lat, lng).to_nvector()
+    pub fn from_lat_long_degrees(latitude_degrees: f64, longitude_degrees: f64) -> Self {
+        Self::new(latlong_to_nvector(
+            Angle::from_degrees(latitude_degrees),
+            Angle::from_degrees(longitude_degrees),
+        ))
     }
 
     pub fn antipode(&self) -> Self {
@@ -213,6 +216,25 @@ impl NVector {
     pub fn as_vec3(&self) -> Vec3 {
         self.0
     }
+}
+
+fn nvector_to_latlong(nvector: Vec3) -> (Angle, Angle) {
+    let x: f64 = nvector.x();
+    let y = nvector.y();
+    let z = nvector.z();
+    let lat = z.atan2((x * x + y * y).sqrt());
+    let lon = y.atan2(x);
+    (Angle::from_radians(lat), Angle::from_radians(lon))
+}
+
+fn latlong_to_nvector(latitude: Angle, longitude: Angle) -> Vec3 {
+    let latitude_rads = latitude.as_radians();
+    let longitude_rads = longitude.as_radians();
+    let cl = latitude_rads.cos();
+    let x = cl * longitude_rads.cos();
+    let y = cl * longitude_rads.sin();
+    let z = latitude_rads.sin();
+    Vec3::new(x, y, z)
 }
 
 #[cfg(test)]

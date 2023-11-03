@@ -47,7 +47,7 @@ pub use crate::length::Length;
 mod numbers;
 
 mod positions;
-pub use crate::positions::{GeocentricPos, GeodeticPos, LatLong, NVector, PositionVector};
+pub use crate::positions::{Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, NVector};
 
 pub mod spherical;
 

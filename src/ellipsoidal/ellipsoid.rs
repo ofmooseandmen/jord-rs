@@ -1,4 +1,6 @@
-use crate::{surface::Surface, GeocentricPos, GeodeticPos, Length, NVector, PositionVector, Vec3};
+use crate::{
+    surface::Surface, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
+};
 
 /// An ellipsoid
 #[derive(PartialEq, Clone, Copy, Debug, Default)]

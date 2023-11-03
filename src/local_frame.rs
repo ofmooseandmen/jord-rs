@@ -1,5 +1,5 @@
 use crate::{
-    surface::Surface, Angle, GeocentricPos, GeodeticPos, LatLong, Length, Mat33, PositionVector,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
     Vec3,
 };
 
@@ -18,7 +18,7 @@ impl LocalPositionVector {
     // TODO(CL): new, from_bearing_and_slant_range, bearing, elevation, slant_range
 }
 
-impl PositionVector for LocalPositionVector {
+impl Cartesian3DVector for LocalPositionVector {
     fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
@@ -48,14 +48,31 @@ impl<S> LocalFrame<S>
 where
     S: Surface,
 {
-    // TODO(CL): enu_frame
+    pub fn enu(origin: GeodeticPos, surface: S) -> Self {
+        let vo = origin.horizontal_position().as_vec3();
+        // up - just the n-vector.
+        let ru = vo;
+        // east - pointing perpendicular to the plane.
+        let re = Vec3::UNIT_Z.cross_prod(vo).unit();
+        // north - by right hand rule.
+        let rn = ru.cross_prod(re);
+
+        let inv_rm = Mat33::new(re, rn, ru);
+
+        Self {
+            origin: surface.geodetic_to_geocentric(origin).as_metres(),
+            dir_rm: inv_rm.transpose(),
+            inv_rm,
+            surface,
+        }
+    }
 
     pub fn ned(origin: GeodeticPos, surface: S) -> Self {
         let vo = origin.horizontal_position().as_vec3();
         //  down (pointing opposite to n-vector).
         let rd = -1.0 * vo;
         // east (pointing perpendicular to the plane)
-        let re = Vec3::UNIT_Z.cross_prod(vo);
+        let re = Vec3::UNIT_Z.cross_prod(vo).unit();
         // north (by right hand rule)
         let rn = re.cross_prod(rd);
 
@@ -236,11 +253,10 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 #[cfg(test)]
 mod tests {
 
-    // destination_pos
+    // to_local
 
     use crate::{
-        ellipsoidal::Ellipsoid, Angle, GeodeticPos, LatLong, Length, LocalFrame,
-        LocalPositionVector, PositionVector, Vec3,
+        ellipsoidal::Ellipsoid, Angle, Cartesian3DVector, GeodeticPos, LatLong, Length, LocalFrame,
     };
 
     // see https://github.com/pbrod/nvector/blob/bf1cf5e1e210b74a57ea4bb2c277b388308bdba9/src/nvector/tests/test_frames.py
