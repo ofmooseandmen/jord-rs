@@ -5,18 +5,6 @@ use {crate::Angle, crate::Vec3};
 /// Cartesian 3D position vector: allows to represent the position of a general coordinate frame B
 /// relative to a reference coordinate frame A as the position vector from A to B.
 pub trait Cartesian3DVector: Sized {
-    /// Creates a [Cartesian3DVector] from the given coordinates.
-    fn new(x: Length, y: Length, z: Length) -> Self;
-
-    /// Creates a [Cartesian3DVector] from the given coordinates in metres.
-    fn from_metres(v: Vec3) -> Self {
-        Self::new(
-            Length::from_metres(v.x()),
-            Length::from_metres(v.y()),
-            Length::from_metres(v.z()),
-        )
-    }
-
     /// Returns the x component of this vector.
     fn x(&self) -> Length;
 
@@ -58,10 +46,7 @@ pub trait Cartesian3DVector: Sized {
     /// Rounds the (x, y, z) components of this vector using the given rounding function.
     fn round<F>(&self, round: F) -> Self
     where
-        F: Fn(Length) -> Length,
-    {
-        Self::new(round(self.x()), round(self.y()), round(self.z()))
-    }
+        F: Fn(Length) -> Length;
 }
 
 /// A geocentric position or Earth Centred Earthy Fixed (ECEF) vector.
@@ -72,11 +57,23 @@ pub struct GeocentricPos {
     z: Length,
 }
 
-impl Cartesian3DVector for GeocentricPos {
-    fn new(x: Length, y: Length, z: Length) -> Self {
+impl GeocentricPos {
+    /// Creates a [GeocentricPos] from the given coordinates.
+    pub fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
 
+    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    pub fn from_metres(v: Vec3) -> Self {
+        Self::new(
+            Length::from_metres(v.x()),
+            Length::from_metres(v.y()),
+            Length::from_metres(v.z()),
+        )
+    }
+}
+
+impl Cartesian3DVector for GeocentricPos {
     fn x(&self) -> Length {
         self.x
     }
@@ -87,6 +84,13 @@ impl Cartesian3DVector for GeocentricPos {
 
     fn z(&self) -> Length {
         self.z
+    }
+
+    fn round<F>(&self, round: F) -> Self
+    where
+        F: Fn(Length) -> Length,
+    {
+        Self::new(round(self.x()), round(self.y()), round(self.z()))
     }
 }
 
@@ -258,4 +262,10 @@ pub(crate) fn assert_opt_nv_eq_d7(expected: NVector, actual: Option<NVector>) {
             LatLong::from_nvector(expected).round_d7()
         ),
     }
+}
+
+#[cfg(test)]
+pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPos, actual: GeodeticPos) {
+    assert_nv_eq_d7(expected.horizontal_position(), actual.horizontal_position());
+    assert_eq!(expected.height().round_mm(), actual.height().round_mm());
 }

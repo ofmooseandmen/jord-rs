@@ -4,25 +4,54 @@ use crate::{
 };
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+enum Orientation {
+    // x = north (or forward), y = east (or right), z = down.
+    #[default]
+    NED,
+    // x = east, y = north, z = up.
+    ENU,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct LocalPositionVector {
     x: Length,
     y: Length,
     z: Length,
+    o: Orientation,
 }
 
 impl LocalPositionVector {
-    pub fn azimuth(&self) -> Angle {
-        Angle::from_radians(self.y().as_metres().atan2(self.x().as_metres())).normalised()
+    fn new(x: Length, y: Length, z: Length, o: Orientation) -> Self {
+        Self { x, y, z, o }
     }
 
-    // TODO(CL): new, from_bearing_and_slant_range, bearing, elevation, slant_range
+    fn from_metres(v: Vec3, o: Orientation) -> Self {
+        Self::new(
+            Length::from_metres(v.x()),
+            Length::from_metres(v.y()),
+            Length::from_metres(v.z()),
+            o,
+        )
+    }
+
+    pub fn azimuth(&self) -> Angle {
+        let (e, n) = match self.o {
+            Orientation::NED => (self.y(), self.x()),
+            Orientation::ENU => (self.x(), self.y()),
+        };
+        Angle::from_radians(e.as_metres().atan2(n.as_metres())).normalised()
+    }
+
+    pub fn elevation(&self) -> Angle {
+        Angle::from_radians((self.z() / self.length()).asin())
+    }
+
+    pub fn length(&self) -> Length {
+        Length::from_metres(self.as_metres().norm())
+    }
 }
 
 impl Cartesian3DVector for LocalPositionVector {
-    fn new(x: Length, y: Length, z: Length) -> Self {
-        Self { x, y, z }
-    }
-
     fn x(&self) -> Length {
         self.x
     }
@@ -34,6 +63,13 @@ impl Cartesian3DVector for LocalPositionVector {
     fn z(&self) -> Length {
         self.z
     }
+
+    fn round<F>(&self, round: F) -> Self
+    where
+        F: Fn(Length) -> Length,
+    {
+        Self::new(round(self.x()), round(self.y()), round(self.z()), self.o)
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -42,6 +78,7 @@ pub struct LocalFrame<S> {
     dir_rm: Mat33,
     inv_rm: Mat33,
     surface: S,
+    o: Orientation,
 }
 
 impl<S> LocalFrame<S>
@@ -64,6 +101,7 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
+            o: Orientation::ENU,
         }
     }
 
@@ -83,6 +121,7 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
+            o: Orientation::NED,
         }
     }
 
@@ -96,6 +135,7 @@ where
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
+            o: Orientation::NED,
         }
     }
 
@@ -109,19 +149,20 @@ where
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
+            o: Orientation::NED,
         }
     }
 
-    pub fn to_local_pos(&self, other: GeodeticPos) -> LocalPositionVector {
-        let og = self.surface.geodetic_to_geocentric(other).as_metres();
+    pub fn to_local_pos(&self, p: GeodeticPos) -> LocalPositionVector {
+        let og = self.surface.geodetic_to_geocentric(p).as_metres();
         // delta in 'Earth' frame.
         let de = og - self.origin;
         let d = de * self.inv_rm;
-        LocalPositionVector::from_metres(d)
+        LocalPositionVector::from_metres(d, self.o)
     }
 
-    pub fn to_geodetic_pos(&self, delta: LocalPositionVector) -> GeodeticPos {
-        let c = delta.as_metres() * self.dir_rm;
+    pub fn to_geodetic_pos(&self, p: LocalPositionVector) -> GeodeticPos {
+        let c = p.as_metres() * self.dir_rm;
         let v = self.origin + c;
         let g = GeocentricPos::from_metres(v);
         self.surface.geocentric_to_geodetic(g)
@@ -165,7 +206,7 @@ pub fn r2xyz(m: Mat33) -> (Angle, Angle, Angle) {
     )
 }
 
-/// | Angles about new axes in the xyz-order from a rotation matrix.
+/// Angles about new axes in the xyz-order from a rotation matrix.
 ///
 /// The produced list contains 3 angles of rotation about new axes.
 /// The z, x, y angles are called Euler angles or Tait-Bryan angles and are
@@ -185,7 +226,7 @@ pub fn r2zyx(m: Mat33) -> (Angle, Angle, Angle) {
     (-a, -b, -c)
 }
 
-/// rotation matrix (direction cosine matrix) from 3 angles about new axes in the zyx-order.
+/// Rotation matrix (direction cosine matrix) from 3 angles about new axes in the zyx-order.
 ///
 /// The produced (no unit) rotation matrix is such
 /// that the relation between a vector v decomposed in A and B is given by:
@@ -253,13 +294,14 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 #[cfg(test)]
 mod tests {
 
-    // to_local
-
     use crate::{
-        ellipsoidal::Ellipsoid, Angle, Cartesian3DVector, GeodeticPos, LatLong, Length, LocalFrame,
+        ellipsoidal::Ellipsoid, positions::assert_geod_eq_d7_mm, Angle, Cartesian3DVector,
+        GeodeticPos, LatLong, Length, LocalFrame, NVector,
     };
 
     // see https://github.com/pbrod/nvector/blob/bf1cf5e1e210b74a57ea4bb2c277b388308bdba9/src/nvector/tests/test_frames.py
+
+    // to_local
 
     #[test]
     fn to_local_pos_w_in_moving_frame_east() {
@@ -307,7 +349,7 @@ mod tests {
         let local_0 = f0.to_local_pos(sensor_position).round_mm();
 
         assert_eq!(Length::ZERO, local_0.x());
-        assert_eq!(Length::from_metres(278.214), local_0.y());
+        assert_eq!(Length::from_metres(278.257), local_0.y());
         assert_eq!(Length::ZERO, local_0.z().round_m());
         assert_eq!(90.0, local_0.azimuth().as_degrees());
 
@@ -315,10 +357,125 @@ mod tests {
         let local_1 = f1.to_local_pos(sensor_position).round_mm();
 
         assert_eq!(Length::ZERO, local_1.x());
-        assert_eq!(Length::from_metres(-278.214), local_1.y());
+        assert_eq!(Length::from_metres(-278.257), local_1.y());
         assert_eq!(Length::ZERO, local_1.z().round_m());
         assert_eq!(270.0, local_1.azimuth().as_degrees());
     }
 
-    // TODO(CL): more tests
+    #[test]
+    fn to_local_pos_ned() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let ned = LocalFrame::ned(point_a, Ellipsoid::WGS84);
+
+        let local = ned.to_local_pos(point_b);
+
+        assert_eq!(Length::from_metres(331730.235), local.x().round_mm());
+        assert_eq!(Length::from_metres(332997.875), local.y().round_mm());
+        assert_eq!(Length::from_metres(17404.271), local.z().round_mm());
+        assert_eq!(Angle::from_degrees(45.1092632), local.azimuth().round_d7());
+        assert_eq!(Angle::from_degrees(2.1205586), local.elevation().round_d7());
+    }
+
+    #[test]
+    fn to_local_pos_enu() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let enu = LocalFrame::enu(point_a, Ellipsoid::WGS84);
+
+        let local = enu.to_local_pos(point_b);
+
+        assert_eq!(Length::from_metres(332997.875), local.x().round_mm());
+        assert_eq!(Length::from_metres(331730.235), local.y().round_mm());
+        assert_eq!(-Length::from_metres(17404.271), local.z().round_mm());
+        assert_eq!(Angle::from_degrees(45.1092632), local.azimuth().round_d7());
+        assert_eq!(
+            -Angle::from_degrees(2.1205586),
+            local.elevation().round_d7()
+        );
+    }
+
+    #[test]
+    fn transitiviy_enu() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let enu = LocalFrame::enu(point_a, Ellipsoid::WGS84);
+        assert_geod_eq_d7_mm(point_b, enu.to_geodetic_pos(enu.to_local_pos(point_b)))
+    }
+
+    #[test]
+    fn transitiviy_ned() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let ned = LocalFrame::ned(point_a, Ellipsoid::WGS84);
+        assert_geod_eq_d7_mm(point_b, ned.to_geodetic_pos(ned.to_local_pos(point_b)))
+    }
+
+    #[test]
+    fn transitiviy_body() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let body = LocalFrame::body(
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(5.0),
+            point_a,
+            Ellipsoid::WGS84,
+        );
+        assert_geod_eq_d7_mm(point_b, body.to_geodetic_pos(body.to_local_pos(point_b)))
+    }
+
+    #[test]
+    fn transitiviy_local_level() {
+        let point_a = GeodeticPos::new(
+            NVector::from_lat_long_degrees(1.0, 2.0),
+            Length::from_metres(-3.0),
+        );
+        let point_b = GeodeticPos::new(
+            NVector::from_lat_long_degrees(4.0, 5.0),
+            Length::from_metres(-6.0),
+        );
+
+        let local_level =
+            LocalFrame::local_level(Angle::from_degrees(45.0), point_a, Ellipsoid::WGS84);
+        assert_geod_eq_d7_mm(
+            point_b,
+            local_level.to_geodetic_pos(local_level.to_local_pos(point_b)),
+        )
+    }
 }

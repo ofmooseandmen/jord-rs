@@ -2,7 +2,7 @@ use crate::{
     surface::Surface, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
 };
 
-/// An ellipsoid
+/// An ellipsoid.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct Ellipsoid {
     equatorial_radius: Length,
