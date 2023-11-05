@@ -7,9 +7,9 @@ use crate::{
 enum Orientation {
     // x = north (or forward), y = east (or right), z = down.
     #[default]
-    NED,
+    Ned,
     // x = east, y = north, z = up.
-    ENU,
+    Enu,
 }
 
 /// A vector whose length and direction is such that it goes from the origin
@@ -61,7 +61,7 @@ impl LocalPositionVector {
     /// ```
     pub fn aer_to_ned(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
         let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPositionVector::new(north, east, -z, Orientation::NED)
+        LocalPositionVector::new(north, east, -z, Orientation::Ned)
     }
 
     /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
@@ -83,7 +83,7 @@ impl LocalPositionVector {
     /// ```
     pub fn aer_to_enu(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
         let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPositionVector::new(east, north, z, Orientation::ENU)
+        LocalPositionVector::new(east, north, z, Orientation::Enu)
     }
 
     fn aer_to_enz(
@@ -101,8 +101,8 @@ impl LocalPositionVector {
     /// Returns the azimuth in compass angle from the 'north'.
     pub fn azimuth(&self) -> Angle {
         let (e, n) = match self.o {
-            Orientation::NED => (self.y(), self.x()),
-            Orientation::ENU => (self.x(), self.y()),
+            Orientation::Ned => (self.y(), self.x()),
+            Orientation::Enu => (self.x(), self.y()),
         };
         Angle::from_radians(e.as_metres().atan2(n.as_metres())).normalised()
     }
@@ -111,8 +111,8 @@ impl LocalPositionVector {
     pub fn elevation(&self) -> Angle {
         let ev = Angle::from_radians((self.z() / self.slant_range()).asin());
         match self.o {
-            Orientation::NED => -ev,
-            Orientation::ENU => ev,
+            Orientation::Ned => -ev,
+            Orientation::Enu => ev,
         }
     }
 
@@ -183,7 +183,7 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
-            o: Orientation::ENU,
+            o: Orientation::Enu,
         }
     }
 
@@ -217,7 +217,7 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
-            o: Orientation::NED,
+            o: Orientation::Ned,
         }
     }
 
@@ -235,7 +235,7 @@ where
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
-            o: Orientation::NED,
+            o: Orientation::Ned,
         }
     }
 
@@ -263,7 +263,7 @@ where
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
-            o: Orientation::NED,
+            o: Orientation::Ned,
         }
     }
 
