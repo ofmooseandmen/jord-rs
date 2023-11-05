@@ -9,22 +9,45 @@ pub struct Mat33 {
 }
 
 impl Mat33 {
-    pub fn row0(&self) -> Vec3 {
-        self.r0
-    }
-
-    pub fn row1(&self) -> Vec3 {
-        self.r1
-    }
-
-    pub fn row2(&self) -> Vec3 {
-        self.r2
-    }
-
+    /// Creates a 3*3 matrix from the given rows components.
     pub fn new(r0: Vec3, r1: Vec3, r2: Vec3) -> Self {
         Self { r0, r1, r2 }
     }
 
+    /// Returns the first row of this matrix.
+    pub fn row0(&self) -> Vec3 {
+        self.r0
+    }
+
+    /// Returns the second row of this matrix.
+    pub fn row1(&self) -> Vec3 {
+        self.r1
+    }
+
+    /// Returns the third row of this matrix.
+    pub fn row2(&self) -> Vec3 {
+        self.r2
+    }
+
+    /// Transposes this 3*3 matrix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Mat33, Vec3};
+    ///
+    /// let m = Mat33::new(
+    ///     Vec3::new(1.0, 2.0, 3.0),
+    ///     Vec3::new(4.0, 5.0, 6.0),
+    ///     Vec3::new(7.0, 8.0, 9.0)
+    /// );
+    /// let e = Mat33::new(
+    ///     Vec3::new(1.0, 4.0, 7.0),
+    ///     Vec3::new(2.0, 5.0, 8.0),
+    ///     Vec3::new(3.0, 6.0, 9.0)
+    /// );
+    /// assert_eq!(e, m.transpose());
+    /// ```
     pub fn transpose(&self) -> Self {
         Mat33::new(
             Vec3::new(self.r0.x(), self.r1.x(), self.r2.x()),

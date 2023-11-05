@@ -2,7 +2,7 @@ use crate::{Angle, NVector, Vec3};
 
 use super::base::{easting, orthogonal};
 
-/// A circle on the surface of a __sphere__ which lies in a plane
+/// A circle on the surface of a sphere which lies in a plane
 // passing through the sphere centre. Every two distinct and non-antipodal points
 // define a unique Great Circle.
 ///
@@ -17,7 +17,7 @@ impl GreatCircle {
     /// Creates a great circle passing by both given positions (in this direction).
     ///
     /// Note: if both start and end positions are equal or the antipode of one another, then an
-    /// arbitrary minor arc is returned - since an infinity of minor arcs exist (see [crate::spherical::is_great_circle]).
+    /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     pub fn new(p1: NVector, p2: NVector) -> Self {
         let normal = orthogonal(p1.as_vec3(), p2.as_vec3());
         GreatCircle { normal }

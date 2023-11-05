@@ -15,7 +15,7 @@ impl MinorArc {
     /// Creates a new minor arc from the given start and end positions.
     ///
     /// Note: if both start and end positions are equal or the antipode of one another, then an
-    /// arbitrary minor arc is returned - since an infinity of minor arcs exist (see [crate::spherical::is_great_circle]).
+    /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     pub fn new(start: NVector, end: NVector) -> Self {
         let normal = orthogonal(start.as_vec3(), end.as_vec3());
         MinorArc { start, end, normal }

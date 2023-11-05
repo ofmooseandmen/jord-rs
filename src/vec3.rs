@@ -1,4 +1,7 @@
 /// A 3-element vector.
+///
+/// [Vec3] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
+/// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct Vec3 {
     x: f64,

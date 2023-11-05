@@ -94,6 +94,7 @@ impl Cartesian3DVector for GeocentricPos {
     }
 }
 
+/// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct GeodeticPos {
     hp: NVector,
@@ -101,19 +102,23 @@ pub struct GeodeticPos {
 }
 
 impl GeodeticPos {
+    /// Creates a new [GeodeticPos] from the given horizontal coordinates and height above the surface.
     pub fn new(hp: NVector, height: Length) -> Self {
         Self { hp, height }
     }
 
+    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPos].
     pub fn horizontal_position(&self) -> NVector {
         self.hp
     }
 
+    /// Returns the height above the surface of this [GeodeticPos].
     pub fn height(&self) -> Length {
         self.height
     }
 }
 
+/// An horizontal position represented by a pair of latitude-longitude.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct LatLong {
     latitude: Angle,
@@ -123,6 +128,7 @@ pub struct LatLong {
 impl LatLong {
     // TODO(CL): normalise?
 
+    /// Creates a new [LatLong] from the given latitude and longitude.
     pub fn new(latitude: Angle, longitude: Angle) -> Self {
         Self {
             latitude,
@@ -130,6 +136,7 @@ impl LatLong {
         }
     }
 
+    /// Creates a new [LatLong] from the given latitude and longitudes in degrees.
     pub fn from_degrees(latitude: f64, longitude: f64) -> Self {
         Self::new(
             Angle::from_degrees(latitude),
@@ -137,19 +144,23 @@ impl LatLong {
         )
     }
 
+    /// Converts the given [NVector] into a [LatLong].
     pub fn from_nvector(nvector: NVector) -> Self {
         let (lat, lng) = nvector_to_latlong(nvector.0);
         Self::new(lat, lng)
     }
 
+    /// Converts this [LatLong] into an [NVector].
     pub fn to_nvector(&self) -> NVector {
         NVector::new(latlong_to_nvector(self.latitude, self.longitude))
     }
 
+    /// Returns the latitude of this [LatLong].
     pub fn latitude(&self) -> Angle {
         self.latitude
     }
 
+    /// Returns the longitude of this [LatLong].
     pub fn longitude(&self) -> Angle {
         self.longitude
     }
@@ -194,14 +205,20 @@ impl LatLong {
     }
 }
 
+/// An horizontal position represented by a n-vector: the unit and normal vector to the surface.
+/// Orientation:
+/// - z-axis points to the North Pole along the body's rotation axis,
+/// - x-axis points towards the point where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct NVector(Vec3);
 
 impl NVector {
+    /// Creates a new [NVector] from the given [unit](crate::Vec3::new_unit) 3D vector.
     pub fn new(v: Vec3) -> Self {
         Self(v)
     }
 
+    /// Creates a new [NVector] from the given latitude and longitude in degrees.
     pub fn from_lat_long_degrees(latitude_degrees: f64, longitude_degrees: f64) -> Self {
         Self::new(latlong_to_nvector(
             Angle::from_degrees(latitude_degrees),
@@ -209,14 +226,17 @@ impl NVector {
         ))
     }
 
+    /// Returns the [NVector] which is the antipode of this [NVector].
     pub fn antipode(&self) -> Self {
         Self::new(-1.0 * self.0)
     }
 
+    /// Determines whether the given [NVector] is the antipode of this [NVector].
     pub fn is_antipode_of(&self, o: Self) -> bool {
         self.0 + o.0 == Vec3::ZERO
     }
 
+    /// Returns this [NVector] as a [Vec3].
     pub fn as_vec3(&self) -> Vec3 {
         self.0
     }

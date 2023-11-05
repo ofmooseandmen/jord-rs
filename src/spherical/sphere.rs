@@ -9,7 +9,9 @@ use super::{
     GreatCircle, MinorArc,
 };
 
-/// An sphere
+/// A sphere; for most use cases, a sphere is an acceptable approximation of the figure of a cellestial body (e.g. Earth).
+///
+/// [Sphere] implements several usefull navigation algorithms.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct Sphere {
     radius: Length,
@@ -28,10 +30,12 @@ impl Sphere {
         radius: Length::from_metres(1_737_400.0f64),
     };
 
+    /// Creates a new [Sphere] with the given radius.
     pub fn new(radius: Length) -> Self {
         Sphere { radius }
     }
 
+    /// Returns the radius of this sphere.
     pub fn radius(&self) -> Length {
         self.radius
     }
@@ -154,7 +158,7 @@ impl Sphere {
     /// Computes the final bearing arriving at `p2` from `p1` in compass angle.
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
     /// The final bearing will differ from the initial bearing by varying degrees according to distance and latitude.
-    /// Returns 0 if both positions are equal or the antipode of each other (see [crate::spherical::is_great_circle]).
+    /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     /// # Examples:
     ///
     /// ```
@@ -176,7 +180,7 @@ impl Sphere {
 
     /// Computes the initial bearing from `p1` to `p2` in compass angle.
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
-    /// Returns 0 if both positions are equal or the antipode of each other (see [crate::spherical::is_great_circle]).
+    /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle)
     ///
     /// # Examples:
     ///
