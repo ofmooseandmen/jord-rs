@@ -49,6 +49,9 @@ mod numbers;
 mod positions;
 pub use crate::positions::{Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, NVector};
 
+mod speed;
+pub use crate::speed::Speed;
+
 pub mod spherical;
 
 mod surface;
