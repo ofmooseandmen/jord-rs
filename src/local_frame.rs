@@ -172,7 +172,7 @@ where
         // up - just the n-vector.
         let ru = vo;
         // east - pointing perpendicular to the plane.
-        let re = Vec3::UNIT_Z.cross_prod(vo).unit();
+        let re = Vec3::from_orthogonal(Vec3::UNIT_Z, vo);
         // north - by right hand rule.
         let rn = ru.cross_prod(re);
 
@@ -205,8 +205,8 @@ where
         let vo = origin.horizontal_position().as_vec3();
         // down (pointing opposite to n-vector).
         let rd = -1.0 * vo;
-        // east (pointing perpendicular to the plane) // TODO(CL) use orthogonal...
-        let re = Vec3::UNIT_Z.cross_prod(vo).unit();
+        // east (pointing perpendicular to the plane)
+        let re = Vec3::from_orthogonal(Vec3::UNIT_Z, vo);
         // north (by right hand rule)
         let rn = re.cross_prod(rd);
 

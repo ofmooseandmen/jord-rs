@@ -1,6 +1,6 @@
 use crate::{NVector, Vec3};
 
-use super::base::{are_ordered, orthogonal};
+use super::base::are_ordered;
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
@@ -17,7 +17,7 @@ impl MinorArc {
     /// Note: if both start and end positions are equal or the antipode of one another, then an
     /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     pub fn new(start: NVector, end: NVector) -> Self {
-        let normal = orthogonal(start.as_vec3(), end.as_vec3());
+        let normal = Vec3::from_orthogonal(start.as_vec3(), end.as_vec3());
         MinorArc { start, end, normal }
     }
 
@@ -57,7 +57,7 @@ impl MinorArc {
     /// assert_eq!(i, Some(LatLong::from_degrees(0.0, 0.0).to_nvector()));
     /// ```
     pub fn intersection(&self, other: MinorArc) -> Option<NVector> {
-        let i = orthogonal(self.normal, other.normal);
+        let i = Vec3::from_orthogonal(self.normal, other.normal);
         // select nearest intersection to start of first minor arc.
         let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
             i
@@ -100,7 +100,7 @@ impl MinorArc {
         if n2 == Vec3::ZERO {
             Some(self.start)
         } else {
-            let proj = orthogonal(n1, n2);
+            let proj = Vec3::from_orthogonal(n1, n2);
             if are_ordered(self.start.as_vec3(), proj, self.end.as_vec3()) {
                 Some(NVector::new(proj))
             } else {
