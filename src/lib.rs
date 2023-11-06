@@ -1,14 +1,4 @@
-//! The `jord` crate implements various geographical position calculations.
-//!
-//! # Literature
-//!
-//! The following reference provide the theoretical basis of most of the algorithms:
-//!
-//! - [Non-singular Horizontal Position Representation; Gade, K.; 2010](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
-//! - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
-//! - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
-//! - [STR: A Simple and Efficient Algorithm for R-Tree Packing](https://apps.dtic.mil/sti/pdfs/ADA324493.pdf)
-//!
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 #![forbid(
     anonymous_parameters,
     illegal_floating_point_literal_pattern,
