@@ -45,6 +45,7 @@ pub use crate::speed::Speed;
 pub mod spherical;
 
 mod surface;
+pub use crate::surface::Surface;
 
 mod vec3;
 pub use crate::vec3::Vec3;

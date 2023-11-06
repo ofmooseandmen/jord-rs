@@ -96,7 +96,6 @@ impl Sphere {
     /// );
     /// assert_eq!(Length::from_metres(-305.665), Sphere::EARTH.cross_track_distance(p, gc).round_mm());
     /// ```
-    // TODO(CL): tests are in great_circle.rs in jord-rs/next
     pub fn cross_track_distance(&self, p: NVector, gc: GreatCircle) -> Length {
         let angle = angle_radians_between(gc.normal(), p.as_vec3(), None);
         (angle - (PI / 2.0)) * self.radius
@@ -528,9 +527,11 @@ fn hours_to_duration(hours: f64) -> Duration {
 #[cfg(test)]
 mod tests {
 
+    // TODO(CL): along_track_distance, cross_track_distance
+
     use std::{f64::consts::PI, time::Duration};
 
-    /// destination.
+    // destination.
 
     #[test]
     fn destination_across_date_line() {
