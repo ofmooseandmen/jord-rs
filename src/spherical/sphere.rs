@@ -2,7 +2,7 @@ use std::{f64::consts::PI, time::Duration};
 
 use crate::{
     surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
-    NVector, Vec3, Vehicle,
+    NVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
@@ -306,6 +306,15 @@ impl Sphere {
 
     // kinematics
 
+    /// Calculates the position that the given vehicle will reach after the given time.
+    pub fn position_after(&self, vehicle: Vehicle, duration: Duration) -> NVector {
+        Sphere::EARTH.destination_pos(
+            vehicle.position(),
+            vehicle.bearing(),
+            vehicle.speed() * duration,
+        )
+    }
+
     ///  Computes the time at the closest point of approach (CPA) between the two given vehicles: the time at which the
     /// 2 vehicles will be the closest assuming they both maintain a constant course and heading.
     ///
@@ -334,18 +343,10 @@ impl Sphere {
     /// assert_eq!(113_961_40, time_at_cpa.as_millis());
     ///
     /// // Position of ownship at CPA:
-    /// let p_cpa_own = Sphere::EARTH.destination_pos(
-    ///     ownship.position(),
-    ///     ownship.bearing(),
-    ///     ownship.speed() * time_at_cpa,
-    /// );
+    /// let p_cpa_own = Sphere::EARTH.position_after(ownship, time_at_cpa);
     ///
     /// // Position of intruder at CPA:
-    /// let p_cpa_int = Sphere::EARTH.destination_pos(
-    ///     intruder.position(),
-    ///     intruder.bearing(),
-    ///     intruder.speed() * time_at_cpa,
-    /// );
+    /// let p_cpa_int = Sphere::EARTH.position_after(intruder, time_at_cpa);
     ///
     /// // Distance between the 2 vehicles at CPA:
     /// let d_cpa = Sphere::EARTH.distance(p_cpa_own, p_cpa_int);
@@ -376,6 +377,125 @@ impl Sphere {
             Self::CPA_NR_MAX_ITERATIONS,
         );
         hours_to_cpa.filter(|h| h >= &0.0).map(hours_to_duration)
+    }
+
+    /// Calculates the maximum time required by an interceptor at the given position to intercept the given intruder: i.e. the interceptor is
+    /// travelling at the minimum speed required to achieve intercept.
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use jord::{Angle, Length, NVector, Speed, Vehicle};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let interceptor_pos = NVector::from_lat_long_degrees(20.0, -60.0);
+    /// let intruder = Vehicle::new(
+    ///     NVector::from_lat_long_degrees(34.0, -50.0),
+    ///     Angle::from_degrees(220.0),
+    ///     Speed::from_knots(600.0)
+    /// );
+    ///
+    /// let opt_max_time = Sphere::EARTH.max_time_to_intercept(interceptor_pos, intruder);
+    /// assert!(opt_max_time.is_some());
+    ///
+    /// let max_time = opt_max_time.unwrap();
+    /// assert_eq!(5_993_823, max_time.as_millis());
+    ///
+    /// // position of the interception = position of intruder at time of interception:
+    /// let interception_pos = Sphere::EARTH.position_after(intruder, max_time);
+    ///
+    /// // distance to interception:
+    /// let interception_distance = Sphere::EARTH.distance(interceptor_pos, interception_pos);
+    ///
+    /// // minimum interceptor speed to achieve intercept:
+    /// let minimum_speed = interception_distance / max_time;
+    /// assert_eq!(53.0, minimum_speed.as_knots().round());
+    /// ```
+    pub fn max_time_to_intercept(
+        &self,
+        interceptor_pos: NVector,
+        intruder: Vehicle,
+    ) -> Option<Duration> {
+        let r_m: f64 = self.radius.as_metres();
+
+        let v10 = interceptor_pos.as_vec3();
+
+        let v20 = intruder.position().as_vec3();
+        let c2 = course(intruder);
+        let int_speed_mps = intruder.speed().as_metres_per_second();
+        let w2 = int_speed_mps / r_m;
+
+        let v10v20 = v10.dot_prod(v20);
+        let v10c2 = v10.dot_prod(c2);
+        // initial angular distance between target and interceptor.
+        let s0 = angle_radians_between(v10, v20, None);
+        // assume target is travelling towards interceptor.
+        let t0 = r_m * s0 / int_speed_mps;
+
+        let st: Box<dyn Fn(f64) -> f64> = sep(v10, v20, c2, int_speed_mps, r_m);
+
+        let t_intercept_secs = int_min_nr_rec(v10v20, v10c2, w2, st, t0, 0);
+
+        if t_intercept_secs < 0.0 {
+            None
+        } else {
+            Some(Duration::from_secs_f64(t_intercept_secs))
+        }
+    }
+
+    /// Calculates time required by an interceptor at the given position and travelling at the given speed to intercept the given intruder.
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use jord::{Angle, Length, NVector, Speed, Vehicle};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let interceptor_pos = NVector::from_lat_long_degrees(20.0, -60.0);
+    /// let intruder = Vehicle::new(
+    ///     NVector::from_lat_long_degrees(34.0, -50.0),
+    ///     Angle::from_degrees(220.0),
+    ///     Speed::from_knots(600.0)
+    /// );
+    ///
+    /// // minimum interceptor speed to achieve intercept is ~ 53 knots
+    /// assert!(Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(50.0), intruder).is_none());
+    ///
+    /// let opt_time = Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(700.0), intruder);
+    /// assert!(opt_time.is_some());
+    /// assert_eq!(2_764_688, opt_time.unwrap().as_millis());
+    /// ```
+    pub fn time_to_intercept(
+        &self,
+        interceptor_pos: NVector,
+        interceptor_speed: Speed,
+        intruder: Vehicle,
+    ) -> Option<Duration> {
+        let r_m: f64 = self.radius.as_metres();
+
+        let v10 = interceptor_pos.as_vec3();
+        let intercept_speed_mps = interceptor_speed.as_metres_per_second();
+        let w1 = intercept_speed_mps / r_m;
+
+        let v20 = intruder.position().as_vec3();
+        let c2 = course(intruder);
+        let int_speed_mps = intruder.speed().as_metres_per_second();
+        let w2 = int_speed_mps / r_m;
+
+        let v10v20 = v10.dot_prod(v20);
+        let v10c2 = v10.dot_prod(c2);
+
+        let t0 = 0.1;
+
+        let st: Box<dyn Fn(f64) -> f64> = sep(v10, v20, c2, int_speed_mps, r_m);
+
+        let t_intercept_secs = int_spd_nr_rec(v10v20, v10c2, w1, w2, st, t0, 0);
+
+        if t_intercept_secs < 0.0 {
+            None
+        } else {
+            Some(Duration::from_secs_f64(t_intercept_secs))
+        }
     }
 }
 
@@ -475,7 +595,7 @@ fn course_rz(theta: f64) -> Mat33 {
     Mat33::new(Vec3::new(c, s, 0.0), Vec3::new(-s, c, 0.0), Vec3::UNIT_Z)
 }
 
-/// Build functions for iteratively solving for time of minimum separation.
+/// Functions for iteratively solving for CPA.
 fn cpa_fn(
     p10: Vec3,
     c10: Vec3,
@@ -522,6 +642,77 @@ fn cpa_fn(
 fn hours_to_duration(hours: f64) -> Duration {
     let nanos: u64 = (hours * NANOS_PER_HOUR).round() as u64;
     Duration::from_nanos(nanos)
+}
+
+/// angular separation in radians at ti (input to returned function) between v10 and track with initial position v20, course c2 and speed s2.
+fn sep(v10: Vec3, v20: Vec3, c2: Vec3, s2_mps: f64, radius_m: f64) -> Box<dyn Fn(f64) -> f64> {
+    let func = move |t_secs: f64| -> f64 {
+        angle_radians_between(v10, pos(v20, c2, s2_mps, t_secs, radius_m), None)
+    };
+    Box::new(func)
+}
+
+/// position from course, speed (mps) and seconds.
+fn pos(v0: Vec3, c: Vec3, mps: f64, t_secs: f64, radius_m: f64) -> Vec3 {
+    let a = mps / radius_m * t_secs;
+    v0 * a.cos() + c * a.sin()
+}
+
+const INTERCEPT_NR_MAX_ITERATIONS: u64 = 50;
+const INTERCEPT_NR_EPSILON: f64 = 1e-11;
+
+/// Newton-Raphson for min speed intercept.
+fn int_min_nr_rec<F>(v10v20: f64, v10c2: f64, w2: f64, sep: F, ti_secs: f64, i: u64) -> f64
+where
+    F: Fn(f64) -> f64,
+{
+    if i == INTERCEPT_NR_MAX_ITERATIONS {
+        -1.0 // no convergence
+    } else {
+        let cosw2t = (w2 * ti_secs).cos();
+        let sinw2t = (w2 * ti_secs).sin();
+        let v10dv2dt = -w2 * (v10v20 * sinw2t - v10c2 * cosw2t);
+        let v10d2v2dt2 = (-1.0 * w2 * w2) * (v10v20 * cosw2t + v10c2 * sinw2t);
+        let si = sep(ti_secs);
+        let sin_si = si.sin();
+        let a = -1.0 / sin_si;
+        let b = si.cos() / (sin_si * sin_si);
+        let f = ti_secs * a * v10dv2dt - si;
+        let d2sdt2 = a * (b * v10dv2dt * v10dv2dt + v10d2v2dt2);
+        let df = ti_secs * d2sdt2;
+        let fi = f / df;
+        let ti1_secs = ti_secs - fi;
+
+        if fi.abs() < INTERCEPT_NR_EPSILON {
+            ti1_secs
+        } else {
+            int_min_nr_rec(v10v20, v10c2, w2, sep, ti1_secs, i + 1)
+        }
+    }
+}
+
+///  Newton-Raphson for speed intercept.
+fn int_spd_nr_rec<F>(v10v20: f64, v10c2: f64, w1: f64, w2: f64, sep: F, ti_secs: f64, i: u64) -> f64
+where
+    F: Fn(f64) -> f64,
+{
+    if i == INTERCEPT_NR_MAX_ITERATIONS {
+        -1.0 // no convergence
+    } else {
+        let cosw2t = (w2 * ti_secs).cos();
+        let sinw2t = (w2 * ti_secs).sin();
+        let si = sep(ti_secs);
+        let f = si / ti_secs - w1;
+        let dsdt = (w2 * (v10v20 * sinw2t - v10c2 * cosw2t)) / si.sin();
+        let df = (dsdt - (si / ti_secs)) / ti_secs;
+        let fi = f / df;
+        let ti1_secs = ti_secs - fi;
+        if fi.abs() < INTERCEPT_NR_EPSILON {
+            ti1_secs
+        } else {
+            int_spd_nr_rec(v10v20, v10c2, w1, w2, sep, ti1_secs, i + 1)
+        }
+    }
 }
 
 #[cfg(test)]
