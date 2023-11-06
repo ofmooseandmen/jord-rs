@@ -12,10 +12,10 @@ pub struct Ellipsoid {
 }
 
 impl Ellipsoid {
-    /// World Geodetic 84 Ellipsoid.
+    /// [World Geodetic](https://en.wikipedia.org/wiki/World_Geodetic_System) 84 Ellipsoid.
     pub const WGS84: Ellipsoid = Ellipsoid {
         equatorial_radius: Length::from_metres(6_378_137.0f64),
-        polar_radius: Length::from_metres(6_356_752.314245f64),
+        polar_radius: Length::from_metres(6_356_752.314245179f64),
         eccentricity: 0.08181919084262157f64,
         flattening: 0.0033528106647474805f64,
     };
@@ -28,11 +28,19 @@ impl Ellipsoid {
         flattening: 0.003352810681182319f64,
     };
 
-    /// Mars Orbiter Laser Altimeter Ellipsoid.
-    pub const MARS_2000: Ellipsoid = Ellipsoid {
-        equatorial_radius: Length::from_metres(3398627f64),
-        polar_radius: Length::from_metres(3378611.5288574793f64),
-        eccentricity: 0.10836918094474898f64,
+    /// [World Geodetic](https://en.wikipedia.org/wiki/World_Geodetic_System) 72 Ellipsoid.
+    pub const WGS72: Ellipsoid = Ellipsoid {
+        equatorial_radius: Length::from_metres(6_378_135.0f64),
+        polar_radius: Length::from_metres(6_356_750.520016094f64),
+        eccentricity: 0.08181881066274845f64,
+        flattening: 0.003352779454167505,
+    };
+
+    /// [Mars Orbiter Laser Altimeter Ellipsoid](https://tharsis.gsfc.nasa.gov/geodesy.html).
+    pub const MOLA: Ellipsoid = Ellipsoid {
+        equatorial_radius: Length::from_metres(3_396_200f64),
+        polar_radius: Length::from_metres(3_376_198.822143698f64),
+        eccentricity: 0.10836918094475001f64,
         flattening: 0.005889281507656065f64,
     };
 
@@ -111,7 +119,7 @@ impl Surface for Ellipsoid {
         let cx = n * m * nx + h * nx;
         let cy = n * m * ny + h * ny;
         let cz = n * nz + h * nz;
-        GeocentricPos::from_metres(Vec3::new(cx, cy, cz))
+        GeocentricPos::from_metres(cx, cy, cz)
     }
 
     fn geocentric_to_geodetic(&self, pos: GeocentricPos) -> GeodeticPos {
@@ -144,4 +152,57 @@ impl Surface for Ellipsoid {
     }
 }
 
-// TODO(CL): tests
+#[cfg(test)]
+mod tests {
+    use crate::Length;
+
+    use super::Ellipsoid;
+
+    #[test]
+    fn wgs84() {
+        let wgs84 = Ellipsoid::new(Length::from_metres(6_378_137.0), 298.257223563);
+        assert_eq!(
+            Ellipsoid::WGS84.equatorial_radius(),
+            wgs84.equatorial_radius()
+        );
+        assert_eq!(Ellipsoid::WGS84.polar_radius(), wgs84.polar_radius());
+        assert_eq!(Ellipsoid::WGS84.eccentricity(), wgs84.eccentricity());
+        assert_eq!(Ellipsoid::WGS84.flattening(), wgs84.flattening());
+    }
+
+    #[test]
+    fn grs80() {
+        let grs80 = Ellipsoid::new(Length::from_metres(6_378_137.0), 298.257222101);
+        assert_eq!(
+            Ellipsoid::GRS80.equatorial_radius(),
+            grs80.equatorial_radius()
+        );
+        assert_eq!(Ellipsoid::GRS80.polar_radius(), grs80.polar_radius());
+        assert_eq!(Ellipsoid::GRS80.eccentricity(), grs80.eccentricity());
+        assert_eq!(Ellipsoid::GRS80.flattening(), grs80.flattening());
+    }
+
+    #[test]
+    fn wgs72() {
+        let wgs72 = Ellipsoid::new(Length::from_metres(6_378_135.0), 298.26);
+        assert_eq!(
+            Ellipsoid::WGS72.equatorial_radius(),
+            wgs72.equatorial_radius()
+        );
+        assert_eq!(Ellipsoid::WGS72.polar_radius(), wgs72.polar_radius());
+        assert_eq!(Ellipsoid::WGS72.eccentricity(), wgs72.eccentricity());
+        assert_eq!(Ellipsoid::WGS72.flattening(), wgs72.flattening());
+    }
+
+    #[test]
+    fn mola() {
+        let mola = Ellipsoid::new(Length::from_metres(3_396_200.0), 169.8);
+        assert_eq!(
+            Ellipsoid::MOLA.equatorial_radius(),
+            mola.equatorial_radius()
+        );
+        assert_eq!(Ellipsoid::MOLA.polar_radius(), mola.polar_radius());
+        assert_eq!(Ellipsoid::MOLA.eccentricity(), mola.eccentricity());
+        assert_eq!(Ellipsoid::MOLA.flattening(), mola.flattening());
+    }
+}

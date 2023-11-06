@@ -383,7 +383,7 @@ impl Sphere {
 impl Surface for Sphere {
     fn geodetic_to_geocentric(&self, pos: GeodeticPos) -> GeocentricPos {
         let h = self.radius + pos.height();
-        GeocentricPos::from_metres(h.as_metres() * pos.horizontal_position().as_vec3())
+        GeocentricPos::from_vec3_metres(h.as_metres() * pos.horizontal_position().as_vec3())
     }
 
     fn geocentric_to_geodetic(&self, pos: GeocentricPos) -> GeodeticPos {

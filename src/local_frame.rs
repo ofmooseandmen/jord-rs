@@ -29,17 +29,50 @@ pub struct LocalPositionVector {
 }
 
 impl LocalPositionVector {
-    fn new(x: Length, y: Length, z: Length, o: Orientation) -> Self {
+    /// Creates a [LocalPositionVector] from the given coordinates.
+    /// Orientation: x = north (or forward), y = east (or right), z = down
+    pub fn new(x: Length, y: Length, z: Length) -> Self {
+        Self::new_with_o(x, y, z, Orientation::Ned)
+    }
+
+    /// Creates a [LocalPositionVector] from the given coordinates in metres.
+    /// Orientation: x = north (or forward), y = east (or right), z = down
+    pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
+        Self::new_with_o(
+            Length::from_metres(x),
+            Length::from_metres(y),
+            Length::from_metres(z),
+            Orientation::Ned,
+        )
+    }
+
+    fn new_with_o(x: Length, y: Length, z: Length, o: Orientation) -> Self {
         Self { x, y, z, o }
     }
 
-    fn from_metres(v: Vec3, o: Orientation) -> Self {
-        Self::new(
+    fn from_metres_with_o(v: Vec3, o: Orientation) -> Self {
+        Self::new_with_o(
             Length::from_metres(v.x()),
             Length::from_metres(v.y()),
             Length::from_metres(v.z()),
             o,
         )
+    }
+
+    /// Converts this [LocalPositionVector] using the given orientation.
+    fn with_orientation(&self, o: Orientation) -> Self {
+        if self.o == o {
+            *self
+        } else {
+            // ENU(x, y, z) = NED(y, x, -z)
+            // NED(x, y, z) = ENU(y, x, -z)
+            LocalPositionVector {
+                x: self.y,
+                y: self.x,
+                z: -self.z,
+                o,
+            }
+        }
     }
 
     /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
@@ -61,7 +94,7 @@ impl LocalPositionVector {
     /// ```
     pub fn aer_to_ned(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
         let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPositionVector::new(north, east, -z, Orientation::Ned)
+        LocalPositionVector::new_with_o(north, east, -z, Orientation::Ned)
     }
 
     /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
@@ -83,7 +116,7 @@ impl LocalPositionVector {
     /// ```
     pub fn aer_to_enu(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
         let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPositionVector::new(east, north, z, Orientation::Enu)
+        LocalPositionVector::new_with_o(east, north, z, Orientation::Enu)
     }
 
     fn aer_to_enz(
@@ -139,7 +172,7 @@ impl Cartesian3DVector for LocalPositionVector {
     where
         F: Fn(Length) -> Length,
     {
-        Self::new(round(self.x()), round(self.y()), round(self.z()), self.o)
+        Self::new_with_o(round(self.x()), round(self.y()), round(self.z()), self.o)
     }
 }
 
@@ -274,16 +307,16 @@ where
         // delta in 'Earth' frame.
         let de = p_geocentric - self.origin;
         let d = de * self.inv_rm;
-        LocalPositionVector::from_metres(d, self.o)
+        LocalPositionVector::from_metres_with_o(d, self.o)
     }
 
     /// Converts the given [LocalPositionVector] into a [GeodeticPos]: the geodetic position of an object
     /// which is located at a bearing and distance from this frame origin.
     pub fn local_to_geodetic_pos(&self, p: LocalPositionVector) -> GeodeticPos {
-        // TODO(CL): modify p to match orientation...
-        let c = p.as_metres() * self.dir_rm;
+        let op = p.with_orientation(self.o);
+        let c = op.as_metres() * self.dir_rm;
         let v = self.origin + c;
-        let p_geocentric = GeocentricPos::from_metres(v);
+        let p_geocentric = GeocentricPos::from_vec3_metres(v);
         self.surface.geocentric_to_geodetic(p_geocentric)
     }
 }
@@ -366,7 +399,7 @@ pub fn r2zyx(m: Mat33) -> (Angle, Angle, Angle) {
 ///
 /// Note that if A is a north-east-down frame and B is a body frame, we
 /// have that z=yaw, y=pitch and x=roll.
-pub fn zyx2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
+pub fn zyx2r(z: Angle, y: Angle, x: Angle) -> Mat33 {
     let cx = x.as_radians().cos();
     let sx = x.as_radians().sin();
     let cy = y.as_radians().cos();
@@ -569,6 +602,27 @@ mod tests {
         assert_eq!(az, local.azimuth().round_d7());
         assert_eq!(el, local.elevation().round_d7());
         assert_eq!(sr, local.slant_range().round_mm());
+    }
+
+    #[test]
+    fn local_to_geodetic_pos_enu() {
+        let origin = GeodeticPos::new(
+            NVector::from_lat_long_degrees(46.017, 7.750),
+            Length::from_metres(1673.0),
+        );
+        let point = GeodeticPos::new(
+            NVector::from_lat_long_degrees(45.976, 7.658),
+            Length::from_metres(4531.0),
+        );
+
+        let enu: LocalFrame<Ellipsoid> = LocalFrame::enu(origin, Ellipsoid::WGS84);
+
+        let local_enu: LocalPositionVector = enu.geodetic_to_local_pos(point);
+
+        // LocalPositionVector::new is NED
+        let local_ned = LocalPositionVector::new(local_enu.y(), local_enu.x(), -local_enu.z());
+
+        assert_geod_eq_d7_mm(point, enu.local_to_geodetic_pos(local_ned));
     }
 
     #[test]

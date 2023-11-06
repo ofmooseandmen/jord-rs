@@ -64,12 +64,17 @@ impl GeocentricPos {
     }
 
     /// Creates a [GeocentricPos] from the given coordinates in metres.
-    pub fn from_metres(v: Vec3) -> Self {
+    pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
         Self::new(
-            Length::from_metres(v.x()),
-            Length::from_metres(v.y()),
-            Length::from_metres(v.z()),
+            Length::from_metres(x),
+            Length::from_metres(y),
+            Length::from_metres(z),
         )
+    }
+
+    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
+        Self::from_metres(v.x(), v.y(), v.z())
     }
 }
 
