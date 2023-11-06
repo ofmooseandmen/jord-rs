@@ -1,6 +1,6 @@
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
 #![forbid(
     anonymous_parameters,
-    const_err,
     illegal_floating_point_literal_pattern,
     late_bound_lifetime_arguments,
     path_statements,
@@ -13,7 +13,11 @@
     unused_extern_crates,
     missing_debug_implementations
 )]
+#![warn(missing_docs)]
 #![deny(clippy::all)]
+
+mod mat33;
+pub use crate::mat33::Mat33;
 
 #[macro_use]
 mod measurement;
@@ -21,50 +25,30 @@ pub use crate::measurement::Measurement;
 
 mod angle;
 pub use crate::angle::Angle;
-pub use crate::angle::AngleResolution::{self, Arcsecond, Microarcsecond, Milliarcsecond};
 
-mod error;
-pub use crate::error::Error;
+pub mod ellipsoidal;
 
-mod great_circle;
-pub use crate::great_circle::{GreatCircle, MinorArc, Side};
-
-mod geocentric;
-pub use crate::geocentric::GeocentricPos;
-
-mod geodetic;
-pub use crate::geodetic::{
-    nvector_from_lat_long_degrees, nvector_to_lat_long, GeodeticPos, HorizontalPos, LatLong,
-};
+mod local_frame;
+pub use crate::local_frame::{r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalPositionVector};
 
 mod length;
 pub use crate::length::Length;
-pub use crate::length::LengthResolution::{self, Metre, Micrometre, Millimetre};
 
-mod local_frames;
-pub use crate::local_frames::{
-    n_e2_r_en, n_e_and_wa2_r_el, n_e_and_ypr2_r_eb, BodyOrientation, Delta,
-};
+mod numbers;
 
-mod math3d;
-pub use crate::math3d::Mat33;
-pub use crate::math3d::Vec3;
+mod positions;
+pub use crate::positions::{Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, NVector};
 
-mod model;
-pub use crate::model::Ellipsoidal;
-pub use crate::model::EllipsoidalT0;
-pub use crate::model::Epoch;
-pub use crate::model::LongitudeRange;
-pub use crate::model::Model;
-pub use crate::model::ModelId;
-pub use crate::model::Spherical;
+mod speed;
+pub use crate::speed::Speed;
 
-pub mod models;
-
-mod rotation;
-pub use crate::rotation::*;
+pub mod spherical;
 
 mod surface;
-pub use crate::surface::{Ellipsoid, Sphere, Surface};
+pub use crate::surface::Surface;
 
-pub mod surfaces;
+mod vec3;
+pub use crate::vec3::Vec3;
+
+mod vehicle;
+pub use crate::vehicle::Vehicle;

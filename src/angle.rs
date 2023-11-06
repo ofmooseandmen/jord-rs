@@ -1,163 +1,132 @@
-// Copyright: (c) 2020 Cedric Liegeois
-// License: BSD3
+use crate::{impl_measurement, Measurement};
+use std::f64::consts::PI;
 
-//! Types and impl for working with angles.
-//!
-
-use crate::Measurement;
-
-/// Resolution for [`rounding`] angles.
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
+/// A one-dimensional angle.
 ///
-/// [`rounding`]: struct.Angle.html#method.round
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AngleResolution {
-    /// Resolution of 1 arcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 30 metres at the equator.
-    Arcsecond,
-    /// Resolution of 1 milliarcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 0.03 metres at the equator.
-    Milliarcsecond,
-    /// Resolution of 1 microarcsecond: for the ubiquitous [WGS84](models/constant.WGS84.html) model this roughly translate to a precision of 0.03 millimetres at the equator.
-    Microarcsecond,
-}
-
-/// A signed angle.
+/// It primarely exists to unambigously represent an angle as opposed to a bare
+/// [f64] (which could be anything and in any unit).
+/// It allows conversion to or from radians and degrees.
 ///
-/// `Angle` implements many traits, including [`Add`], [`Sub`], [`Mul`], and
-/// [`Div`], among others.
-// FIXME Display & FromStr
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+/// [Angle] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
+/// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
 pub struct Angle {
-    decimal_degrees: f64,
+    radians: f64,
 }
 
-/// The number of seconds in one degree.
-const DG_TO_SECS: f64 = 3_600.0;
-
-/// The number of milliseconds in one degree.
-const DG_TO_MILLIS: f64 = DG_TO_SECS * 1_000.0;
-
-/// The number of microseconds in one degree.
-const DG_TO_MICROS: f64 = DG_TO_MILLIS * 1_000.0;
-
-// FIXME parse
 impl Angle {
-    /// Equivalent to `Angle::from_decimal_degrees(0.0)`.
-    ///
-    /// ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(Angle::from_decimal_degrees(0.0), Angle::zero());
-    /// ```
-    pub const fn zero() -> Self {
+    /// 2 PI radians.
+    const TWO_PI: f64 = 2.0 * PI;
+
+    /// Zero angle.
+    pub const ZERO: Angle = Angle { radians: 0.0 };
+
+    /// 180 degrees angle.
+    pub const HALF_CIRCLE: Angle = Angle { radians: PI };
+
+    /// Converts this angle to a floating point value in degrees.
+    pub fn as_degrees(&self) -> f64 {
+        self.radians.to_degrees()
+    }
+
+    /// Converts this angle to a floating point value in radians.
+    pub fn as_radians(&self) -> f64 {
+        self.radians
+    }
+
+    /// Creates an angle from a floating point value in degrees.
+    pub fn from_degrees(degrees: f64) -> Self {
         Angle {
-            decimal_degrees: 0.0,
+            radians: degrees.to_radians(),
         }
     }
 
-    /// Create a new `Angle` with the given number of decimal degrees.
-    pub const fn from_decimal_degrees(decimal_degrees: f64) -> Self {
-        Angle { decimal_degrees }
+    /// Creates an angle from a floating point value in radians.
+    pub const fn from_radians(radians: f64) -> Self {
+        Angle { radians }
     }
 
-    /// Create a new `Angle` with the given number of arc degrees, minutes, seconds and milliseconds.
-    /// Given minutes, seconds and milliseconds are wrapped if needed.
+    /// Returns a new angle by normalising this angle to the range [0, 360) degrees.
     ///
-    ///  ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(10, 30, 45, 0));
-    /// assert_eq!(Angle::from_decimal_degrees(10.5125), Angle::from_dms(9, 89, 105, 0));
+    /// # Examples
+    ///
     /// ```
-    pub fn from_dms(degrees: i16, minutes: u8, seconds: u8, milliseconds: u16) -> Self {
-        let add = degrees.abs() as f64
-            + (minutes as f64 / 60.0)
-            + (seconds as f64 / 3600.0)
-            + (milliseconds as f64 / (3600.0 * 1000.0));
-        let dd;
-        if degrees < 0 {
-            dd = -add;
+    /// use jord::Angle;
+    ///
+    /// assert_eq!(Angle::from_degrees(-361.0).normalised().as_degrees(), 359.0);
+    /// assert_eq!(Angle::from_degrees(-2.0).normalised().as_degrees(), 358.0);
+    /// assert_eq!(Angle::from_degrees(154.0).normalised().as_degrees(), 154.0);
+    /// assert_eq!(Angle::from_degrees(360.0).normalised().as_degrees(), 0.0);
+    /// ```
+    pub fn normalised(&self) -> Self {
+        if self.radians >= 0.0 && self.radians < Self::TWO_PI {
+            *self
         } else {
-            dd = add;
+            let res = self.radians % Self::TWO_PI;
+            if res < 0.0 {
+                Self::from_radians(res + Self::TWO_PI)
+            } else {
+                Self::from_radians(res)
+            }
         }
-        Angle::from_decimal_degrees(dd).round(AngleResolution::Milliarcsecond)
     }
 
-    /// Returns a new `Angle` from the [decimal degrees] of this `Angle` rounded to the given [resolution].
+    /// Rounds this angle to the nearest decimal degrees with 5 decimal places - when representing
+    /// an Earth latitude/longtiude this is approximately 1.11 metres at the equator.
     ///
-    ///  ```rust
-    /// # use jord::{AngleResolution, Angle, Arcsecond, Milliarcsecond, Microarcsecond};
-    /// assert_eq!(154.55, Angle::from_decimal_degrees(154.54987654321).round(Arcsecond).decimal_degrees());
-    /// assert_eq!(154.54987666666668, Angle::from_decimal_degrees(154.54987654321).round(Milliarcsecond).decimal_degrees());
-    /// assert_eq!(154.54987654333334, Angle::from_decimal_degrees(154.54987654321).round(Microarcsecond).decimal_degrees());
+    /// # Examples
+    ///
     /// ```
+    /// use jord::Angle;
     ///
-    /// [decimal degrees]: ../angle/struct.Angle.html#method.decimal_degrees
-    /// [resolution]: ../angle/enum.AngleResolution.html
-    pub fn round(self, resolution: AngleResolution) -> Self {
-        let scale = match resolution {
-            AngleResolution::Arcsecond => DG_TO_SECS,
-            AngleResolution::Milliarcsecond => DG_TO_MILLIS,
-            AngleResolution::Microarcsecond => DG_TO_MICROS,
-        };
-        let decimal_degrees = ((self.decimal_degrees * scale).round()) / scale;
-        Angle { decimal_degrees }
-    }
-
-    /// Converts this `Angle` to a number of decimal degrees.
-    pub const fn decimal_degrees(self) -> f64 {
-        self.decimal_degrees
-    }
-
-    /// Returns the degree component of this `Angle`.
-    ///
-    ///  ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(-154, Angle::from_dms(-154, 3, 42, 500).arcdegrees());
+    /// assert_eq!(Angle::from_degrees(3.44444), Angle::from_degrees(3.444444).round_d5());
+    /// assert_eq!(Angle::from_degrees(3.44445), Angle::from_degrees(3.444445).round_d5());
     /// ```
-    pub const fn arcdegrees(self) -> i64 {
-        self.decimal_degrees as i64
+    pub fn round_d5(&self) -> Self {
+        let d5 = (self.as_degrees() * 1e5).round() / 1e5;
+        Self::from_degrees(d5)
     }
 
-    /// Returns the arcminutes component of this `Angle`.
+    /// Rounds this angle to the nearest decimal degrees with 6 decimal places - when representing
+    /// an Earth latitude/longtiude this is approximately 0.111 metres at the equator.
     ///
-    ///  ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(45, Angle::from_dms(-154, 45, 42, 500).arcminutes());
-    /// ```
-    pub fn arcminutes(self) -> u8 {
-        Angle::field(self, 60000000.0, 60.0) as u8
-    }
-
-    /// Returns the arcseconds component of this `Angle`.
+    /// # Examples
     ///
-    ///  ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(42, Angle::from_dms(-154, 45, 42, 500).arcseconds());
     /// ```
-    pub fn arcseconds(self) -> u8 {
-        Angle::field(self, 1000000.0, 60.0) as u8
-    }
-
-    /// Returns the arcmilliseconds component of this `Angle`.
+    /// use jord::Angle;
     ///
-    ///  ```rust
-    /// # use jord::Angle;
-    /// assert_eq!(500, Angle::from_dms(-154, 45, 42, 500).milliarcseconds());
+    /// assert_eq!(Angle::from_degrees(3.444444), Angle::from_degrees(3.4444444).round_d6());
+    /// assert_eq!(Angle::from_degrees(3.444445), Angle::from_degrees(3.4444445).round_d6());
     /// ```
-    pub fn milliarcseconds(self) -> u16 {
-        Angle::field(self, 1000.0, 1000.0) as u16
+    pub fn round_d6(&self) -> Self {
+        let d6 = (self.as_degrees() * 1e6).round() / 1e6;
+        Self::from_degrees(d6)
     }
 
-    fn field(self, div: f64, modu: f64) -> u64 {
-        let uas = (self.decimal_degrees * DG_TO_MICROS).round();
-        (uas.abs() / div % modu) as u64
+    /// Rounds this angle to the nearest decimal degrees with 7 decimal places - when representing
+    /// an Earth latitude/longtiude this is approximately 1.11 centimetres at the equator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::Angle;
+    ///
+    /// assert_eq!(Angle::from_degrees(3.4444444), Angle::from_degrees(3.44444444).round_d7());
+    /// assert_eq!(Angle::from_degrees(3.4444445), Angle::from_degrees(3.44444445).round_d7());
+    /// ```
+    pub fn round_d7(&self) -> Self {
+        let d7 = (self.as_degrees() * 1e7).round() / 1e7;
+        Self::from_degrees(d7)
     }
 }
 
 impl Measurement for Angle {
     fn from_default_unit(amount: f64) -> Self {
-        Angle::from_decimal_degrees(amount)
+        Angle::from_radians(amount)
     }
 
-    fn as_default_unit(self) -> f64 {
-        self.decimal_degrees()
+    fn as_default_unit(&self) -> f64 {
+        self.as_radians()
     }
 }
 
