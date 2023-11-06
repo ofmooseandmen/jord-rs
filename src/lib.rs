@@ -58,3 +58,6 @@ mod surface;
 
 mod vec3;
 pub use crate::vec3::Vec3;
+
+mod vehicle;
+pub use crate::vehicle::Vehicle;

@@ -21,6 +21,41 @@ use crate::{impl_measurement, Length, Measurement};
 ///
 /// [Speed] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
 /// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
+///
+/// # Speed from distance and time
+///
+/// ```
+/// use jord::{Length, Speed};
+/// use std::time::Duration;
+///
+/// assert_eq!(
+///     Speed::from_metres_per_second(1.0),
+///     Length::from_metres(1.0) / Duration::from_secs(1)
+/// );
+///
+/// assert_eq!(
+///     Speed::from_knots(1.0),
+///     Length::from_nautical_miles(1.0) / Duration::from_secs(3600)
+/// );
+/// ```
+///
+/// # Distance travelled at speed over time
+///
+/// ```
+/// use jord::{Length, Speed};
+/// use std::time::Duration;
+///
+/// assert_eq!(
+///     Length::from_metres(2.0),
+///     Speed::from_metres_per_second(1.0) * Duration::from_secs(2)
+/// );
+///
+/// assert_eq!(
+///     Length::from_nautical_miles(2.0),
+///     (Speed::from_knots(1.0) * Duration::from_secs(7200)).round_mm()
+/// );
+///  
+/// ```
 pub struct Speed {
     mps: f64,
 }
@@ -46,28 +81,6 @@ impl Speed {
     /// Creates a speed from a floating point value in knots.
     pub fn from_knots(knots: f64) -> Self {
         Speed::from_metres_per_second(knots * Self::KNOTS_TO_MPS)
-    }
-
-    /// Creates a speed by calculating the average speed required to covered the given distance in the given duration.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::time::Duration;
-    /// use jord::{Length, Speed};
-    ///
-    /// assert_eq!(
-    ///     Speed::from_metres_per_second(1.0),
-    ///     Speed::from_average(Length::from_metres(1.0), Duration::from_secs(1))
-    /// );
-    /// assert_eq!(
-    ///     Speed::from_knots(1.0),
-    ///     Speed::from_average(Length::from_nautical_miles(1.0), Duration::from_secs(3600))
-    /// );
-    /// ```
-    pub fn from_average(distance: Length, duration: Duration) -> Self {
-        let mps = distance.as_metres() / duration.as_secs_f64();
-        Speed::from_metres_per_second(mps)
     }
 
     /// Converts this speed to a floating point value in metres per second.
@@ -97,3 +110,21 @@ impl Measurement for Speed {
 }
 
 impl_measurement! { Speed }
+
+impl ::std::ops::Div<Duration> for Length {
+    type Output = Speed;
+
+    fn div(self, rhs: Duration) -> Speed {
+        let mps = self.as_metres() / rhs.as_secs_f64();
+        Speed::from_metres_per_second(mps)
+    }
+}
+
+impl ::std::ops::Mul<Duration> for Speed {
+    type Output = Length;
+
+    fn mul(self, rhs: Duration) -> Length {
+        let metres = self.as_metres_per_second() * rhs.as_secs_f64();
+        Length::from_metres(metres)
+    }
+}

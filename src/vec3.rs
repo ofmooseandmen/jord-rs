@@ -10,49 +10,49 @@ pub struct Vec3 {
 }
 
 impl Vec3 {
-    /// `Vec3` (1, 0, 0).
+    /// (1.0, 0.0, 0.0).
     pub const UNIT_X: Vec3 = Vec3 {
         x: 1.0,
         y: 0.0,
         z: 0.0,
     };
 
-    /// `Vec3` (0, 1, 0).
+    /// (0.0, 1.0, 0.0).
     pub const UNIT_Y: Vec3 = Vec3 {
         x: 0.0,
         y: 1.0,
         z: 0.0,
     };
 
-    /// `Vec3` (0, 0, 1).
+    /// (0.0, 0.0, 1.0).
     pub const UNIT_Z: Vec3 = Vec3 {
         x: 0.0,
         y: 0.0,
         z: 1.0,
     };
 
-    /// `Vec3` (-1, 0, 0).
+    /// (-1.0, 0.0, 0.0).
     pub const NEG_UNIT_X: Vec3 = Vec3 {
         x: -1.0,
         y: 0.0,
         z: 0.0,
     };
 
-    /// `Vec3` (0, -1, 0).
+    /// (0.0, -1.0, 0.0).
     pub const NEG_UNIT_Y: Vec3 = Vec3 {
         x: 0.0,
         y: -1.0,
         z: 0.0,
     };
 
-    /// `Vec3` (0, 0, -1).
+    /// (0.0, 0.0, -1.0).
     pub const NEG_UNIT_Z: Vec3 = Vec3 {
         x: 0.0,
         y: 0.0,
         z: -1.0,
     };
 
-    /// Origin: (0, 0, 0).
+    /// Origin: (0.0, 0.0, 0.0).
     pub const ZERO: Vec3 = Vec3 {
         x: 0.0,
         y: 0.0,
@@ -262,7 +262,7 @@ impl Vec3 {
         self.squared_norm().sqrt()
     }
 
-    /// Similar to [stable_cross_prod](crate::Vec3::crate::stable_cross_prod), but returns a unit vector (without creating an intermediate
+    /// Similar to [stable_cross_prod](crate::Vec3::stable_cross_prod), but returns a unit vector (without creating an intermediate
     /// [Vec3].
     ///
     /// #Examples:

@@ -1,7 +1,8 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
+    NVector, Vec3, Vehicle,
 };
 
 use super::{
@@ -18,6 +19,12 @@ pub struct Sphere {
 }
 
 impl Sphere {
+    // 1 millisecond in hours.
+    const ONE_MILLI_HOURS: f64 = 1.0 / (3_600.0 * 1_000.0);
+
+    // CPA Newton-Raphson maximum number of iteration. */
+    const CPA_NR_MAX_ITERATIONS: u64 = 50;
+
     /// Spherical Earth model using the IUGG (International Union of Geodesy and Geophysics) Earth volumic radius - generally accepted
     /// as the Earth radius when assuming a spherical model.
     /// Note: this is equal to the volumetric radius of the ubiquous WGS84 ellipsoid rounded to 1 decimal.
@@ -260,14 +267,6 @@ impl Sphere {
         }
     }
 
-    /// Returns the angle in radians turned from AB to BC. Angle is positive for left turn,
-    /// negative for right turn and 0 if all 3 positions are collinear (i.e. on the same great circle).
-    pub fn turn(a: NVector, b: NVector, c: NVector) -> Angle {
-        let n1 = Vec3::from_orthogonal(a.as_vec3(), b.as_vec3());
-        let n2 = Vec3::from_orthogonal(b.as_vec3(), c.as_vec3());
-        Angle::from_radians(angle_radians_between(n1, n2, Some(b.as_vec3())))
-    }
-
     /// Determines whether v0 if right of (negative integer), left of (positive integer) or on the
     /// great circle (zero), from v1 to v2.
     ///
@@ -297,6 +296,88 @@ impl Sphere {
     pub fn side_exact(p0: NVector, p1: NVector, p2: NVector) -> f64 {
         side_exact(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
     }
+
+    /// Returns the angle in radians turned from AB to BC. Angle is positive for left turn,
+    /// negative for right turn and 0 if all 3 positions are collinear (i.e. on the same great circle).
+    pub fn turn(a: NVector, b: NVector, c: NVector) -> Angle {
+        let n1 = Vec3::from_orthogonal(a.as_vec3(), b.as_vec3());
+        let n2 = Vec3::from_orthogonal(b.as_vec3(), c.as_vec3());
+        Angle::from_radians(angle_radians_between(n1, n2, Some(b.as_vec3())))
+    }
+
+    // kinematics
+
+    ///  Computes the time at the closest point of approach (CPA) between the two given vehicles: the time at which the
+    /// 2 vehicles will be the closest assuming they both maintain a constant course and heading.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, Length, NVector, Speed, Vehicle};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let ownship = Vehicle::new(
+    ///     NVector::from_lat_long_degrees(20.0, -60.0),
+    ///     Angle::from_degrees(10.0),
+    ///     Speed::from_knots(15.0),
+    /// );
+    ///
+    /// let intruder = Vehicle::new(
+    ///     NVector::from_lat_long_degrees(34.0, -50.0),
+    ///     Angle::from_degrees(220.0),
+    ///     Speed::from_knots(300.0),
+    /// );
+    ///
+    /// let opt_time_at_cpa = Sphere::EARTH.time_to_cpa(ownship, intruder);
+    /// assert!(opt_time_at_cpa.is_some());
+    /// let time_at_cpa = opt_time_at_cpa.unwrap();
+    ///
+    /// assert_eq!(113_961_40, time_at_cpa.as_millis());
+    ///
+    /// // Position of ownship at CPA:
+    /// let p_cpa_own = Sphere::EARTH.destination_pos(
+    ///     ownship.position(),
+    ///     ownship.bearing(),
+    ///     ownship.speed() * time_at_cpa,
+    /// );
+    ///
+    /// // Position of intruder at CPA:
+    /// let p_cpa_int = Sphere::EARTH.destination_pos(
+    ///     intruder.position(),
+    ///     intruder.bearing(),
+    ///     intruder.speed() * time_at_cpa,
+    /// );
+    ///
+    /// // Distance between the 2 vehicles at CPA:
+    /// let d_cpa = Sphere::EARTH.distance(p_cpa_own, p_cpa_int);
+    /// assert_eq!(Length::from_metres(124_232.0), d_cpa.round_m());
+    ///
+    /// ```
+    pub fn time_to_cpa(&self, ownship: Vehicle, intruder: Vehicle) -> Option<Duration> {
+        let r_nm = self.radius.as_nautical_miles();
+
+        let own_p0 = ownship.position().as_vec3();
+        let own_course = course(ownship);
+        let own_speed_knots = ownship.speed().as_knots();
+        let own_w = own_speed_knots / r_nm;
+
+        let int_p0 = intruder.position().as_vec3();
+        let int_course = course(intruder);
+        let int_speed_knots = intruder.speed().as_knots();
+        let int_w = int_speed_knots / r_nm;
+
+        let f = cpa_fn(own_p0, own_course, own_w, int_p0, int_course, int_w, false);
+        let df = cpa_fn(own_p0, own_course, own_w, int_p0, int_course, int_w, true);
+
+        let hours_to_cpa = newton_raphson(
+            f,
+            df,
+            0.0,
+            Self::ONE_MILLI_HOURS,
+            Self::CPA_NR_MAX_ITERATIONS,
+        );
+        hours_to_cpa.filter(|h| h >= &0.0).map(hours_to_duration)
+    }
 }
 
 impl Surface for Sphere {
@@ -310,6 +391,9 @@ impl Surface for Sphere {
         GeodeticPos::new(NVector::new(Vec3::unit(pos.as_metres())), h)
     }
 }
+
+// nanoseconds in one hour.
+const NANOS_PER_HOUR: f64 = 3_600.0 * 1_000.0 * 1_000_000.0;
 
 fn final_bearing_radians(v1: NVector, v2: NVector) -> f64 {
     initial_bearing_radians(v2, v1) + PI
@@ -342,10 +426,109 @@ fn contains_antipodal(ps: &[NVector]) -> bool {
     false
 }
 
+/// Implementation of the Newton Raphson root-finding algorithm.
+/// See: https://en.wikipedia.org/wiki/Newton%27s_method
+fn newton_raphson<F>(f: F, df: F, x0: f64, epsilon: f64, max_iters: u64) -> Option<f64>
+where
+    F: Fn(f64) -> f64,
+{
+    let mut x = x0;
+    for _i in 0..max_iters {
+        let y = f(x);
+        let d = df(x);
+        if d == 0.0 {
+            return None;
+        }
+
+        let m = y / d;
+        if m.abs() < epsilon {
+            return Some(x);
+        }
+        x -= m;
+    }
+    None
+}
+
+fn course(vehicle: Vehicle) -> Vec3 {
+    let ll = LatLong::from_nvector(vehicle.position());
+    let lat_rads = ll.latitude().as_radians();
+    let lng_rads = ll.longitude().as_radians();
+    let bearing_rads = vehicle.bearing().as_radians();
+    let r = (course_rz(-lng_rads) * course_ry(lat_rads)) * course_rx(bearing_rads);
+    Vec3::UNIT_Z * r
+}
+
+fn course_rx(theta: f64) -> Mat33 {
+    let c = theta.cos();
+    let s = theta.sin();
+    Mat33::new(Vec3::UNIT_X, Vec3::new(0.0, c, s), Vec3::new(0.0, -s, c))
+}
+
+fn course_ry(theta: f64) -> Mat33 {
+    let c = theta.cos();
+    let s = theta.sin();
+    Mat33::new(Vec3::new(c, 0.0, -s), Vec3::UNIT_Y, Vec3::new(s, 0.0, c))
+}
+
+fn course_rz(theta: f64) -> Mat33 {
+    let c = theta.cos();
+    let s = theta.sin();
+    Mat33::new(Vec3::new(c, s, 0.0), Vec3::new(-s, c, 0.0), Vec3::UNIT_Z)
+}
+
+/// Build functions for iteratively solving for time of minimum separation.
+fn cpa_fn(
+    p10: Vec3,
+    c10: Vec3,
+    w1: f64,
+    p20: Vec3,
+    c20: Vec3,
+    w2: f64,
+    derivate: bool,
+) -> Box<dyn Fn(f64) -> f64> {
+    let a = -(w1 * p10.dot_prod(c20) + w2 * p20.dot_prod(c10));
+    let b = w1 * c10.dot_prod(p20) + w2 * c20.dot_prod(p10);
+    let c = -(w1 * p10.dot_prod(p20) - w2 * c20.dot_prod(c10));
+    let d = w1 * c10.dot_prod(c20) - w2 * p20.dot_prod(p10);
+
+    if derivate {
+        let func = move |t: f64| -> f64 {
+            let w1t: f64 = w1 * t;
+            let w2t = w2 * t;
+            let sw1t = w1t.sin();
+            let sw2t = w2t.sin();
+            let cw1t = w1t.cos();
+            let cw2t = w2t.cos();
+            -(c * w2 + d * w1) * sw1t * sw2t
+                + (d * w2 + c * w1) * cw1t * cw2t
+                + (a * w2 - b * w1) * sw1t * cw2t
+                - (b * w2 - a * w1) * cw1t * sw2t
+        };
+        Box::new(func)
+    } else {
+        let func = move |t: f64| -> f64 {
+            let w1t = w1 * t;
+            let w2t = w2 * t;
+            let sw1t = w1t.sin();
+            let sw2t = w2t.sin();
+            let cw1t = w1t.cos();
+            let cw2t = w2t.cos();
+            a * sw1t * sw2t + b * cw1t * cw2t + c * sw1t * cw2t + d * cw1t * sw2t
+        };
+        Box::new(func)
+    }
+}
+
+/// Converts the given amount of decimal hours into a [Duration].
+fn hours_to_duration(hours: f64) -> Duration {
+    let nanos: u64 = (hours * NANOS_PER_HOUR).round() as u64;
+    Duration::from_nanos(nanos)
+}
+
 #[cfg(test)]
 mod tests {
 
-    use std::f64::consts::PI;
+    use std::{f64::consts::PI, time::Duration};
 
     /// destination.
 
@@ -702,8 +885,10 @@ mod tests {
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
         spherical::Sphere,
-        Angle, LatLong, Length, NVector, Vec3,
+        Angle, LatLong, Length, NVector, Speed, Vec3, Vehicle,
     };
+
+    use super::newton_raphson;
 
     #[test]
     fn mean_antipodal() {
@@ -838,5 +1023,234 @@ mod tests {
             NVector::from_lat_long_degrees(60.0, 10.0),
         );
         assert_eq!(Angle::from_radians(-0.3175226173130951), actual);
+    }
+
+    // newton_raphson
+    #[test]
+    fn newton_raphson_line() {
+        let f: &dyn Fn(f64) -> f64 = &|x| 3.0 * x + 1.0;
+        let df: &dyn Fn(f64) -> f64 = &|_| 3.0;
+        let x0 = 0.0;
+        let r = newton_raphson(f, df, x0, 1e-15, 100);
+        assert_eq!(Some(-1.0 / 3.0), r);
+    }
+
+    #[test]
+    fn newton_raphson_parabola() {
+        let f: &dyn Fn(f64) -> f64 = &|x| x * x - 1.0;
+        let df: &dyn Fn(f64) -> f64 = &|x| 2.0 * x;
+
+        let mut x0 = 0.0;
+        let mut r: Option<f64> = newton_raphson(f, df, x0, 1e-15, 100);
+        assert!(r.is_none());
+
+        x0 = 0.1;
+        r = newton_raphson(f, df, x0, 1e-15, 100);
+        assert_eq!(Some(1.0), r);
+
+        x0 = -0.1;
+        r = newton_raphson(f, df, x0, 1e-15, 100);
+        assert_eq!(Some(-1.0), r);
+    }
+
+    #[test]
+    fn newton_raphson_sinusoid() {
+        let f: &dyn Fn(f64) -> f64 = &|x| x.sin();
+        let df: &dyn Fn(f64) -> f64 = &|x| x.cos();
+
+        let mut x0 = 0.0;
+
+        // Initial value is root.
+        let mut r: Option<f64> = newton_raphson(f, df, x0, 1e-15, 100);
+        assert_eq!(Some(0.0), r);
+
+        // No root, derivative is 0.
+        x0 = PI / 2.0;
+        r = newton_raphson(f, df, x0, 1e-15, 100);
+        assert!(r.is_none());
+
+        // Second root.
+        x0 = PI * 3.0 / 4.0;
+        r = newton_raphson(f, df, x0, 1e-15, 100);
+        assert_eq!(Some(PI), r);
+    }
+
+    // time to CPA
+
+    #[test]
+    fn time_to_cpa_catch_up() {
+        // faster vehicle chases other vehicle on the same great circle.
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(-24.0, 129.0),
+            Angle::from_degrees(45.0),
+            Speed::from_knots(405.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(-23.40981138888889, 129.64166694444444),
+            Angle::from_degrees(44.742017777777775),
+            Speed::from_knots(400.0),
+        );
+
+        assert_time_to_cpa(
+            Duration::from_secs(10 * 60 * 60),
+            Sphere::EARTH.time_to_cpa(ownship, intruder),
+        );
+    }
+
+    #[test]
+    fn time_to_cpa_same_fleeing_along_equator() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, 0.1),
+            Angle::from_degrees(90.0),
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, -0.1),
+            Angle::from_degrees(270.0),
+            Speed::from_knots(400.0),
+        );
+
+        assert!(Sphere::EARTH.time_to_cpa(ownship, intruder).is_none());
+    }
+
+    #[test]
+    fn time_to_cpa_same_head_on_along_equator() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, -0.1),
+            Angle::from_degrees(90.0),
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, 0.1),
+            Angle::from_degrees(270.0),
+            Speed::from_knots(400.0),
+        );
+
+        assert_time_to_cpa(
+            elapsed_at_knots(
+                800.0,
+                (Angle::from_degrees(0.2) * Sphere::EARTH.radius()).as_nautical_miles(),
+            ),
+            Sphere::EARTH.time_to_cpa(ownship, intruder),
+        );
+    }
+
+    #[test]
+    fn time_to_cpa_head_on_over_north_pole() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(89.0, 0.0),
+            Angle::ZERO,
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(89.0, 180.0),
+            Angle::ZERO,
+            Speed::from_knots(400.0),
+        );
+
+        assert_time_to_cpa(
+            elapsed_at_knots(
+                800.0,
+                (Angle::from_degrees(2.0) * Sphere::EARTH.radius()).as_nautical_miles(),
+            ),
+            Sphere::EARTH.time_to_cpa(ownship, intruder),
+        );
+    }
+
+    #[test]
+    fn time_to_cpa_test() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(20.0, -60.0),
+            Angle::from_degrees(10.0),
+            Speed::from_knots(15.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(34.0, -50.0),
+            Angle::from_degrees(220.0),
+            Speed::from_knots(300.0),
+        );
+
+        assert_time_to_cpa(
+            Duration::from_millis(113_961_40),
+            Sphere::EARTH.time_to_cpa(ownship, intruder),
+        );
+    }
+
+    #[test]
+    fn time_to_cpa_trailing_ships() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(20.0, 30.0),
+            Angle::from_degrees(20.000959722222223),
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(20.00211277777778, 30.000818333333335),
+            Angle::from_degrees(20.00169861111111),
+            Speed::from_knots(400.0),
+        );
+
+        assert_time_to_cpa(
+            Duration::from_millis(4_177),
+            Sphere::EARTH.time_to_cpa(ownship, intruder),
+        );
+    }
+
+    #[test]
+    fn time_to_cpa_trailing_ships_same_speed() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(20.0, 30.0),
+            Angle::from_degrees(20.0000000844),
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(20.0021127100, 30.0008183256),
+            Angle::from_degrees(20.0002805853),
+            Speed::from_knots(400.0),
+        );
+
+        assert!(Sphere::EARTH.time_to_cpa(ownship, intruder).is_none());
+    }
+
+    #[test]
+    fn time_to_cpa_trailing_ships_same_speed_equator() {
+        let ownship = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, 1.0),
+            Angle::from_degrees(90.0),
+            Speed::from_knots(400.0),
+        );
+
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(0.0, 1.0000001),
+            Angle::from_degrees(90.0),
+            Speed::from_knots(400.0),
+        );
+
+        assert!(Sphere::EARTH.time_to_cpa(ownship, intruder).is_none());
+    }
+
+    fn assert_time_to_cpa(expected: Duration, actual: Option<Duration>) {
+        assert!(actual.is_some());
+        let a_ms = actual.unwrap().as_millis() as i128;
+        let e_ms = expected.as_millis() as i128;
+        let diff = (a_ms - e_ms).abs();
+        assert!(
+            diff < 100,
+            "expected {:?}ms but was {:?}ms - diff = {:?}ms",
+            expected.as_millis(),
+            actual.unwrap().as_millis(),
+            diff
+        );
+    }
+    /// Time taken to cover a distance at a speed.
+    fn elapsed_at_knots(knots: f64, nm: f64) -> Duration {
+        let millis: u64 = (nm / knots * 60.0 * 60.0 * 1000.0).round() as u64;
+        Duration::from_millis(millis)
     }
 }
