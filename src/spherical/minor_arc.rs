@@ -79,7 +79,7 @@ impl MinorArc {
     /// within the minor arc (including start and end). If the given position is strictly "perpendicular" to this
     /// minor arc, this method arbitrarily returns the start (p can be projected anywhere on the minor arc).
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::{LatLong, Length};
