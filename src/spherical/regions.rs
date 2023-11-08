@@ -723,10 +723,6 @@ mod tests {
         NVector::from_lat_long_degrees(4.3947, 18.5582)
     }
 
-    fn copenhagen() -> NVector {
-        NVector::from_lat_long_degrees(55.6761, 12.5683)
-    }
-
     fn dar_es_salaam() -> NVector {
         NVector::from_lat_long_degrees(-6.7924, 39.2083)
     }
@@ -745,10 +741,6 @@ mod tests {
 
     fn hoor() -> NVector {
         NVector::from_lat_long_degrees(55.9349, 13.5396)
-    }
-
-    fn horby() -> NVector {
-        NVector::from_lat_long_degrees(55.8576, 13.6642)
     }
 
     fn juba() -> NVector {
@@ -777,6 +769,40 @@ mod tests {
 
     fn ystad() -> NVector {
         NVector::from_lat_long_degrees(55.4295, 13.82)
+    }
+
+    // is_convex
+
+    #[test]
+    fn is_convex_concave() {
+        assert_convex(false, &vec![ystad(), hoor(), helsingborg(), kristianstad()]);
+    }
+
+    #[test]
+    fn is_convex_concave_collinear_vertices() {
+        assert_convex(
+            false,
+            &vec![
+                NVector::from_lat_long_degrees(10.0, 10.0),
+                NVector::from_lat_long_degrees(11.0, 10.0),
+                NVector::from_lat_long_degrees(12.0, 10.0),
+                NVector::from_lat_long_degrees(12.0, 15.0),
+                NVector::from_lat_long_degrees(11.0, 12.5),
+                NVector::from_lat_long_degrees(10.0, 15.0),
+            ],
+        );
+    }
+
+    #[test]
+    fn is_convex() {
+        assert_convex(true, &vec![ystad(), malmo(), helsingborg(), kristianstad()]);
+    }
+
+    fn assert_convex(e: bool, vs: &[NVector]) {
+        assert_eq!(e, Loop::new(vs).is_convex());
+        let mut rvs = vs.to_vec();
+        rvs.reverse();
+        assert_eq!(e, Loop::new(&rvs).is_convex());
     }
 
     // contains_point.
@@ -856,6 +882,60 @@ mod tests {
     }
 
     // triangulate.
+
+    #[test]
+    fn triangulate_collinear_during_triangulation_1() {
+        let v0 = NVector::from_lat_long_degrees(35.0, 10.0);
+        let v1 = NVector::from_lat_long_degrees(35.0, 20.0);
+        let v2 = NVector::from_lat_long_degrees(30.0, 20.0);
+        let v3 = NVector::from_lat_long_degrees(25.0, 25.0);
+        let v4 = NVector::from_lat_long_degrees(20.0, 20.0);
+        let l = Loop::new(&vec![v0, v1, v2, v3, v4]);
+
+        let expected = vec![(v0, v1, v2), (v4, v0, v2), (v2, v3, v4)];
+        assert_triangulation(&expected, &l);
+    }
+
+    #[test]
+    fn triangulate_collinear_during_triangulation_2() {
+        let v0 = NVector::from_lat_long_degrees(17.0, 100.0);
+        let v1 = NVector::from_lat_long_degrees(16.0, 105.0);
+        let v2 = NVector::from_lat_long_degrees(15.0, 100.0);
+        let v3 = NVector::from_lat_long_degrees(10.0, 100.0);
+        let v4 = NVector::from_lat_long_degrees(10.0, 90.0);
+        let v5 = NVector::from_lat_long_degrees(20.0, 90.0);
+        let v6 = NVector::from_lat_long_degrees(20.0, 100.0);
+        let l = Loop::new(&vec![v0, v1, v2, v3, v4, v5, v6]);
+
+        let expected = vec![
+            (v0, v1, v2),
+            (v2, v3, v4),
+            (v0, v2, v4),
+            (v6, v0, v4),
+            (v4, v5, v6),
+        ];
+        assert_triangulation(&expected, &l);
+    }
+
+    #[test]
+    fn triangulate_convex_clockwise_6() {
+        let l = Loop::new(&vec![
+            bangui(),
+            juba(),
+            narobi(),
+            dar_es_salaam(),
+            harare(),
+            kinshasa(),
+        ]);
+        let expected = vec![
+            (kinshasa(), bangui(), juba()),
+            (kinshasa(), juba(), narobi()),
+            (kinshasa(), narobi(), dar_es_salaam()),
+            (dar_es_salaam(), harare(), kinshasa()),
+        ];
+        assert_triangulation(&expected, &l);
+    }
+
     #[test]
     fn triangulate_concave_clockwise_7() {
         let vs = vec![
@@ -884,7 +964,7 @@ mod tests {
 
     // see: https://github.com/chrisveness/geodesy/blob/master/test/latlon-nvector-spherical-tests.js
     #[test]
-    fn spherical_excess_concave_5() {
+    fn spherical_excess() {
         let vs = vec![
             NVector::from_lat_long_degrees(1.0, 1.0),
             NVector::from_lat_long_degrees(5.0, 1.0),
