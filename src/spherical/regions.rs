@@ -76,12 +76,17 @@ pub fn is_loop_convex(vs: &[NVector]) -> bool {
     is_convex(ovs)
 }
 
-/// TODO(CL): add is_loop_simple
-
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
-/// A [Loop] always stores the vertices in clockwise order, regardless of the order supplied at
-/// creation.
+/// ## Semantics:
+/// - Vertices are stored in clockwise order, regardless of the order supplied at creation.
+/// - if less than 3 vertices are supplied at [construction](crate::spherical::Loop::new), the loop is considered as empty.
+/// - An edge (i.e. the segment connecting 2 consecutive vertices) is always a [minor arc](crate::spherical::MinorArc).
+/// - Consecutive vertices cannot be coincidental or the antipode of one another (see [is_great_circle](crate::spherical::Sphere::is_great_circle)).
+/// - Edges cannot not self-intersect.
+/// 
+/// The 2 last points are not enforced at runtime, therefore operations are undefined on invalid loops (use [is_valid](crate::spherical::Loop::is_valid), to validate a loop).
+/// 
 #[derive(PartialEq, Clone, Debug, Default)]
 pub struct Loop {
     /// vertices in clockwise order.
@@ -100,7 +105,7 @@ impl Loop {
         edges: Vec::new(),
     };
 
-    /// TODO(CL): explain that vertices will be re-arranged in clockwise order.
+    /// Creates a new loop from the given vertices.
     pub fn new(vs: &[NVector]) -> Self {
         let opened = opened(vs);
         let size = opened.len();
@@ -220,17 +225,37 @@ impl Loop {
         todo!()
     }
 
-    /// TODO(CL).
+    /// Returns the number of vertices of this loop.
     pub fn num_vertices(&self) -> usize {
         self.vertices.len()
     }
 
-    /// TODO(CL).
+    /// Returns the vertex at the given index (panics if the given index is invalid).
     pub fn vertex(&self, i: usize) -> NVector {
         self.vertices[i].0
     }
 
-    /// maybe rename interior_contains (or document),
+    /// Determines whether the **interior** of this loop contains the given point (i.e. excluding points which are
+    /// vertices or on one of the edge of this loop).
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::Loop;
+    /// 
+    /// let vs = vec![
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 0.0)
+    /// ];
+    ///
+    /// let l = Loop::new(&vs);
+    /// 
+    /// assert!(l.contains_point(NVector::from_lat_long_degrees(5.0, 5.0)));
+    /// assert!(!l.contains_point(NVector::from_lat_long_degrees(11.0, 11.0)));
+    /// ```
     pub fn contains_point(&self, p: NVector) -> bool {
         match self.insides {
             Some((a, b)) => {

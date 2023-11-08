@@ -13,6 +13,7 @@ The following reference provide the theoretical basis of most of the algorithms:
 
 - [Non-singular Horizontal Position Representation; Gade, K.; 2010](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
+- [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
 
 ## Solutions to the 10 examples from [NavLab](http:://www.navlab.net/nvector)
 
@@ -109,7 +110,9 @@ assert_eq!(
 );
 ```
 
-### Example 5: Surface distance (spherical Earth model)
+**The following examples assume a spherical Earth model**
+
+### Example 5: Surface distance
 Given position A and B. Find the surface distance (i.e. great circle distance).
 
 ```
@@ -234,3 +237,23 @@ let d = Sphere::EARTH.cross_track_distance(b, a);
 
 assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ```
+
+## Other supported algorithms
+
+### great circle navigation
+
+- [side of a point w.r.t. 2 other points](crate::spherical::Sphere::side)
+- [angle turned from AB to BC](crate::spherical::Sphere::turn)
+
+### loop (spherical model)
+
+- [loop clockwise?](crate::spherical::is_loop_clockwise)
+- [loop convex?](crate::spherical::is_loop_convex)
+- [point inside loop?](crate::spherical::Loop::contains_point)
+- [loop triangulation](crate::spherical::Loop::triangulate)
+
+### kinematics (spherical model)
+
+- [time to closest point of approach between 2 vehicles](crate::spherical::Sphere::time_to_cpa)
+- [minimum speed for interception](crate::spherical::Sphere::max_time_to_intercept)
+- [time to intercept](crate::spherical::Sphere::time_to_intercept)

@@ -297,7 +297,7 @@ impl Sphere {
         side_exact(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
     }
 
-    /// Returns the angle in radians turned from AB to BC. Angle is positive for left turn,
+    /// Returns the angle turned from AB to BC. Angle is positive for left turn,
     /// negative for right turn and 0 if all 3 positions are collinear (i.e. on the same great circle).
     pub fn turn(a: NVector, b: NVector, c: NVector) -> Angle {
         let n1 = Vec3::from_orthogonal(a.as_vec3(), b.as_vec3());
