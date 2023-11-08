@@ -83,7 +83,7 @@ impl Sphere {
     /// Returns a negative length if the position is left of great circle, positive length if the position is right
     /// of great circle; the orientation of the great circle is therefore important.
     ///
-    /// # Example:
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, LatLong, Length};
@@ -136,7 +136,7 @@ impl Sphere {
 
     /// Computes the surface distance on the great circle between the two given positions.
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::{Length, LatLong};
@@ -165,7 +165,8 @@ impl Sphere {
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
     /// The final bearing will differ from the initial bearing by varying degrees according to distance and latitude.
     /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle).
-    /// # Examples:
+    ///
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, LatLong};
@@ -188,7 +189,7 @@ impl Sphere {
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
     /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle)
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, LatLong};
@@ -382,7 +383,7 @@ impl Sphere {
     /// Calculates the maximum time required by an interceptor at the given position to intercept the given intruder: i.e. the interceptor is
     /// travelling at the minimum speed required to achieve intercept.
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, Length, NVector, Speed, Vehicle};
@@ -445,7 +446,7 @@ impl Sphere {
 
     /// Calculates time required by an interceptor at the given position and travelling at the given speed to intercept the given intruder.
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, Length, NVector, Speed, Vehicle};

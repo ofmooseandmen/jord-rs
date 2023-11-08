@@ -45,7 +45,7 @@ impl GreatCircle {
     /// "perpendicular" to this great circle, this method arbitrarily returns a position on the great circle (p
     /// can be projected anywhere on the great circle).
     ///
-    /// # Examples:
+    /// # Examples
     ///
     /// ```
     /// use jord::LatLong;
