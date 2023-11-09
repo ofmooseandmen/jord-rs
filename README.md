@@ -238,21 +238,22 @@ let d = Sphere::EARTH.cross_track_distance(b, a);
 assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ```
 
-## Other supported algorithms
+## Other supported algorithms (spherical model)
 
 ### great circle navigation
 
 - [side of a point w.r.t. 2 other points](crate::spherical::Sphere::side)
 - [angle turned from AB to BC](crate::spherical::Sphere::turn)
 
-### loop (spherical model)
+### loops
 
 - [loop clockwise?](crate::spherical::is_loop_clockwise)
 - [loop convex?](crate::spherical::is_loop_convex)
 - [point inside loop?](crate::spherical::Loop::contains_point)
 - [loop triangulation](crate::spherical::Loop::triangulate)
+- [spherical excess](crate::spherical::Loop::spherical_excess)
 
-### kinematics (spherical model)
+### kinematics
 
 - [time to closest point of approach between 2 vehicles](crate::spherical::Sphere::time_to_cpa)
 - [minimum speed for interception](crate::spherical::Sphere::max_time_to_intercept)

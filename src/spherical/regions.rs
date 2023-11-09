@@ -2,10 +2,12 @@ use std::{cmp::Ordering, f64::consts::PI};
 
 use crate::{numbers::eq_zero, Angle, NVector, Vec3};
 
-use super::{base::angle_radians_between, MinorArc, Sphere};
+use super::{
+    base::{angle_radians_between, are_ordered},
+    MinorArc, Sphere,
+};
 
-/// Determines whether the given *loop* is defined in clockwise order. A *loop* is a single chain of
-/// vertices where the first vertex is implicitly connected to the last.
+/// Determines whether the given vertices are given in clockwise order.
 ///
 /// - the loop can be explicity close (first == last) or not (first != last)
 /// - returns false if less than 3 positions are given
@@ -41,8 +43,7 @@ pub fn is_loop_clockwise(vs: &[NVector]) -> bool {
     }
 }
 
-/// Determines whether the given *loop* is convex. A *loop* is a single chain of vertices where the
-/// first vertex is implicitly connected to the last.
+/// Determines whether the given vertices define a convex [loop](Loop).
 ///
 /// Notes:
 /// - array of vertices can be opened (first != last) or closed (first == last)
@@ -76,17 +77,79 @@ pub fn is_loop_convex(vs: &[NVector]) -> bool {
     is_convex(ovs)
 }
 
+/// Determines whether the given vertices define a simple [loop](Loop).
+/// - All edges are defined [minor arc](crate::spherical::MinorArc)s: consecutive vertices cannot be coincidental or the antipode of one another, and,
+/// - No 2 edges are intersecting each other.
+///
+/// # Examples
+///
+/// ```
+/// use jord::NVector;
+/// use jord::spherical::is_loop_simple;
+///
+/// // consectutive coincidental vertices:
+/// let vs1 = vec![
+///     NVector::from_lat_long_degrees(-2.0, -2.0),
+///     NVector::from_lat_long_degrees(-2.0, -2.0),
+///     NVector::from_lat_long_degrees(3.0, 0.0),
+/// ];
+/// assert!(!is_loop_simple(&vs1));
+///
+/// // consectutive antipodal vertices:
+/// let vs2 = vec![
+///     NVector::from_lat_long_degrees(-2.0, -2.0),
+///     NVector::from_lat_long_degrees(-2.0, -2.0).antipode(),
+///     NVector::from_lat_long_degrees(3.0, 0.0),
+/// ];
+/// assert!(!is_loop_simple(&vs2));
+///
+/// // self-intersecting loop:
+/// let vs3 = vec![
+///     NVector::from_lat_long_degrees(-2.0, -2.0),
+///     NVector::from_lat_long_degrees(2.0, -2.0),
+///     NVector::from_lat_long_degrees(3.0, 0.0),
+///     NVector::from_lat_long_degrees(-2.0, 2.0),
+///     NVector::from_lat_long_degrees(2.0, 2.0)
+/// ];
+/// assert!(!is_loop_simple(&vs3));
+///
+/// // simple loop:
+/// let vs4 = vec![
+///     NVector::from_lat_long_degrees(-2.0, -2.0),
+///     NVector::from_lat_long_degrees(2.0, -2.0),
+///     NVector::from_lat_long_degrees(3.0, 0.0),
+///     NVector::from_lat_long_degrees(2.0, 2.0),
+///     NVector::from_lat_long_degrees(-2.0, 2.0)
+/// ];
+/// assert!(is_loop_simple(&vs4));
+/// ```
+pub fn is_loop_simple(vs: &[NVector]) -> bool {
+    let len: usize = vs.len();
+    let mut es: Vec<MinorArc> = Vec::with_capacity(len - 1);
+    for i in 0..len {
+        let cur = vs[i];
+        let next = vs[(i + 1) % len];
+        if Sphere::is_great_circle(cur, next) {
+            es.push(MinorArc::new(cur, next));
+        } else {
+            return false;
+        }
+    }
+    !is_self_intersecting(&es)
+}
+
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
 /// ## Semantics:
 /// - Vertices are stored in clockwise order, regardless of the order supplied at creation.
-/// - if less than 3 vertices are supplied at [construction](crate::spherical::Loop::new), the loop is considered as empty.
+/// - If less than 3 vertices are supplied at [construction](crate::spherical::Loop::new), the loop is considered as empty.
 /// - An edge (i.e. the segment connecting 2 consecutive vertices) is always a [minor arc](crate::spherical::MinorArc).
 /// - Consecutive vertices cannot be coincidental or the antipode of one another (see [is_great_circle](crate::spherical::Sphere::is_great_circle)).
-/// - Edges cannot not self-intersect.
+/// - No 2 edges are intersecting each other.
 ///
-/// The 2 last points are not enforced at runtime, therefore operations are undefined on invalid loops (use [is_valid](crate::spherical::Loop::is_valid), to validate a loop).
-///
+/// The 2 last points are not enforced at runtime, therefore operations are undefined on invalid loops. The following functions can be used to validate a loop:
+/// - [is_loop_simple](crate::spherical::is_loop_simple) prior to construction, or,
+/// - [is_valid](crate::spherical::Loop::is_valid) post construction.
 #[derive(PartialEq, Clone, Debug, Default)]
 pub struct Loop {
     /// vertices in clockwise order.
@@ -108,9 +171,9 @@ impl Loop {
     /// Creates a new loop from the given vertices.
     pub fn new(vs: &[NVector]) -> Self {
         let opened = opened(vs);
-        let size = opened.len();
+        let len = opened.len();
 
-        match size.cmp(&3) {
+        match len.cmp(&3) {
             // less than 3 vertices: empty loop.
             Ordering::Less => Self::EMPTY,
             // 3 vertices: triangle.
@@ -184,9 +247,60 @@ impl Loop {
         is_convex(&vs)
     }
 
-    /// TODO(CL) false if self-intersecting or any edge is undefined.
+    /// Determines whether this loop is valid:
+    /// - All edges are defined [minor arc](crate::spherical::MinorArc)s: consecutive vertices cannot be coincidental or the antipode of one another, and,
+    /// - No 2 edges are intersecting each other.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::Loop;
+    ///
+    /// // consectutive coincidental vertices:
+    /// let l1 = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(3.0, 0.0),
+    /// ]);
+    /// assert!(!l1.is_valid());
+    ///
+    /// // consectutive antipodal vertices:
+    /// let l2 = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0).antipode(),
+    ///     NVector::from_lat_long_degrees(3.0, 0.0),
+    /// ]);
+    /// assert!(!l2.is_valid());
+    ///
+    /// // self-intersecting loop:
+    /// let l3 = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(3.0, 0.0),
+    ///     NVector::from_lat_long_degrees(-2.0, 2.0),
+    ///     NVector::from_lat_long_degrees(2.0, 2.0)
+    /// ]);
+    /// assert!(!l3.is_valid());
+    ///
+    /// // valid loop:
+    /// let l4 = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(-2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(2.0, -2.0),
+    ///     NVector::from_lat_long_degrees(3.0, 0.0),
+    ///     NVector::from_lat_long_degrees(2.0, 2.0),
+    ///     NVector::from_lat_long_degrees(-2.0, 2.0)
+    /// ]);
+    /// assert!(l4.is_valid());
+    /// ```
     pub fn is_valid(&self) -> bool {
-        todo!()
+        let v_len = self.vertices.len();
+        for i in 0..v_len {
+            if !Sphere::is_great_circle(self.vertices[i].0, self.vertices[(i + 1) % v_len].0) {
+                return false;
+            }
+        }
+        !is_self_intersecting(&self.edges)
     }
 
     /// Determines whether this loop is empty (i.e. less than 3 vertices where given at construction).
@@ -198,31 +312,52 @@ impl Loop {
     /// use jord::spherical::Loop;
     ///
     /// assert!(Loop::new(&[]).is_empty());
+    ///
     /// assert!(Loop::new(&[NVector::from_lat_long_degrees(0.0, 0.0)]).is_empty());
+    ///
     /// assert!(Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(1.0, 0.0)
     /// ]).is_empty());
+    ///
     /// assert!(Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(1.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// ]).is_empty());
-    ///
     /// ```
     pub fn is_empty(&self) -> bool {
         // see new(): if less than 3 vertices are supplied, self.vertices is empty.
         self.vertices.is_empty()
     }
 
-    /// TODO(CL)
-    pub fn is_vertex(&self, _: NVector) -> bool {
-        todo!()
+    /// Determines if the given position is a vertex of this loop.
+    pub fn is_vertex(&self, p: NVector) -> bool {
+        self.vertices.iter().any(|v| v.0 == p)
     }
 
-    /// TODO(CL).
-    pub fn is_on_edge(&self, _: NVector) -> bool {
-        todo!()
+    /// Determines whether the given position is on an edge of this loop.
+    ///
+    /// # Examples
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::Loop;
+    ///
+    /// let l = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 0.0),
+    /// ]);
+    ///
+    /// assert!(l.is_on_edge(NVector::from_lat_long_degrees(0.0, 5.0)));
+    /// assert!(!l.is_on_edge(NVector::from_lat_long_degrees(0.0, 11.0)));
+    /// ```
+    pub fn is_on_edge(&self, p: NVector) -> bool {
+        self.edges.iter().any(|e| {
+            Sphere::side(p, e.start(), e.end()) == 0
+                && are_ordered(e.start().as_vec3(), p.as_vec3(), e.end().as_vec3())
+        })
     }
 
     /// Returns the number of vertices of this loop.
@@ -322,7 +457,29 @@ impl Loop {
         }
     }
 
-    /// TODO(CL)
+    /// Triangulates this loop - using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
+    ///  
+    /// This method returns either [loop number vertices](crate::spherical::Loop::num_vertices) - 2 triangle (triple of [NVector]s) if the triangulation succeeds
+    /// or an empty vec if triangulation fails (should only occur if the loop is not valid - such as self-intersecting).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::Loop;
+    ///
+    /// let v0 = NVector::from_lat_long_degrees(0.0, 0.0);
+    /// let v1 = NVector::from_lat_long_degrees(1.0, 0.0);
+    /// let v2 = NVector::from_lat_long_degrees(1.0, 1.0);
+    /// let v3 = NVector::from_lat_long_degrees(0.0, 1.0);
+    ///
+    /// let l = Loop::new(&vec![v0, v1, v2, v3]);
+    ///
+    /// assert_eq!(vec![
+    ///     (v3, v0, v1),
+    ///     (v1, v2, v3)
+    /// ], l.triangulate());
+    /// ```
     pub fn triangulate(&self) -> Vec<(NVector, NVector, NVector)> {
         if self.is_empty() {
             Vec::new()
@@ -333,7 +490,30 @@ impl Loop {
         }
     }
 
-    /// TODO(CL).
+    /// Calculates the [spherical excess](https://en.wikipedia.org/wiki/Spherical_trigonometry#Area_and_spherical_excess) of this loop.
+    ///
+    /// The area of this loop can be obtained by multiplying the spherical excess by the sphere radius squared.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::{Loop, Sphere};
+    ///
+    /// let l = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(1.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 1.0),
+    /// ]);
+    ///
+    /// let se = l.spherical_excess();
+    ///
+    /// assert_eq!(Angle::from_degrees(0.0087271), se.round_d7());
+    ///
+    /// // area in km^2 (on Earth):
+    /// let r = Sphere::EARTH.radius().as_kilometres();
+    /// assert_eq!(6_182.0, (se.as_radians() * r * r).round());
+    /// ```
     pub fn spherical_excess(&self) -> Angle {
         if self.is_empty() {
             Angle::ZERO
@@ -559,13 +739,13 @@ fn find_insides(vs: &[Vertex]) -> Option<(NVector, NVector)> {
 
 /// Searches for the next ear in the given list of remaining vertices, returning None if no ear can be found.
 fn next_ear(remaining: &mut Vec<Vertex>) -> Option<(NVector, NVector, NVector)> {
-    let size = remaining.len();
-    for i in 0..size {
+    let len = remaining.len();
+    for i in 0..len {
         let cur = remaining[i];
         if cur.1 == Classification::Convex {
             // cur is a convex vertex: i is an ear if triangle cur - 1, i, cur + 1 contains no reflex.
-            let prev: NVector = remaining[(i + size - 1) % size].0;
-            let next = remaining[(i + 1) % size].0;
+            let prev: NVector = remaining[(i + len - 1) % len].0;
+            let next = remaining[(i + 1) % len].0;
             let ear = all_outside(prev, cur.0, next, remaining);
             if ear {
                 remaining.remove(i);
@@ -585,9 +765,9 @@ fn next_ear(remaining: &mut Vec<Vertex>) -> Option<(NVector, NVector, NVector)> 
 /// - a vertex is a convex if right of [previous, next],
 /// - otherwise it's both
 fn re_classify(vertices: &mut Vec<Vertex>, ear_index: usize) {
-    let size = vertices.len();
-    let last = size - 1;
-    if ear_index == 0 || ear_index == size {
+    let len = vertices.len();
+    let last = len - 1;
+    if ear_index == 0 || ear_index == len {
         let mut v_prev = vertices[last].0;
         let mut v_cur = vertices[0].0;
         let mut v_next = vertices[1].0;
@@ -709,6 +889,25 @@ fn locate_with_orientation(
 fn eq(a: Vec3, b: Vec3) -> bool {
     let d = a - b;
     eq_zero(d.x()) && eq_zero(d.y()) && eq_zero(d.z())
+}
+
+fn is_self_intersecting(es: &[MinorArc]) -> bool {
+    let len = es.len();
+    if len <= 3 {
+        false
+    } else {
+        // check that no pair of non-contiguous edges intersects.
+        for i in 0..len - 1 {
+            let e1 = es[i];
+            let last = if i == 0 { len - 1 } else { len };
+            for e2 in es.iter().take(last).skip(i + 2) {
+                if e1.intersection(*e2).is_some() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]
@@ -890,10 +1089,9 @@ mod tests {
         let v2 = NVector::from_lat_long_degrees(30.0, 20.0);
         let v3 = NVector::from_lat_long_degrees(25.0, 25.0);
         let v4 = NVector::from_lat_long_degrees(20.0, 20.0);
-        let l = Loop::new(&vec![v0, v1, v2, v3, v4]);
 
         let expected = vec![(v0, v1, v2), (v4, v0, v2), (v2, v3, v4)];
-        assert_triangulation(&expected, &l);
+        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4]);
     }
 
     #[test]
@@ -905,7 +1103,6 @@ mod tests {
         let v4 = NVector::from_lat_long_degrees(10.0, 90.0);
         let v5 = NVector::from_lat_long_degrees(20.0, 90.0);
         let v6 = NVector::from_lat_long_degrees(20.0, 100.0);
-        let l = Loop::new(&vec![v0, v1, v2, v3, v4, v5, v6]);
 
         let expected = vec![
             (v0, v1, v2),
@@ -914,30 +1111,31 @@ mod tests {
             (v6, v0, v4),
             (v4, v5, v6),
         ];
-        assert_triangulation(&expected, &l);
+        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6]);
     }
 
     #[test]
-    fn triangulate_convex_clockwise_6() {
-        let l = Loop::new(&vec![
+    fn triangulate_convex_6() {
+        let vs = &vec![
             bangui(),
             juba(),
             narobi(),
             dar_es_salaam(),
             harare(),
             kinshasa(),
-        ]);
+        ];
+
         let expected = vec![
             (kinshasa(), bangui(), juba()),
             (kinshasa(), juba(), narobi()),
             (kinshasa(), narobi(), dar_es_salaam()),
             (dar_es_salaam(), harare(), kinshasa()),
         ];
-        assert_triangulation(&expected, &l);
+        assert_loop_triangulation(&expected, &vs);
     }
 
     #[test]
-    fn triangulate_concave_clockwise_7() {
+    fn triangulate_concave_7() {
         let vs = vec![
             bangui(),
             juba(),
@@ -947,7 +1145,6 @@ mod tests {
             kinshasa(),
             narobi(),
         ];
-        let l = Loop::new(&vs);
 
         let expected = vec![
             (narobi(), bangui(), juba()),
@@ -957,7 +1154,71 @@ mod tests {
             (dar_es_salaam(), kinshasa(), narobi()),
         ];
 
-        assert_triangulation(&expected, &l);
+        assert_loop_triangulation(&expected, &vs);
+    }
+
+    #[test]
+    fn triangulate_quadrangle_with_many_on_meridian() {
+        let v0 = NVector::from_lat_long_degrees(-85.0, 53.0);
+        let v1 = NVector::from_lat_long_degrees(-45.0, 53.0);
+        let v2 = NVector::from_lat_long_degrees(-45.0, 75.0);
+        let v3 = NVector::from_lat_long_degrees(-55.0, 75.0);
+        let v4 = NVector::from_lat_long_degrees(-58.0, 75.0);
+        let v5 = NVector::from_lat_long_degrees(-65.0, 75.0);
+        let v6 = NVector::from_lat_long_degrees(-75.0, 75.0);
+        let v7 = NVector::from_lat_long_degrees(-76.0, 75.0);
+        let v8 = NVector::from_lat_long_degrees(-78.0, 75.0);
+        let v9 = NVector::from_lat_long_degrees(-85.0, 75.0);
+
+        let expected = vec![
+            (v9, v0, v1),
+            (v1, v2, v3),
+            (v1, v3, v4),
+            (v1, v4, v5),
+            (v1, v5, v6),
+            (v1, v6, v7),
+            (v1, v7, v8),
+            (v1, v8, v9),
+        ];
+        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
+    }
+
+    #[test]
+    fn triangulate_several_collinear_during_triangulation() {
+        let v0 = NVector::from_lat_long_degrees(15.0, 20.0);
+        let v1 = NVector::from_lat_long_degrees(10.0, 25.0);
+        let v2 = NVector::from_lat_long_degrees(5.0, 20.0);
+        let v3 = NVector::from_lat_long_degrees(0.0, 20.0);
+        let v4 = NVector::from_lat_long_degrees(0.0, 10.0);
+        let v5 = NVector::from_lat_long_degrees(35.0, 10.0);
+        let v6 = NVector::from_lat_long_degrees(35.0, 20.0);
+        let v7 = NVector::from_lat_long_degrees(30.0, 20.0);
+        let v8 = NVector::from_lat_long_degrees(25.0, 25.0);
+        let v9 = NVector::from_lat_long_degrees(20.0, 20.0);
+
+        let expected = vec![
+            (v0, v1, v2),
+            (v2, v3, v4),
+            (v0, v2, v4),
+            (v9, v0, v4),
+            (v9, v4, v5),
+            (v5, v6, v7),
+            (v9, v5, v7),
+            (v7, v8, v9),
+        ];
+        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
+    }
+
+    #[test]
+    fn triangulate_self_intersecting() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(2.0, -2.0),
+            NVector::from_lat_long_degrees(3.0, 0.0),
+            NVector::from_lat_long_degrees(-2.0, 2.0),
+            NVector::from_lat_long_degrees(2.0, 2.0),
+        ]);
+        assert!(l.triangulate().is_empty());
     }
 
     // spherical_excess
@@ -977,6 +1238,13 @@ mod tests {
             Angle::from_radians(0.0018241779916116775),
             l.spherical_excess().round_d7()
         );
+    }
+
+    fn assert_loop_triangulation(e: &[(NVector, NVector, NVector)], vs: &[NVector]) {
+        assert_triangulation(e, &Loop::new(&vs));
+        let mut rvs = vs.to_vec();
+        rvs.reverse();
+        assert_triangulation(e, &Loop::new(&rvs));
     }
 
     fn assert_triangulation(e: &[(NVector, NVector, NVector)], l: &Loop) {

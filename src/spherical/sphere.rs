@@ -25,14 +25,14 @@ impl Sphere {
     // CPA Newton-Raphson maximum number of iteration. */
     const CPA_NR_MAX_ITERATIONS: u64 = 50;
 
-    /// Spherical Earth model using the IUGG (International Union of Geodesy and Geophysics) Earth volumic radius - generally accepted
+    /// Spherical Earth model using the [IUGG](https://iugg.org) (International Union of Geodesy and Geophysics) Earth volumic radius - generally accepted
     /// as the Earth radius when assuming a spherical model.
     /// Note: this is equal to the volumetric radius of the ubiquous WGS84 ellipsoid rounded to 1 decimal.
     pub const EARTH: Sphere = Sphere {
         radius: Length::from_metres(6_371_000.8f64),
     };
 
-    /// Spherical Moon model using the IAU/IAG radius.
+    /// Spherical Moon model using the [IAU/IAG](https://lunar.gsfc.nasa.gov/library/LunCoordWhitePaper-10-08.pdf) radius.
     pub const MOON: Sphere = Sphere {
         radius: Length::from_metres(1_737_400.0f64),
     };
