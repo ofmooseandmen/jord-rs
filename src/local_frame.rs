@@ -301,7 +301,7 @@ where
     }
 
     /// Converts the given [GeodeticPos] into a [LocalPositionVector]: the exact vector between this frame
-    /// origin and the given position.
+    /// origin and the given position. The resulting [LocalPositionVector] orientation is the one of this frame.   
     pub fn geodetic_to_local_pos(&self, p: GeodeticPos) -> LocalPositionVector {
         let p_geocentric = self.surface.geodetic_to_geocentric(p).as_metres();
         // delta in 'Earth' frame.
@@ -311,7 +311,8 @@ where
     }
 
     /// Converts the given [LocalPositionVector] into a [GeodeticPos]: the geodetic position of an object
-    /// which is located at a bearing and distance from this frame origin.
+    /// which is located at a bearing and distance from this frame origin. The given [LocalPositionVector]
+    /// is re-oriented to match the orientation of this frame if required.
     pub fn local_to_geodetic_pos(&self, p: LocalPositionVector) -> GeodeticPos {
         let op = p.with_orientation(self.o);
         let c = op.as_metres() * self.dir_rm;
