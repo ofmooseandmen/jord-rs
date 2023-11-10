@@ -1,5 +1,6 @@
 # Jord - Geographical Position Calculations
 
+[![jord on Crates.io](https://img.shields.io/crates/v/jord.svg?color=brightgreen)](https://crates.io/crates/jord)
 [![GitHub CI](https://github.com/ofmooseandmen/jord-rs/workflows/CI/badge.svg)](https://github.com/ofmooseandmen/jord-rs/actions)
 [![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://opensource.org/license/mit)
 
