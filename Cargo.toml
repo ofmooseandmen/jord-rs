@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Cedric Liegeois <omam.github@gmail.com>",
           ]
 repository = "https://github.com/ofmooseandmen/jord-rs"
+documentation = "https://docs.rs/jord"
 keywords = ["geo", "geography", "geodesy", "geodetics", "wgs84", "n-vector"]
 description = "Geographical Position Calculations (Ellipsoidal and Spherical models)"
 license = "BSD3"
