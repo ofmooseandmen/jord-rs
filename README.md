@@ -248,7 +248,7 @@ assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ### loops
 
 - [loop clockwise?](crate::spherical::is_loop_clockwise)
-- [loop convex?](crate::spherical::is_loop_convex)
+- [loop convex?](crate::spherical::Loop::is_convex)
 - [point inside loop?](crate::spherical::Loop::contains_point)
 - [loop triangulation](crate::spherical::Loop::triangulate)
 - [spherical excess](crate::spherical::Loop::spherical_excess)

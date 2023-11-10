@@ -21,6 +21,9 @@ impl Angle {
     /// Zero angle.
     pub const ZERO: Angle = Angle { radians: 0.0 };
 
+    /// 90 degrees angle.
+    pub const QUARTER_CIRCLE: Angle = Angle { radians: PI / 2.0 };
+
     /// 180 degrees angle.
     pub const HALF_CIRCLE: Angle = Angle { radians: PI };
 
