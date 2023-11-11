@@ -33,7 +33,7 @@ impl Loop {
     /// - be given in clockwise or anti-clockwise order,
     /// - define a loop explicity closed (first == last) or opened (first != last)
     ///
-    /// An [empty](crate::spherical::Loop::EMPTY) loop is returned if the given vertices do not comply with [is_empty](crate::spherical::Loop::is_empty).
+    /// An [empty](crate::spherical::Loop::EMPTY) loop is returned if the given vertices are [empty](crate::spherical::Loop::is_empty).
     ///
     /// # Examples
     ///

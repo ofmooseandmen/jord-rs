@@ -72,6 +72,32 @@ impl Rectangle {
         }
     }
 
+    /// Compares the latitude intervalsof this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as the
+    ///  interval that is northernmost overall (including both low and high latitudes).
+    pub fn cmp_by_latitude(&self, o: Self) -> Ordering {
+        let s = (self.lat.lo + self.lat.hi) - (o.lat.lo + o.lat.hi);
+        if s == Angle::ZERO {
+            Ordering::Equal
+        } else if s < Angle::ZERO {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    }
+
+    /// Compares the longitude intervals of this rectangle and the given one: the [greater](Ordering::Greater) longitude interval is defined as
+    /// the interval that is easternmost overall (including both low and high longitudes).
+    pub fn cmp_by_longitude(&self, o: Self) -> Ordering {
+        let s = (self.lng.lo + self.lng.hi) - (o.lng.lo + o.lng.hi);
+        if s == Angle::ZERO {
+            Ordering::Equal
+        } else if s < Angle::ZERO {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    }
+
     /// Determines whether this rectangle contains the given point.
     ///
     /// # Examples
@@ -110,16 +136,6 @@ impl Rectangle {
         self.lat.contains_int(r.lat) && self.lng.contains_int(r.lng)
     }
 
-    /// Southernmost and westernmost - or 'low', point of this rectangle.
-    pub fn south_west(&self) -> LatLong {
-        LatLong::new(self.lat.lo, self.lng.lo)
-    }
-
-    /// Northernmost and easternmost - or 'high', point of this rectangle.
-    pub fn north_east(&self) -> LatLong {
-        LatLong::new(self.lat.hi, self.lng.hi)
-    }
-
     /// Determines whether this rectangle is [full](crate::spherical::Rectangle::full).
     pub fn is_full(&self) -> bool {
         self.is_latitude_full() && self.is_longitude_full()
@@ -148,6 +164,16 @@ impl Rectangle {
     /// Determines whether the longitude interval of this rectangle is empty.
     pub fn is_longitude_empty(&self) -> bool {
         self.lng.is_empty()
+    }
+
+    /// Northernmost and easternmost - or 'high', point of this rectangle.
+    pub fn north_east(&self) -> LatLong {
+        LatLong::new(self.lat.hi, self.lng.hi)
+    }
+
+    /// Southernmost and westernmost - or 'low', point of this rectangle.
+    pub fn south_west(&self) -> LatLong {
+        LatLong::new(self.lat.lo, self.lng.lo)
     }
 
     /// Expands this rectangle to include the north pole - the longitude interval becomes
@@ -183,29 +209,12 @@ impl Rectangle {
             *self
         }
     }
-    /// Compares the latitude intervalsof this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as the
-    ///  interval that is northernmost overall (including both low and high latitudes).
-    pub fn cmp_by_latitude(&self, o: Self) -> Ordering {
-        let s = (self.lat.lo + self.lat.hi) - (o.lat.lo + o.lat.hi);
-        if s == Angle::ZERO {
-            Ordering::Equal
-        } else if s < Angle::ZERO {
-            Ordering::Less
-        } else {
-            Ordering::Greater
-        }
-    }
 
-    /// Compares the longitude intervals of this rectangle and the given one: the [greater](Ordering::Greater) longitude interval is defined as
-    /// the interval that is easternmost overall (including both low and high longitudes).
-    pub fn cmp_by_longitude(&self, o: Self) -> Ordering {
-        let s = (self.lng.lo + self.lng.hi) - (o.lng.lo + o.lng.hi);
-        if s == Angle::ZERO {
-            Ordering::Equal
-        } else if s < Angle::ZERO {
-            Ordering::Less
-        } else {
-            Ordering::Greater
+    /// Returns the smallest rectangle containing the union of this rectangle and the given rectangle.
+    pub fn union(&self, o: Self) -> Self {
+        Rectangle {
+            lat: self.lat.union(o.lat),
+            lng: self.lng.union(o.lng),
         }
     }
 }
@@ -287,6 +296,20 @@ impl LatitudeInterval {
     /// Returns true if this latitude interval is full.
     fn is_full(&self) -> bool {
         self.lo == -Angle::QUARTER_CIRCLE && self.hi == Angle::QUARTER_CIRCLE
+    }
+
+    /// Returns the smallest latitude interval that contains this latitude interval and the given latitude
+    /// interval.
+    fn union(&self, o: Self) -> Self {
+        if self.is_empty() {
+            o
+        } else if o.is_empty() {
+            *self
+        } else {
+            let lo = if self.lo <= o.lo { self.lo } else { o.lo };
+            let hi = if self.hi >= o.hi { self.hi } else { o.hi };
+            Self::new(lo, hi)
+        }
     }
 }
 
@@ -381,6 +404,36 @@ impl LongitudeInterval {
     /// Returns true if this longitude interval is inverted.
     fn is_inverted(&self) -> bool {
         self.lo > self.hi
+    }
+
+    /// Returns the smallest longitude interval that contains this longitude interval and the given longitude
+    /// interval.
+    fn union(&self, o: Self) -> Self {
+        if o.is_empty() {
+            *self
+        } else if self.contains_lng(o.lo) && self.contains_lng(o.hi) {
+            // Either this interval contains o, or the union of the two intervals is the full interval.
+            if self.contains_int(o) {
+                *self
+            } else {
+                Self::full()
+            }
+        } else if self.contains_lng(o.hi) {
+            Self::new(o.lo, self.hi)
+        } else if self.is_empty() || o.contains_lng(self.lo) {
+            // This interval contains neither endpoint of o. This means that either y contains all of this
+            // interval, or the two intervals are disjoint.
+            o
+        } else {
+            // check which pair of endpoints are closer together.
+            let dlo = Self::positive_distance(o.hi, self.lo);
+            let dhi = Self::positive_distance(self.hi, o.lo);
+            if dlo < dhi {
+                Self::new(o.lo, self.hi)
+            } else {
+                Self::new(self.lo, o.hi)
+            }
+        }
     }
 }
 
@@ -655,5 +708,148 @@ mod tests {
 
         // longitude after west.
         assert!(!a.contains_point(LatLong::from_degrees(10.0, -10.0)));
+    }
+
+    // contains_rectangle
+
+    #[test]
+    fn contains_rectangle() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_contains_rect(a, b, true);
+        assert_contains_rect(b, a, false);
+    }
+
+    #[test]
+    fn contains_rectangle_empty() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_contains_rect(a, Rectangle::empty(), true);
+        assert_contains_rect(Rectangle::empty(), a, false);
+        assert_contains_rect(Rectangle::empty(), Rectangle::empty(), true);
+    }
+
+    #[test]
+    fn contains_rectangle_intersecting() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(15.0),
+            Angle::from_degrees(15.0),
+        );
+        assert_contains_rect(a, b, false);
+        assert_contains_rect(b, a, false);
+    }
+
+    #[test]
+    fn contains_rectangle_non_verlapping() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(40.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+        );
+        assert_contains_rect(a, b, false);
+        assert_contains_rect(b, a, false);
+    }
+
+    #[test]
+    fn contains_rectangle_not_by_ongitude() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(40.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_contains_rect(a, b, false);
+        assert_contains_rect(b, a, false);
+    }
+
+    #[test]
+    fn contains_rectangle_other_longitude_empty() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(-180.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(180.0),
+        );
+        assert_contains_rect(a, b, true);
+    }
+
+    #[test]
+    fn contains_rectangle_other_longitude_inverted_does_not_contain() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::ZERO,
+            Angle::from_degrees(20.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(40.0),
+        );
+        assert_contains_rect(a, b, false);
+    }
+
+    #[test]
+    fn contains_rectangle_other_longitude_inverted_this_full() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(180.0),
+            Angle::ZERO,
+            Angle::from_degrees(-180.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(40.0),
+        );
+        assert_contains_rect(a, b, true);
+    }
+
+    fn assert_contains_rect(a: Rectangle, b: Rectangle, expected: bool) {
+        assert_eq!(expected, a.contains_rectangle(b));
+        assert_eq!(expected, a.union(b) == a);
     }
 }
