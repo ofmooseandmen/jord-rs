@@ -19,16 +19,19 @@ impl Vehicle {
     }
 
     /// Returns the horizontal position of this vehicle.
+    #[inline]
     pub fn position(&self) -> NVector {
         self.position
     }
 
     /// Returns the bearing of this vehicle.
+    #[inline]
     pub fn bearing(&self) -> Angle {
         self.bearing
     }
 
     /// Returns the speed of this vehicle.
+    #[inline]
     pub fn speed(&self) -> Speed {
         self.speed
     }

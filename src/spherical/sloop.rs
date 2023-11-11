@@ -1,11 +1,8 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
-use crate::{numbers::eq_zero, Angle, NVector, Vec3};
+use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
 
-use super::{
-    base::{angle_radians_between, are_ordered},
-    MinorArc, Sphere,
-};
+use super::{base::angle_radians_between, MinorArc, Sphere};
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
@@ -263,7 +260,7 @@ impl Loop {
     }
 
     /// Determines if the given position is a vertex of this loop.
-    pub fn is_vertex(&self, p: NVector) -> bool {
+    pub fn has_vertex(&self, p: NVector) -> bool {
         self.vertices.iter().any(|v| v.0 == p)
     }
 
@@ -281,14 +278,11 @@ impl Loop {
     ///     NVector::from_lat_long_degrees(10.0, 0.0),
     /// ]);
     ///
-    /// assert!(l.is_on_edge(NVector::from_lat_long_degrees(0.0, 5.0)));
-    /// assert!(!l.is_on_edge(NVector::from_lat_long_degrees(0.0, 11.0)));
+    /// assert!(l.any_edge_contains_point(NVector::from_lat_long_degrees(0.0, 5.0)));
+    /// assert!(!l.any_edge_contains_point(NVector::from_lat_long_degrees(0.0, 11.0)));
     /// ```
-    pub fn is_on_edge(&self, p: NVector) -> bool {
-        self.edges.iter().any(|e| {
-            Sphere::side(p, e.start(), e.end()) == 0
-                && are_ordered(e.start().as_vec3(), p.as_vec3(), e.end().as_vec3())
-        })
+    pub fn any_edge_contains_point(&self, p: NVector) -> bool {
+        self.edges.iter().any(|e| e.contains_point(p))
     }
 
     /// Returns the number of vertices of this loop.
@@ -337,6 +331,9 @@ impl Loop {
     pub fn contains_point(&self, p: NVector) -> bool {
         match self.insides {
             Some((a, b)) => {
+                if p == a || p == b {
+                    return true;
+                }
                 let i = if a.is_antipode_of(p) { b } else { a };
                 let ma = MinorArc::new(i, p);
                 let mut count_i: usize = 0;
@@ -349,16 +346,15 @@ impl Loop {
                 let mut first_i_vec3 = Vec3::ZERO;
                 let mut prev_i_vec3 = Vec3::ZERO;
                 let n = self.edges.len();
-                for i in 0..n {
-                    let e = self.edges[i];
-                    if let Some(iv) = ma.intersection(e) {
+                for (i, e) in self.edges.iter().enumerate() {
+                    if let Some(iv) = ma.intersection(*e) {
                         if i == 0 {
                             count_i += 1;
                             first_i_vec3 = iv.as_vec3();
                         } else if i == n - 1 {
                             let iv_vec3 = iv.as_vec3();
                             // last edge, check diff with first and prev.
-                            if eq(first_i_vec3, iv_vec3) || eq(prev_i_vec3, iv_vec3) {
+                            if vec3_eq(first_i_vec3, iv_vec3) || vec3_eq(prev_i_vec3, iv_vec3) {
                                 // skip this intersection (already found on previous or first edge).
                             } else {
                                 count_i += 1;
@@ -366,7 +362,7 @@ impl Loop {
                         } else {
                             let iv_vec3 = iv.as_vec3();
                             // check diff with prev.
-                            if eq(prev_i_vec3, iv_vec3) {
+                            if vec3_eq(prev_i_vec3, iv_vec3) {
                                 // skip this intersection (already found on previous or first edge).
                             } else {
                                 count_i += 1;
@@ -833,9 +829,8 @@ fn locate_with_orientation(
     PosLocation::Outside
 }
 
-fn eq(a: Vec3, b: Vec3) -> bool {
-    let d = a - b;
-    eq_zero(d.x()) && eq_zero(d.y()) && eq_zero(d.z())
+fn vec3_eq(a: Vec3, b: Vec3) -> bool {
+    eq(a.x(), b.x()) && eq(a.y(), b.y()) && eq(a.z(), b.z())
 }
 
 #[cfg(test)]
@@ -1046,6 +1041,22 @@ mod tests {
     }
 
     #[test]
+    fn contains_insides() {
+        let vertices: Vec<NVector> = vec![
+            NVector::from_lat_long_degrees(55.605, 13.0038),
+            NVector::from_lat_long_degrees(55.4295, 13.82),
+            NVector::from_lat_long_degrees(56.0294, 14.1567),
+            NVector::from_lat_long_degrees(56.0465, 12.6945),
+            NVector::from_lat_long_degrees(55.7047, 13.191),
+        ];
+        let l = Loop::new(&vertices);
+        let i1: NVector = l.insides.unwrap().0;
+        let i2: NVector = l.insides.unwrap().1;
+        assert!(l.contains_point(i1));
+        assert!(l.contains_point(i2));
+    }
+
+    #[test]
     fn contains_point_north_pole_cap() {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(85.0, 10.0),
@@ -1102,7 +1113,7 @@ mod tests {
         // (0.0, 5.0) is on the (0.0, 0.0) -> (0.0, 10.0)
         let p = NVector::from_lat_long_degrees(0.0, 5.0);
         assert!(!l.contains_point(p));
-        assert!(l.is_on_edge(p));
+        assert!(l.any_edge_contains_point(p));
     }
 
     #[test]
@@ -1118,7 +1129,7 @@ mod tests {
         let l = Loop::new(&vec![v1, v2, v3]);
 
         assert!(!l.contains_point(p));
-        assert!(l.is_on_edge(p));
+        assert!(l.any_edge_contains_point(p));
     }
 
     // see: https://github.com/spacetelescope/spherical_geometry/blob/master/spherical_geometry/tests/test_basic.py

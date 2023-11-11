@@ -79,14 +79,17 @@ impl GeocentricPos {
 }
 
 impl Cartesian3DVector for GeocentricPos {
+    #[inline]
     fn x(&self) -> Length {
         self.x
     }
 
+    #[inline]
     fn y(&self) -> Length {
         self.y
     }
 
+    #[inline]
     fn z(&self) -> Length {
         self.z
     }
@@ -113,11 +116,13 @@ impl GeodeticPos {
     }
 
     /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPos].
+    #[inline]
     pub fn horizontal_position(&self) -> NVector {
         self.hp
     }
 
     /// Returns the height above the surface of this [GeodeticPos].
+    #[inline]
     pub fn height(&self) -> Length {
         self.height
     }
@@ -161,11 +166,13 @@ impl LatLong {
     }
 
     /// Returns the latitude of this [LatLong].
+    #[inline]
     pub fn latitude(&self) -> Angle {
         self.latitude
     }
 
     /// Returns the longitude of this [LatLong].
+    #[inline]
     pub fn longitude(&self) -> Angle {
         self.longitude
     }
@@ -242,6 +249,7 @@ impl NVector {
     }
 
     /// Returns this [NVector] as a [Vec3].
+    #[inline]
     pub fn as_vec3(&self) -> Vec3 {
         self.0
     }

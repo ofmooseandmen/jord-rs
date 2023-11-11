@@ -20,15 +20,6 @@ pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64
     sin_o.atan2(cos_o)
 }
 
-/// Determines whether the three points a, b and c occur in this order along the minor arc (a, c).
-/// This effectively determines whether b is located within the minor arc (a, c).
-///
-/// See [s2predicates.h](https://github.com/google/s2geometry/blob/master/src/s2/s2predicates.h)#OrderedCCW.
-pub(crate) fn are_ordered(a: Vec3, b: Vec3, c: Vec3) -> bool {
-    let n = Vec3::from_orthogonal(a, c);
-    side(b, n, a) >= 0 && side(c, n, b) >= 0
-}
-
 /// Easting at given *n*-vector.
 pub(crate) fn easting(v: Vec3) -> Vec3 {
     // north pole = (0, 0, 1), south pole = (0, 0, -1)
@@ -60,7 +51,7 @@ pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
 /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
 /// - otherwise, v0 is left of (v1, v2)
 pub(crate) fn side_exact(v0: Vec3, v1: Vec3, v2: Vec3) -> f64 {
-    let ortho = Vec3::from_orthogonal(v1, v2);
+    let ortho = v1.orthogonal_to(v2);
     v0.dot_prod(ortho)
 }
 

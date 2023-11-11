@@ -43,6 +43,7 @@ impl Sphere {
     }
 
     /// Returns the radius of this sphere.
+    #[inline]
     pub fn radius(&self) -> Length {
         self.radius
     }
@@ -300,8 +301,8 @@ impl Sphere {
     /// Returns the angle turned from AB to BC. Angle is positive for left turn,
     /// negative for right turn and 0 if all 3 positions are collinear (i.e. on the same great circle).
     pub fn turn(a: NVector, b: NVector, c: NVector) -> Angle {
-        let n1 = Vec3::from_orthogonal(a.as_vec3(), b.as_vec3());
-        let n2 = Vec3::from_orthogonal(b.as_vec3(), c.as_vec3());
+        let n1 = a.as_vec3().orthogonal_to(b.as_vec3());
+        let n2 = b.as_vec3().orthogonal_to(c.as_vec3());
         Angle::from_radians(angle_radians_between(n1, n2, Some(b.as_vec3())))
     }
 

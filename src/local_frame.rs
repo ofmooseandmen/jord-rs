@@ -156,14 +156,17 @@ impl LocalPositionVector {
 }
 
 impl Cartesian3DVector for LocalPositionVector {
+    #[inline]
     fn x(&self) -> Length {
         self.x
     }
 
+    #[inline]
     fn y(&self) -> Length {
         self.y
     }
 
+    #[inline]
     fn z(&self) -> Length {
         self.z
     }
@@ -205,7 +208,7 @@ where
         // up - just the n-vector.
         let ru = vo;
         // east - pointing perpendicular to the plane.
-        let re = Vec3::from_orthogonal(Vec3::UNIT_Z, vo);
+        let re = Vec3::UNIT_Z.orthogonal_to(vo);
         // north - by right hand rule.
         let rn = ru.cross_prod(re);
 
@@ -239,7 +242,7 @@ where
         // down (pointing opposite to n-vector).
         let rd = -1.0 * vo;
         // east (pointing perpendicular to the plane)
-        let re = Vec3::from_orthogonal(Vec3::UNIT_Z, vo);
+        let re = Vec3::UNIT_Z.orthogonal_to(vo);
         // north (by right hand rule)
         let rn = re.cross_prod(rd);
 

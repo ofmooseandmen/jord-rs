@@ -88,45 +88,6 @@ impl Vec3 {
         }
     }
 
-    /// Returns a unit-length vector that is orthogonal to both given unit length vectors.
-    ///
-    /// This function is similar to [v1 x v2](crate::Vec3::cross_prod_unit) except that it does a better job of ensuring
-    /// orthogonality when both vectors are nearly parallel and it returns a non-zero result even when
-    /// both vectors are equal or opposite.
-    ///
-    /// See [S2Geometry GetStableCrossProd](https://github.com/google/s2geometry/blob/master/src/s2/s2edge_crossings_internal.h).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jord::Vec3;
-    ///
-    /// assert_eq!(
-    ///     Vec3::new(0.0, 0.0, 1.0),
-    ///     Vec3::from_orthogonal(Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0))
-    /// );
-    /// assert_eq!(
-    ///     Vec3::new(0.0, -1.0, 0.0),
-    ///     Vec3::from_orthogonal(Vec3::new(1.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0))
-    /// );
-    /// assert_eq!(
-    ///     Vec3::new(0.0, -1.0, 0.0),
-    ///     Vec3::from_orthogonal(Vec3::new(1.0, 0.0, 0.0), Vec3::new(-1.0, 0.0, 0.0))
-    /// );
-    /// ```
-    pub fn from_orthogonal(v1: Self, v2: Self) -> Self {
-        // The direction of v1 x v2 is unstable as v2 + v1 or v2 - v1 approaches 0. To avoid this,
-        // we just compute (v2 + v1) x (v2 - v1) which is twice the cross product of v2 and v1, but
-        // is always perpendicular (since both v1 and v2 are unit-length vectors).
-        let r = v1.stable_cross_prod_unit(v2);
-        if r == Vec3::ZERO {
-            // return an arbitrary orthogonal vector.
-            v1.orthogonal()
-        } else {
-            r
-        }
-    }
-
     /// Creates a 3-dimensional vector of unit length which is the mean of all given vectors: unit length vector of
     /// the sum of all vectors.
     ///
@@ -152,16 +113,19 @@ impl Vec3 {
     }
 
     /// Returns the x component of this vector.
+    #[inline]
     pub fn x(self) -> f64 {
         self.x
     }
 
     /// Returns the y component of this vector.
+    #[inline]
     pub fn y(self) -> f64 {
         self.y
     }
 
     /// Returns the z component of this vector.
+    #[inline]
     pub fn z(self) -> f64 {
         self.z
     }
@@ -221,6 +185,45 @@ impl Vec3 {
     /// ```
     pub fn dot_prod(self, o: Self) -> f64 {
         self.x() * o.x() + self.y() * o.y() + self.z() * o.z()
+    }
+
+    /// Returns a unit-length vector that is orthogonal to this vector and the given one.
+    ///
+    /// This function is similar to [v1 x v2](crate::Vec3::cross_prod_unit) except that it does a better job of ensuring
+    /// orthogonality when both vectors are nearly parallel and it returns a non-zero result even when
+    /// both vectors are equal or opposite.
+    ///
+    /// See [S2Geometry GetStableCrossProd](https://github.com/google/s2geometry/blob/master/src/s2/s2edge_crossings_internal.h).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::Vec3;
+    ///
+    /// assert_eq!(
+    ///     Vec3::new(0.0, 0.0, 1.0),
+    ///     Vec3::new(1.0, 0.0, 0.0).orthogonal_to(Vec3::new(0.0, 1.0, 0.0))
+    /// );
+    /// assert_eq!(
+    ///     Vec3::new(0.0, -1.0, 0.0),
+    ///     Vec3::new(1.0, 0.0, 0.0).orthogonal_to(Vec3::new(1.0, 0.0, 0.0))
+    /// );
+    /// assert_eq!(
+    ///     Vec3::new(0.0, -1.0, 0.0),
+    ///     Vec3::new(1.0, 0.0, 0.0).orthogonal_to(Vec3::new(-1.0, 0.0, 0.0))
+    /// );
+    /// ```
+    pub fn orthogonal_to(&self, o: Self) -> Self {
+        // The direction of v1 x v2 is unstable as v2 + v1 or v2 - v1 approaches 0. To avoid this,
+        // we just compute (v2 + v1) x (v2 - v1) which is twice the cross product of v2 and v1, but
+        // is always perpendicular (since both v1 and v2 are unit-length vectors).
+        let r = self.stable_cross_prod_unit(o);
+        if r == Vec3::ZERO {
+            // return an arbitrary orthogonal vector.
+            self.orthogonal()
+        } else {
+            r
+        }
     }
 
     /// Returns a unit length vector orthogonal to this vector.

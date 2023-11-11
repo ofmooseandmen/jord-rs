@@ -1,6 +1,6 @@
 [package]
 name = "jord"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Cedric Liegeois <omam.github@gmail.com>",
           ]
@@ -14,3 +14,24 @@ readme = "README.md"
 [dependencies]
 
 [dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "minor_arc"
+harness = false
+
+[[bench]]
+name = "positions"
+harness = false
+
+[[bench]]
+name = "sphere"
+harness = false
+
+[[bench]]
+name = "sloop"
+harness = false
+
+[[bench]]
+name = "vec3"
+harness = false

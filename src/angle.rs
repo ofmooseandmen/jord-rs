@@ -33,6 +33,7 @@ impl Angle {
     }
 
     /// Converts this angle to a floating point value in radians.
+    #[inline]
     pub fn as_radians(&self) -> f64 {
         self.radians
     }
@@ -128,6 +129,7 @@ impl Measurement for Angle {
         Angle::from_radians(amount)
     }
 
+    #[inline]
     fn as_default_unit(&self) -> f64 {
         self.as_radians()
     }

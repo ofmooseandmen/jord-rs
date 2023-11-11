@@ -60,21 +60,25 @@ impl Ellipsoid {
     }
 
     /// Returns the equatorial radius (or semi-major axis A) of this ellipsoid.
+    #[inline]
     pub fn equatorial_radius(&self) -> Length {
         self.equatorial_radius
     }
 
     /// Returns the polar radius (or semi-minor axis B) of this ellipsoid.
+    #[inline]
     pub fn polar_radius(&self) -> Length {
         self.polar_radius
     }
 
     /// Returns the eccentricity of this ellipsoid.
+    #[inline]
     pub fn eccentricity(&self) -> f64 {
         self.eccentricity
     }
 
     /// Returns the flattening of this ellipsoid.
+    #[inline]
     pub fn flattening(&self) -> f64 {
         self.flattening
     }

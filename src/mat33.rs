@@ -15,16 +15,19 @@ impl Mat33 {
     }
 
     /// Returns the first row of this matrix.
+    #[inline]
     pub fn row0(&self) -> Vec3 {
         self.r0
     }
 
     /// Returns the second row of this matrix.
+    #[inline]
     pub fn row1(&self) -> Vec3 {
         self.r1
     }
 
     /// Returns the third row of this matrix.
+    #[inline]
     pub fn row2(&self) -> Vec3 {
         self.r2
     }

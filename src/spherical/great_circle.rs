@@ -19,7 +19,7 @@ impl GreatCircle {
     /// Note: if both start and end positions are equal or the antipode of one another, then an
     /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     pub fn new(p1: NVector, p2: NVector) -> Self {
-        let normal = Vec3::from_orthogonal(p1.as_vec3(), p2.as_vec3());
+        let normal = p1.as_vec3().orthogonal_to(p2.as_vec3());
         GreatCircle { normal }
     }
 
@@ -37,6 +37,7 @@ impl GreatCircle {
     }
 
     /// Returns the vector normal to this great circle.
+    #[inline]
     pub fn normal(&self) -> Vec3 {
         self.normal
     }
@@ -66,7 +67,7 @@ impl GreatCircle {
         if n2 == Vec3::ZERO {
             Some(NVector::new(p.as_vec3().orthogonal()))
         } else {
-            let proj = Vec3::from_orthogonal(n1, n2);
+            let proj = n1.orthogonal_to(n2);
             Some(NVector::new(proj))
         }
     }

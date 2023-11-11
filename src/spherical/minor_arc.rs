@@ -1,6 +1,7 @@
-use crate::{NVector, Vec3};
-
-use super::base::are_ordered;
+use crate::{
+    numbers::{eq_zero, gte, lte},
+    NVector, Vec3,
+};
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
@@ -17,21 +18,24 @@ impl MinorArc {
     /// Note: if both start and end positions are equal or the antipode of one another, then an
     /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
     pub fn new(start: NVector, end: NVector) -> Self {
-        let normal = Vec3::from_orthogonal(start.as_vec3(), end.as_vec3());
+        let normal = start.as_vec3().orthogonal_to(end.as_vec3());
         MinorArc { start, end, normal }
     }
 
     /// Returns the start position of this minor arc.
+    #[inline]
     pub fn start(&self) -> NVector {
         self.start
     }
 
     /// Returns the end position of this minor arc.
+    #[inline]
     pub fn end(&self) -> NVector {
         self.end
     }
 
     /// Returns the vector normal to this minor arc.
+    #[inline]
     pub fn normal(&self) -> Vec3 {
         self.normal
     }
@@ -57,21 +61,24 @@ impl MinorArc {
     /// assert_eq!(i, Some(LatLong::from_degrees(0.0, 0.0).to_nvector()));
     /// ```
     pub fn intersection(&self, other: MinorArc) -> Option<NVector> {
-        let i = Vec3::from_orthogonal(self.normal, other.normal);
-        // select nearest intersection to start of first minor arc.
-        let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
-            i
-        } else {
-            // antipode of i.
-            i * -1.0
-        };
-
-        if are_ordered(self.start.as_vec3(), potential, self.end.as_vec3())
-            && are_ordered(other.start.as_vec3(), potential, other.end.as_vec3())
-        {
-            Some(NVector::new(potential))
-        } else {
+        let i = self.normal.stable_cross_prod_unit(other.normal);
+        if i == Vec3::ZERO {
+            // equal or opposite minor arcs: no intersection
             None
+        } else {
+            // select nearest intersection to start of first minor arc.
+            let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
+                i
+            } else {
+                // antipode of i.
+                i * -1.0
+            };
+
+            if self.contains_vec3(potential) && other.contains_vec3(potential) {
+                Some(NVector::new(potential))
+            } else {
+                None
+            }
         }
     }
 
@@ -100,13 +107,51 @@ impl MinorArc {
         if n2 == Vec3::ZERO {
             Some(self.start)
         } else {
-            let proj = Vec3::from_orthogonal(n1, n2);
-            if are_ordered(self.start.as_vec3(), proj, self.end.as_vec3()) {
+            let proj = n1.orthogonal_to(n2);
+            if self.contains_vec3(proj) {
                 Some(NVector::new(proj))
             } else {
                 None
             }
         }
+    }
+
+    /// Determines whether this minor arc contains the given point.
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::MinorArc;
+    ///
+    /// let ma = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -10.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// assert!(ma.contains_point(NVector::from_lat_long_degrees(0.0, 5.0)));
+    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(1.0, 5.0)));
+    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(0.0, 11.0)));
+    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(0.0, -11.0)));
+    /// ```
+    pub fn contains_point(&self, p: NVector) -> bool {
+        let v = p.as_vec3();
+        eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v)
+    }
+
+    /// Determines whether this minor arc contains the given point which is assumed to be on the great circle.
+    fn contains_vec3(&self, v: Vec3) -> bool {
+        // v is left of (normal, start)
+        // and
+        // v if right of (normal, end)
+
+        // effectively this is base#side(v, normal, start) >=0 && base#side(v, normal, end) <= 0
+        // however since normal is never eq or opposite to start or end, using
+        // Vec3::cross_prod_unit is enough (base#side make no assumption about it's inputs and
+        // therefore calls the more expensive function Vec3::orthogonal_to).
+        let start = self.start.as_vec3();
+        let end = self.end.as_vec3();
+        let n = self.normal;
+        gte(v.dot_prod(n.cross_prod_unit(start)), 0.0)
+            && lte(v.dot_prod(n.cross_prod_unit(end)), 0.0)
     }
 }
 
@@ -120,6 +165,28 @@ mod tests {
     };
 
     // intersection
+
+    #[test]
+    fn intersection_eq() {
+        let arc = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        assert!(arc.intersection(arc).is_none());
+    }
+
+    #[test]
+    fn intersection_opposite() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+            NVector::from_lat_long_degrees(54.0, 154.0),
+        );
+        assert!(arc1.intersection(arc2).is_none());
+    }
 
     #[test]
     fn intersection_arc_across_equator() {

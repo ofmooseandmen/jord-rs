@@ -70,6 +70,7 @@ impl Length {
     }
 
     /// Converts this length to a floating point value in metres.
+    #[inline]
     pub const fn as_metres(&self) -> f64 {
         self.metres
     }
@@ -156,6 +157,7 @@ impl Measurement for Length {
         Length::from_metres(amount)
     }
 
+    #[inline]
     fn as_default_unit(&self) -> f64 {
         self.metres
     }

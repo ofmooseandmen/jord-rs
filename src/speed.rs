@@ -84,6 +84,7 @@ impl Speed {
     }
 
     /// Converts this speed to a floating point value in metres per second.
+    #[inline]
     pub const fn as_metres_per_second(&self) -> f64 {
         self.mps
     }
@@ -104,6 +105,7 @@ impl Measurement for Speed {
         Speed::from_metres_per_second(amount)
     }
 
+    #[inline]
     fn as_default_unit(&self) -> f64 {
         self.mps
     }
