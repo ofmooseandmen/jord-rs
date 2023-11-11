@@ -410,29 +410,35 @@ impl LongitudeInterval {
     /// interval.
     fn union(&self, o: Self) -> Self {
         if o.is_empty() {
-            *self
-        } else if self.contains_lng(o.lo) && self.contains_lng(o.hi) {
-            // Either this interval contains o, or the union of the two intervals is the full interval.
-            if self.contains_int(o) {
-                *self
-            } else {
-                Self::full()
+            return *self;
+        }
+        if self.contains_lng(o.lo) {
+            if self.contains_lng(o.hi) {
+                // Either this interval contains o, or the union of the two intervals is the full interval.
+                if self.contains_int(o) {
+                    return *self;
+                }
+                return LongitudeInterval::full();
             }
-        } else if self.contains_lng(o.hi) {
-            Self::new(o.lo, self.hi)
-        } else if self.is_empty() || o.contains_lng(self.lo) {
-            // This interval contains neither endpoint of o. This means that either y contains all of this
-            // interval, or the two intervals are disjoint.
-            o
+            return LongitudeInterval::new(self.lo, o.hi);
+        }
+        if self.contains_lng(o.hi) {
+            return LongitudeInterval::new(o.lo, self.hi);
+        }
+
+        // This interval contains neither endpoint of o. This means that either y contains all of this
+        // interval, or the two intervals are disjoint.
+        if self.is_empty() || o.contains_lng(self.lo) {
+            return o;
+        }
+
+        // Check which pair of endpoints are closer together.
+        let dlo = Self::positive_distance(o.hi, self.lo);
+        let dhi = Self::positive_distance(self.hi, o.lo);
+        if dlo < dhi {
+            LongitudeInterval::new(o.lo, self.hi)
         } else {
-            // check which pair of endpoints are closer together.
-            let dlo = Self::positive_distance(o.hi, self.lo);
-            let dhi = Self::positive_distance(self.hi, o.lo);
-            if dlo < dhi {
-                Self::new(o.lo, self.hi)
-            } else {
-                Self::new(self.lo, o.hi)
-            }
+            LongitudeInterval::new(self.lo, o.hi)
         }
     }
 }
@@ -441,7 +447,7 @@ impl LongitudeInterval {
 mod tests {
     use std::cmp::Ordering;
 
-    use crate::{Angle, LatLong};
+    use crate::{spherical::MinorArc, Angle, LatLong, NVector};
 
     use super::Rectangle;
 
@@ -851,5 +857,410 @@ mod tests {
     fn assert_contains_rect(a: Rectangle, b: Rectangle, expected: bool) {
         assert_eq!(expected, a.contains_rectangle(b));
         assert_eq!(expected, a.union(b) == a);
+    }
+
+    // from_minor_arc
+
+    #[test]
+    fn from_minor_arc_from_north_pole() {
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(90.0, 0.0),
+            NVector::from_lat_long_degrees(45.0, 45.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(90.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(45.0),
+            Angle::ZERO,
+        );
+        assert_rect_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn from_minor_arc_from_south_pole() {
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(-90.0, 0.0),
+            NVector::from_lat_long_degrees(-45.0, 45.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(-45.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-90.0),
+            Angle::ZERO,
+        );
+        assert_rect_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn from_minor_arc_iso_latitude_north() {
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(45.0, 0.0),
+            NVector::from_lat_long_degrees(45.0, 10.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(45.1092215),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(45.0),
+            Angle::ZERO,
+        );
+        assert_rect_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn from_minor_arc_iso_latitude_south() {
+        let ma: MinorArc = MinorArc::new(
+            NVector::from_lat_long_degrees(-45.0, 0.0),
+            NVector::from_lat_long_degrees(-45.0, 10.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(-45.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(-45.1092215),
+            Angle::ZERO,
+        );
+        assert_rect_eq_d7(expected, actual);
+    }
+
+    #[test]
+    fn from_minor_arc_iso_longitude() {
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(10.0, 0.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::ZERO,
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        assert_rect_eq_d7(expected, actual);
+        for lat in -900..900 {
+            let lat_f = lat as f64;
+            let p = LatLong::from_degrees(lat_f / 10.0, 0.0);
+            if lat >= 0 && lat <= 100 {
+                assert!(actual.contains_point(p));
+            } else {
+                assert!(!actual.contains_point(p));
+            }
+        }
+    }
+
+    #[test]
+    fn from_minor_arc_smallest_longitude_interval() {
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(45.0, 0.0),
+            NVector::from_lat_long_degrees(46.0, -10.0),
+        );
+        let actual = Rectangle::from_minor_arc(ma);
+        let expected = Rectangle::from_nesw(
+            Angle::from_degrees(46.0),
+            Angle::ZERO,
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-10.0),
+        );
+        assert_rect_eq_d7(expected, actual);
+        assert!(actual.contains_point(LatLong::from_degrees(45.5, -5.0)));
+        assert!(!actual.contains_point(LatLong::from_degrees(45.5, 1.0)));
+    }
+
+    fn assert_rect_eq_d7(e: Rectangle, a: Rectangle) {
+        assert_eq!(e.north_east(), a.north_east().round_d7());
+        assert_eq!(e.south_west(), a.south_west().round_d7());
+    }
+
+    // from_nesw
+
+    #[test]
+    fn from_nesw_longitude_spans_180() {
+        // Outside at meridian 0.
+        check_nesw(false, ll(0, 0), 10, -170, -10, 170);
+
+        // Inside at meridian 180.
+        check_nesw(true, ll(0, 180), 10, -170, -10, 170);
+
+        // Inside, either side of meridian 180.
+        check_nesw(true, ll(0, -175), 10, -170, -10, 170);
+        check_nesw(true, ll(0, 175), 10, -170, -10, 170);
+
+        // Outside, either side of meridian 180.
+        check_nesw(false, ll(0, -165), 10, -170, -10, 170);
+        check_nesw(false, ll(0, 165), 10, -170, -10, 170);
+    }
+
+    #[test]
+    fn from_nesw_nominal_inside() {
+        check_nesw(true, ll(0, 0), 10, 10, -10, -10);
+        // on north parallel.
+        check_nesw(true, ll(10, 0), 10, 10, -10, -10);
+        // on south parallel.
+        check_nesw(true, ll(-10, 0), 10, 10, -10, -10);
+        // on east meridian.
+        check_nesw(true, ll(0, 10), 10, 10, -10, -10);
+        // on west meridian.
+        check_nesw(true, ll(0, -10), 10, 10, -10, -10);
+    }
+
+    #[test]
+    fn from_nesw_nominal_outside() {
+        check_nesw(false, ll(20, 0), 10, 10, -10, -10);
+        check_nesw(false, ll(-20, 0), 10, 10, -10, -10);
+        check_nesw(false, ll(0, 20), 10, 10, -10, -10);
+        check_nesw(false, ll(0, -20), 10, 10, -10, -10);
+        check_nesw(false, ll(90, 0), 10, 10, -10, -10);
+        check_nesw(false, ll(-90, 0), 10, 10, -10, -10);
+    }
+
+    #[test]
+    fn from_nesw_north_pole() {
+        // At the pole.
+        check_nesw(true, ll(90, 45), 90, 50, 80, 40);
+
+        // Inside a rectangle extending to the north pole.
+        check_nesw(true, ll(85, 45), 90, 50, 80, 40);
+
+        // Outside (by longitude) a rectangle extending to the north pole.
+        check_nesw(false, ll(85, 35), 90, 50, 80, 40);
+
+        // Outside (by latitude) a rectangle extending to the north pole.
+        check_nesw(false, ll(76, 0), 90, 50, 80, 40);
+    }
+
+    #[test]
+    fn from_nesw_over_both_hemispheres() {
+        check_nesw(true, ll(0, 0), 10, 170, -10, -170);
+        check_nesw(false, ll(0, 180), 10, 170, -10, -170);
+    }
+
+    #[test]
+    fn from_nesw_reversed_latitudes() {
+        check_nesw(false, ll(0, 0), -10, 10, 10, -10);
+    }
+
+    #[test]
+    fn from_nesw_south_pole() {
+        // At the pole.
+        check_nesw(true, ll(-90, 45), -80, 50, -90, 40);
+
+        // Inside a rectangle extending to the south pole.
+        check_nesw(true, ll(-85, 45), -80, 50, -90, 40);
+
+        // Outside (by longitude) a rectangle extending to the south pole.
+        check_nesw(false, ll(-85, 35), -80, 50, -90, 40);
+
+        // Outside (by latitude) a rectangle extending to the south pole.
+        check_nesw(false, ll(-76, 0), -80, 50, -90, 40);
+    }
+
+    #[test]
+    fn from_nesw_zero_rectangle() {
+        check_nesw(true, ll(10, 10), 10, 10, 10, 10);
+        check_nesw(false, ll(10, 11), 10, 10, 10, 10);
+        check_nesw(false, ll(11, 10), 10, 10, 10, 10);
+    }
+
+    fn check_nesw(expected: bool, test_point: LatLong, n: i64, e: i64, s: i64, w: i64) {
+        let rect = Rectangle::from_nesw(
+            Angle::from_degrees(n as f64),
+            Angle::from_degrees(e as f64),
+            Angle::from_degrees(s as f64),
+            Angle::from_degrees(w as f64),
+        );
+        let actual = rect.contains_point(test_point);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn polar_closure_no_pole() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_eq!(a, a.polar_closure());
+        assert!(!a.is_longitude_full());
+    }
+
+    #[test]
+    fn polar_closure_north_pole() {
+        let actual = Rectangle::from_nesw(
+            Angle::from_degrees(90.0),
+            Angle::from_degrees(50.0),
+            Angle::from_degrees(80.0),
+            Angle::from_degrees(40.0),
+        )
+        .polar_closure();
+
+        // full longitude range.
+        assert!(actual.is_longitude_full());
+
+        assert!(actual.contains_point(ll(90, 0)));
+        assert!(actual.contains_point(ll(85, 45)));
+        // all longitudes are in
+        assert!(actual.contains_point(ll(85, 35)));
+        // out by latitude
+        assert!(!actual.contains_point(ll(76, 0)));
+    }
+
+    #[test]
+    fn polar_closure_south_pole() {
+        let actual = Rectangle::from_nesw(
+            Angle::from_degrees(-80.0),
+            Angle::from_degrees(50.0),
+            Angle::from_degrees(-90.0),
+            Angle::from_degrees(40.0),
+        )
+        .polar_closure();
+
+        // full longitude range.
+        assert!(actual.is_longitude_full());
+
+        assert!(actual.contains_point(ll(-90, 0)));
+        assert!(actual.contains_point(ll(-85, 45)));
+        // all longitudes are in
+        assert!(actual.contains_point(ll(-85, 35)));
+        // out by latitude
+        assert!(!actual.contains_point(ll(-76, 0)));
+    }
+
+    // union
+    #[test]
+    fn union_both_empty() {
+        assert_eq!(
+            Rectangle::empty(),
+            Rectangle::empty().union(Rectangle::empty())
+        );
+    }
+
+    #[test]
+    fn union_non_overlapping() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(40.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+        );
+        let union = a.union(b);
+        assert!(union.contains_rectangle(a));
+        assert!(union.contains_rectangle(b));
+
+        //p is neither in a nor b, but is in their union.
+        let p = ll(25, 25);
+        assert!(!a.contains_point(p));
+        assert!(!b.contains_point(p));
+        assert!(union.contains_point(p));
+    }
+
+    #[test]
+    fn union_one_empty() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_eq!(a, a.union(Rectangle::empty()));
+        assert_eq!(a, Rectangle::empty().union(a));
+    }
+
+    #[test]
+    fn overlapping() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(15.0),
+            Angle::from_degrees(15.0),
+        );
+        let union = a.union(b);
+        assert!(union.contains_rectangle(a));
+        assert!(union.contains_rectangle(b));
+
+        //pa is only in a, but is in the union.
+        let pa = ll(14, 14);
+        assert!(a.contains_point(pa));
+        assert!(!b.contains_point(pa));
+        assert!(union.contains_point(pa));
+
+        //pb is only in a, but is in the union.
+        let pb = ll(25, 25);
+        assert!(!a.contains_point(pb));
+        assert!(b.contains_point(pb));
+        assert!(union.contains_point(pb));
+    }
+
+    #[test]
+    fn is_longitude_full() {
+        assert!(Rectangle::from_nesw(
+            Angle::ZERO,
+            Angle::from_degrees(180.0),
+            Angle::ZERO,
+            Angle::from_degrees(-180.0)
+        )
+        .is_longitude_full());
+
+        assert!(!Rectangle::from_nesw(
+            Angle::ZERO,
+            Angle::from_degrees(179.0),
+            Angle::ZERO,
+            Angle::from_degrees(-180.0)
+        )
+        .is_longitude_full());
+
+        assert!(!Rectangle::from_nesw(
+            Angle::ZERO,
+            Angle::from_degrees(180.0),
+            Angle::ZERO,
+            Angle::from_degrees(-179.0)
+        )
+        .is_longitude_full());
+    }
+
+    #[test]
+    fn expand_to_north_pole() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        let expanded = r.expand_to_north_pole();
+        assert!(expanded.is_longitude_full());
+        assert!(expanded.contains_point(ll(90, 0)));
+        assert!(expanded.contains_point(ll(-10, 0)));
+    }
+
+    #[test]
+    fn expand_to_south_pole() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        let expanded = r.expand_to_south_pole();
+        assert!(expanded.is_longitude_full());
+        assert!(expanded.contains_point(ll(-90, 0)));
+        assert!(expanded.contains_point(ll(10, 0)));
+    }
+
+    fn ll(lat: i64, lng: i64) -> LatLong {
+        LatLong::from_degrees(lat as f64, lng as f64)
     }
 }
