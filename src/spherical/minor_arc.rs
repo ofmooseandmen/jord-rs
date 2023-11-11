@@ -71,7 +71,7 @@ impl MinorArc {
                 i
             } else {
                 // antipode of i.
-                i * -1.0
+                -i
             };
 
             if self.contains_vec3(potential) && other.contains_vec3(potential) {

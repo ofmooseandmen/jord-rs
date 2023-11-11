@@ -240,7 +240,7 @@ impl NVector {
 
     /// Returns the [NVector] which is the antipode of this [NVector].
     pub fn antipode(&self) -> Self {
-        Self::new(-1.0 * self.0)
+        Self::new(-self.0)
     }
 
     /// Determines whether the given [NVector] is the antipode of this [NVector].

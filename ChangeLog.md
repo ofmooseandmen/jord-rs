@@ -1,5 +1,6 @@
 ### 0.3.0
 
+- Performance improvements
 - Doc improvements
 - Updated spherical::Rectangle: compare_by_latitude/longitude & union
 - Added tests

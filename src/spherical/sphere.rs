@@ -1,12 +1,12 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
-    NVector, Speed, Vec3, Vehicle,
+    numbers::eq_zero, surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos,
+    LatLong, Length, Mat33, NVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
-    base::{angle_radians_between, easting, side, side_exact},
+    base::{angle_radians_between, easting, exact_side},
     GreatCircle, MinorArc,
 };
 
@@ -285,17 +285,14 @@ impl Sphere {
     /// assert_eq!(1, Sphere::side(p1, p3, p2));
     /// ```
     pub fn side(p0: NVector, p1: NVector, p2: NVector) -> i8 {
-        side(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
-    }
-
-    /// Similar to `side` but returns the value of the dot product between v0 and the orthogonal
-    /// unit-length vector to v1 and v2.
-    ///
-    /// - if the dot product is nearly-zero or zero, the 3 positions are collinear
-    /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
-    /// - otherwise, v0 is left of (v1, v2)
-    pub fn side_exact(p0: NVector, p1: NVector, p2: NVector) -> f64 {
-        side_exact(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
+        let side = exact_side(p0.as_vec3(), p1.as_vec3(), p2.as_vec3());
+        if eq_zero(side) {
+            0
+        } else if side < 0.0 {
+            -1
+        } else {
+            1
+        }
     }
 
     /// Returns the angle turned from AB to BC. Angle is positive for left turn,

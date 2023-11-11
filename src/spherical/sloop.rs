@@ -2,7 +2,10 @@ use std::{cmp::Ordering, f64::consts::PI};
 
 use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
 
-use super::{base::angle_radians_between, MinorArc, Sphere};
+use super::{
+    base::{angle_radians_between, exact_side},
+    MinorArc, Sphere,
+};
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
@@ -380,15 +383,32 @@ impl Loop {
             }
             None => {
                 if self.vertices.len() == 3 {
-                    let loc = locate_with_orientation(
-                        p,
-                        self.vertices[0].0,
-                        self.vertices[1].0,
-                        self.vertices[2].0,
-                        // vertices are in clockwise order.
-                        -1,
-                    );
-                    loc == PosLocation::Inside
+                    if p == self.vertices[0].0 || p == self.vertices[1].0 || p == self.vertices[2].0
+                    {
+                        return false;
+                    }
+                    // vertices are in clockwise order, so negate dot product for side.
+                    let v = p.as_vec3();
+                    let side_edge1 = -v.dot_prod(self.edges[0].normal());
+                    let side_edge2 = -v.dot_prod(self.edges[1].normal());
+                    let side_edge3 = -v.dot_prod(self.edges[2].normal());
+
+                    let on_edge1 = eq_zero(side_edge1);
+                    if on_edge1 && side_edge2 > 0.0 && side_edge3 > 0.0 {
+                        return false;
+                    }
+
+                    let on_edge2 = eq_zero(side_edge2);
+                    if on_edge2 && side_edge1 > 0.0 && side_edge3 > 0.0 {
+                        return false;
+                    }
+
+                    let on_edge3 = eq_zero(side_edge3);
+                    if on_edge3 && side_edge1 > 0.0 && side_edge2 > 0.0 {
+                        return false;
+                    }
+
+                    side_edge1 > 0.0 && side_edge2 > 0.0 && side_edge3 > 0.0
                 } else {
                     false
                 }
@@ -528,14 +548,6 @@ enum Classification {
 #[derive(PartialEq, Clone, Copy, Debug)]
 struct Vertex(NVector, Classification);
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-enum PosLocation {
-    Inside,
-    Outside,
-    Edge,
-    Vertex,
-}
-
 /// if first == last, returns [first ... last - 1] otherwise returns given array.
 fn opened(vs: &[NVector]) -> &[NVector] {
     if vs.is_empty() {
@@ -619,6 +631,7 @@ fn to_edges(vs: &[Vertex]) -> Vec<MinorArc> {
     res
 }
 
+/// Triangulates given loop using ear-clipping method.
 fn ear_clipping(vs: &[Vertex]) -> Vec<(NVector, NVector, NVector)> {
     let mut remaining = vs.to_vec();
     let mut res: Vec<(NVector, NVector, NVector)> = Vec::with_capacity(2);
@@ -761,72 +774,58 @@ fn classify(v: &mut Vertex, side: i8) {
 fn all_outside(v1: NVector, v2: NVector, v3: NVector, vertices: &[Vertex]) -> bool {
     for v in vertices {
         // skip convex vertices.
-        if v.1 != Classification::Convex {
-            let loc = locate(v.0, v1, v2, v3);
-            if loc == PosLocation::Inside || loc == PosLocation::Edge {
-                return false;
-            }
+        if v.1 != Classification::Convex && inside_or_edge(v.0, v1, v2, v3) {
+            return false;
         }
     }
     true
 }
 
-fn locate(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> PosLocation {
+/// if p inside triangle (v1, v2, v3) or on any edge of that triangle.
+fn inside_or_edge(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> bool {
     if p == v1 || p == v2 || p == v3 {
-        PosLocation::Vertex
-    } else {
-        let sign = if is_clockwise(&[v1, v2, v3]) { -1 } else { 1 };
-        locate_with_orientation(p, v1, v2, v3, sign)
+        return false;
     }
-}
-
-/// locate with sign: -1 for clockwise, 1 for anti-clockwise.
-fn locate_with_orientation(
-    p: NVector,
-    v1: NVector,
-    v2: NVector,
-    v3: NVector,
-    sign: i32,
-) -> PosLocation {
-    let s = sign as f64;
-    let side_edge1 = Sphere::side_exact(p, v1, v2) * s;
-    let side_edge2 = Sphere::side_exact(p, v2, v3) * s;
-    let side_edge3 = Sphere::side_exact(p, v3, v1) * s;
+    let sign = if is_clockwise(&[v1, v2, v3]) {
+        -1.0
+    } else {
+        1.0
+    };
+    let side_edge1 = exact_side(p.as_vec3(), v1.as_vec3(), v2.as_vec3()) * sign;
+    let side_edge2 = exact_side(p.as_vec3(), v2.as_vec3(), v3.as_vec3()) * sign;
+    let side_edge3 = exact_side(p.as_vec3(), v3.as_vec3(), v1.as_vec3()) * sign;
 
     let on_edge1 = eq_zero(side_edge1);
     let on_edge2 = eq_zero(side_edge2);
     let on_edge3 = eq_zero(side_edge3);
 
-    let mut pending_location = PosLocation::Outside;
+    let mut on_edge = false;
     if on_edge1 && side_edge2 > 0.0 && side_edge3 > 0.0 {
-        pending_location = PosLocation::Edge;
+        on_edge = true;
     }
 
     if on_edge2 && side_edge1 > 0.0 && side_edge3 > 0.0 {
-        if pending_location == PosLocation::Edge {
+        if on_edge {
             // position is detected on (vertex1, vertex2) and (vertex2, vertex3), assume it is vertex2.
-            return PosLocation::Vertex;
+            return false;
         }
-        pending_location = PosLocation::Edge;
+        on_edge = true;
     }
 
     if on_edge3 && side_edge1 > 0.0 && side_edge2 > 0.0 {
-        if pending_location == PosLocation::Edge {
+        if on_edge {
             // position is detected on (vertex1, vertex2) or (vertex2, vertex3)
             // and (vertex3, vertex1), assume it is vertex3 or vertex1.
-            return PosLocation::Vertex;
+            return false;
         }
-        pending_location = PosLocation::Edge;
+        on_edge = true;
     }
 
-    if pending_location == PosLocation::Edge {
-        return pending_location;
+    if on_edge {
+        return true;
     }
 
-    if side_edge1 > 0.0 && side_edge2 > 0.0 && side_edge3 > 0.0 {
-        return PosLocation::Inside;
-    }
-    PosLocation::Outside
+    side_edge1 > 0.0 && side_edge2 > 0.0 && side_edge3 > 0.0
 }
 
 fn vec3_eq(a: Vec3, b: Vec3) -> bool {

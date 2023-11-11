@@ -407,6 +407,14 @@ impl From<(f64, f64, f64)> for Vec3 {
     }
 }
 
+impl ::std::ops::Neg for Vec3 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Vec3::new(-self.x, -self.y, -self.z)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

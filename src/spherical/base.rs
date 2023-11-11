@@ -1,4 +1,4 @@
-use crate::{numbers::eq_zero, Vec3};
+use crate::Vec3;
 
 /// Computes the signed angle in radians between the given vectors.
 ///
@@ -31,26 +31,15 @@ pub(crate) fn easting(v: Vec3) -> Vec3 {
     Vec3::new_unit(-v.y(), v.x(), 0.0)
 }
 
-/// Determines whether v0 if right of (negative integer), left of (positive integer) or on the
-/// great circle (zero), from v1 to v2.
-pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
-    let side = side_exact(v0, v1, v2);
-    if eq_zero(side) {
-        0
-    } else if side < 0.0 {
-        -1
-    } else {
-        1
-    }
-}
-
-/// Similar to `side` but returns the value of the dot product between v0 and the orthogonal
-/// unit-length vector to v1 and v2.
+/// Determines whether v0 if right (negative f64) or left (positive f64) of the
+/// great circle from v1 to v2.
 ///
+/// This function returns the value of the dot product between v0 and the orthogonal
+/// unit-length vector to v1 and v2:
 /// - if the dot product is nearly-zero or zero, the 3 positions are collinear
 /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
 /// - otherwise, v0 is left of (v1, v2)
-pub(crate) fn side_exact(v0: Vec3, v1: Vec3, v2: Vec3) -> f64 {
+pub(crate) fn exact_side(v0: Vec3, v1: Vec3, v2: Vec3) -> f64 {
     let ortho = v1.orthogonal_to(v2);
     v0.dot_prod(ortho)
 }

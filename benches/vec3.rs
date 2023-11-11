@@ -13,6 +13,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let v2 = Vec3::new(0.0, 1.0, 0.0);
         b.iter(|| v1.stable_cross_prod_unit(v2));
     });
+
+    c.bench_function("Vec3::stable_cross_prod", |b| {
+        let v1 = Vec3::new(1.0, 0.0, 0.0);
+        let v2 = Vec3::new(0.0, 1.0, 0.0);
+        b.iter(|| v1.stable_cross_prod(v2));
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
