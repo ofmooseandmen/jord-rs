@@ -1,3 +1,8 @@
+### 0.4.0
+
+- Performance improvements
+- Added tests
+
 ### 0.3.0
 
 - Performance improvements

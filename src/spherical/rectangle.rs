@@ -16,22 +16,19 @@ pub struct Rectangle {
     lng: LongitudeInterval,
 }
 
+// TODO(CL): Exmaples
 impl Rectangle {
-    /// Creates an empty rectangle.
-    pub fn empty() -> Self {
-        Self {
-            lat: LatitudeInterval::empty(),
-            lng: LongitudeInterval::empty(),
-        }
-    }
+    /// Empty rectangle.
+    pub const EMPTY: Rectangle = Self {
+        lat: LatitudeInterval::EMPTY,
+        lng: LongitudeInterval::EMPTY,
+    };
 
     /// Creates a full rectangle.
-    pub fn full() -> Self {
-        Self {
-            lat: LatitudeInterval::full(),
-            lng: LongitudeInterval::full(),
-        }
-    }
+    pub const FULL: Rectangle = Self {
+        lat: LatitudeInterval::FULL,
+        lng: LongitudeInterval::FULL,
+    };
 
     /// Creates the minimal bounding rectangle containing the given minor arc.
     ///
@@ -72,29 +69,31 @@ impl Rectangle {
         }
     }
 
-    /// Compares the latitude intervalsof this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as the
-    ///  interval that is northernmost overall (including both low and high latitudes).
+    /// Compares the latitude intervalsof this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as
+    /// the interval that is northernmost overall (including both low and high latitudes).
     pub fn cmp_by_latitude(&self, o: Self) -> Ordering {
-        let s = (self.lat.lo + self.lat.hi) - (o.lat.lo + o.lat.hi);
-        if s == Angle::ZERO {
-            Ordering::Equal
-        } else if s < Angle::ZERO {
+        let a = self.lat.lo.as_radians() + self.lat.hi.as_radians();
+        let b = o.lat.lo.as_radians() + o.lat.hi.as_radians();
+        if a < b {
             Ordering::Less
-        } else {
+        } else if a > b {
             Ordering::Greater
+        } else {
+            Ordering::Equal
         }
     }
 
     /// Compares the longitude intervals of this rectangle and the given one: the [greater](Ordering::Greater) longitude interval is defined as
     /// the interval that is easternmost overall (including both low and high longitudes).
     pub fn cmp_by_longitude(&self, o: Self) -> Ordering {
-        let s = (self.lng.lo + self.lng.hi) - (o.lng.lo + o.lng.hi);
-        if s == Angle::ZERO {
-            Ordering::Equal
-        } else if s < Angle::ZERO {
+        let a = self.lng.lo.as_radians() + self.lng.hi.as_radians();
+        let b = o.lng.lo.as_radians() + o.lng.hi.as_radians();
+        if a < b {
             Ordering::Less
-        } else {
+        } else if a > b {
             Ordering::Greater
+        } else {
+            Ordering::Equal
         }
     }
 
@@ -136,7 +135,7 @@ impl Rectangle {
         self.lat.contains_int(r.lat) && self.lng.contains_int(r.lng)
     }
 
-    /// Determines whether this rectangle is [full](crate::spherical::Rectangle::full).
+    /// Determines whether this rectangle is [full](crate::spherical::Rectangle::FULL).
     pub fn is_full(&self) -> bool {
         self.is_latitude_full() && self.is_longitude_full()
     }
@@ -151,7 +150,7 @@ impl Rectangle {
         self.lng.is_full()
     }
 
-    /// Determines whether this rectangle is [empty](crate::spherical::Rectangle::empty).
+    /// Determines whether this rectangle is [empty](crate::spherical::Rectangle::EMPTY).
     pub fn is_empty(&self) -> bool {
         self.is_latitude_empty() && self.is_longitude_empty()
     }
@@ -182,7 +181,7 @@ impl Rectangle {
     pub fn expand_to_north_pole(&self) -> Self {
         Self {
             lat: LatitudeInterval::new(self.lat.lo, Angle::QUARTER_CIRCLE),
-            lng: LongitudeInterval::full(),
+            lng: LongitudeInterval::FULL,
         }
     }
 
@@ -192,7 +191,7 @@ impl Rectangle {
     pub fn expand_to_south_pole(&self) -> Self {
         Self {
             lat: LatitudeInterval::new(-Angle::QUARTER_CIRCLE, self.lat.hi),
-            lng: LongitudeInterval::full(),
+            lng: LongitudeInterval::FULL,
         }
     }
 
@@ -203,7 +202,7 @@ impl Rectangle {
         if self.lat.lo == -Angle::QUARTER_CIRCLE || self.lat.hi == Angle::QUARTER_CIRCLE {
             Self {
                 lat: self.lat,
-                lng: LongitudeInterval::full(),
+                lng: LongitudeInterval::FULL,
             }
         } else {
             *self
@@ -217,6 +216,16 @@ impl Rectangle {
             lng: self.lng.union(o.lng),
         }
     }
+
+    /// Returns the smallest rectangle containing the union of all the given rectangles.
+    pub fn from_union<'a>(it: impl Iterator<Item = &'a Self>) -> Self {
+        let mut res = Self::EMPTY;
+        for r in it {
+            res.lat.mut_union(r.lat);
+            res.lng.mut_union(r.lng);
+        }
+        res
+    }
 }
 
 /// latitude interval: {@link #lo} is assumed to be less than {@link #hi}, otherwise the interval is empty.
@@ -227,19 +236,15 @@ struct LatitudeInterval {
 }
 
 impl LatitudeInterval {
-    fn empty() -> Self {
-        Self {
-            lo: Angle::from_radians(1.0),
-            hi: Angle::ZERO,
-        }
-    }
+    const EMPTY: LatitudeInterval = Self {
+        lo: Angle::QUARTER_CIRCLE,
+        hi: Angle::ZERO,
+    };
 
-    fn full() -> Self {
-        Self {
-            lo: -Angle::QUARTER_CIRCLE,
-            hi: Angle::QUARTER_CIRCLE,
-        }
-    }
+    const FULL: LatitudeInterval = Self {
+        lo: Angle::NEG_QUARTER_CIRCLE,
+        hi: Angle::QUARTER_CIRCLE,
+    };
 
     fn new(lo: Angle, hi: Angle) -> Self {
         Self { lo, hi }
@@ -301,14 +306,24 @@ impl LatitudeInterval {
     /// Returns the smallest latitude interval that contains this latitude interval and the given latitude
     /// interval.
     fn union(&self, o: Self) -> Self {
+        let mut r = *self;
+        r.mut_union(o);
+        r
+    }
+
+    fn mut_union(&mut self, o: Self) {
         if self.is_empty() {
-            o
+            self.lo = o.lo;
+            self.hi = o.hi;
         } else if o.is_empty() {
-            *self
+            // no-op
         } else {
-            let lo = if self.lo <= o.lo { self.lo } else { o.lo };
-            let hi = if self.hi >= o.hi { self.hi } else { o.hi };
-            Self::new(lo, hi)
+            if self.lo > o.lo {
+                self.lo = o.lo;
+            }
+            if self.hi < o.hi {
+                self.hi = o.hi;
+            }
         }
     }
 }
@@ -320,19 +335,15 @@ struct LongitudeInterval {
 }
 
 impl LongitudeInterval {
-    fn empty() -> Self {
-        Self {
-            lo: Angle::HALF_CIRCLE,
-            hi: -Angle::HALF_CIRCLE,
-        }
-    }
+    const EMPTY: LongitudeInterval = Self {
+        lo: Angle::HALF_CIRCLE,
+        hi: Angle::NEG_HALF_CIRCLE,
+    };
 
-    fn full() -> Self {
-        Self {
-            lo: -Angle::HALF_CIRCLE,
-            hi: Angle::HALF_CIRCLE,
-        }
-    }
+    const FULL: LongitudeInterval = Self {
+        lo: Angle::NEG_HALF_CIRCLE,
+        hi: Angle::HALF_CIRCLE,
+    };
 
     fn new(lo: Angle, hi: Angle) -> Self {
         Self { lo, hi }
@@ -351,7 +362,7 @@ impl LongitudeInterval {
     /// Normalises the given longitude: if the given longitude is -180 degrees, 180 degrees is
     /// returned. This is done to workaround the discontinuity at the date line.
     fn normalised_longitude(longitude: Angle) -> Angle {
-        if longitude == -Angle::HALF_CIRCLE {
+        if longitude == Angle::NEG_HALF_CIRCLE {
             Angle::HALF_CIRCLE
         } else {
             longitude
@@ -393,12 +404,12 @@ impl LongitudeInterval {
 
     /// Returns true if this longitude interval is full.
     fn is_full(&self) -> bool {
-        self.lo == -Angle::HALF_CIRCLE && self.hi == Angle::HALF_CIRCLE
+        self.lo == Angle::NEG_HALF_CIRCLE && self.hi == Angle::HALF_CIRCLE
     }
 
     /// Returns true if this longitude interval is empty.
     fn is_empty(&self) -> bool {
-        self.lo == Angle::HALF_CIRCLE && self.hi == -Angle::HALF_CIRCLE
+        self.lo == Angle::HALF_CIRCLE && self.hi == Angle::NEG_HALF_CIRCLE
     }
 
     /// Returns true if this longitude interval is inverted.
@@ -409,36 +420,42 @@ impl LongitudeInterval {
     /// Returns the smallest longitude interval that contains this longitude interval and the given longitude
     /// interval.
     fn union(&self, o: Self) -> Self {
+        let mut r = *self;
+        r.mut_union(o);
+        r
+    }
+
+    fn mut_union(&mut self, o: Self) {
         if o.is_empty() {
-            return *self;
-        }
-        if self.contains_lng(o.lo) {
+            // no-op.
+        } else if self.contains_lng(o.lo) {
             if self.contains_lng(o.hi) {
                 // Either this interval contains o, or the union of the two intervals is the full interval.
                 if self.contains_int(o) {
-                    return *self;
+                    // no-op.
+                } else {
+                    self.lo = Angle::NEG_HALF_CIRCLE;
+                    self.hi = Angle::HALF_CIRCLE;
                 }
-                return LongitudeInterval::full();
+            } else {
+                self.hi = o.hi;
             }
-            return LongitudeInterval::new(self.lo, o.hi);
-        }
-        if self.contains_lng(o.hi) {
-            return LongitudeInterval::new(o.lo, self.hi);
-        }
-
-        // This interval contains neither endpoint of o. This means that either y contains all of this
-        // interval, or the two intervals are disjoint.
-        if self.is_empty() || o.contains_lng(self.lo) {
-            return o;
-        }
-
-        // Check which pair of endpoints are closer together.
-        let dlo = Self::positive_distance(o.hi, self.lo);
-        let dhi = Self::positive_distance(self.hi, o.lo);
-        if dlo < dhi {
-            LongitudeInterval::new(o.lo, self.hi)
+        } else if self.contains_lng(o.hi) {
+            self.lo = o.lo;
+        } else if self.is_empty() || o.contains_lng(self.lo) {
+            // This interval contains neither endpoint of o. This means that either y contains all of this
+            // interval, or the two intervals are disjoint.
+            self.lo = o.lo;
+            self.hi = o.hi;
         } else {
-            LongitudeInterval::new(self.lo, o.hi)
+            // Check which pair of endpoints are closer together.
+            let dlo = Self::positive_distance(o.hi, self.lo);
+            let dhi = Self::positive_distance(self.hi, o.lo);
+            if dlo < dhi {
+                self.lo = o.lo;
+            } else {
+                self.hi = o.hi;
+            }
         }
     }
 }
@@ -659,7 +676,7 @@ mod tests {
 
     #[test]
     fn contains_point_empty() {
-        assert!(!Rectangle::empty().contains_point(LatLong::from_degrees(0.0, 0.0)));
+        assert!(!Rectangle::EMPTY.contains_point(LatLong::from_degrees(0.0, 0.0)));
     }
 
     #[test]
@@ -744,9 +761,9 @@ mod tests {
             Angle::from_degrees(10.0),
             Angle::from_degrees(10.0),
         );
-        assert_contains_rect(a, Rectangle::empty(), true);
-        assert_contains_rect(Rectangle::empty(), a, false);
-        assert_contains_rect(Rectangle::empty(), Rectangle::empty(), true);
+        assert_contains_rect(a, Rectangle::EMPTY, true);
+        assert_contains_rect(Rectangle::EMPTY, a, false);
+        assert_contains_rect(Rectangle::EMPTY, Rectangle::EMPTY, true);
     }
 
     #[test]
@@ -1131,10 +1148,7 @@ mod tests {
     // union
     #[test]
     fn union_both_empty() {
-        assert_eq!(
-            Rectangle::empty(),
-            Rectangle::empty().union(Rectangle::empty())
-        );
+        assert_eq!(Rectangle::EMPTY, Rectangle::EMPTY.union(Rectangle::EMPTY));
     }
 
     #[test]
@@ -1170,8 +1184,8 @@ mod tests {
             Angle::from_degrees(10.0),
             Angle::from_degrees(10.0),
         );
-        assert_eq!(a, a.union(Rectangle::empty()));
-        assert_eq!(a, Rectangle::empty().union(a));
+        assert_eq!(a, a.union(Rectangle::EMPTY));
+        assert_eq!(a, Rectangle::EMPTY.union(a));
     }
 
     #[test]
@@ -1188,7 +1202,7 @@ mod tests {
             Angle::from_degrees(15.0),
             Angle::from_degrees(15.0),
         );
-        let union = a.union(b);
+        let union: Rectangle = a.union(b);
         assert!(union.contains_rectangle(a));
         assert!(union.contains_rectangle(b));
 
@@ -1203,6 +1217,43 @@ mod tests {
         assert!(!a.contains_point(pb));
         assert!(b.contains_point(pb));
         assert!(union.contains_point(pb));
+    }
+
+    // from_union
+
+    #[test]
+    fn from_union_all_empty() {
+        let all = vec![Rectangle::EMPTY, Rectangle::EMPTY, Rectangle::EMPTY];
+        let union = Rectangle::from_union(all.iter());
+        assert_eq!(Rectangle::EMPTY, union);
+    }
+
+    #[test]
+    fn from_union_all_overlapping() {
+        let all = vec![
+            Rectangle::from_nesw(
+                Angle::from_degrees(20.0),
+                Angle::from_degrees(20.0),
+                Angle::from_degrees(10.0),
+                Angle::from_degrees(10.0),
+            ),
+            Rectangle::from_nesw(
+                Angle::from_degrees(30.0),
+                Angle::from_degrees(30.0),
+                Angle::from_degrees(15.0),
+                Angle::from_degrees(15.0),
+            ),
+            Rectangle::from_nesw(
+                Angle::from_degrees(40.0),
+                Angle::from_degrees(40.0),
+                Angle::from_degrees(5.0),
+                Angle::from_degrees(5.0),
+            ),
+        ];
+        let union = Rectangle::from_union(all.iter());
+        for r in all.iter() {
+            assert!(union.contains_rectangle(*r));
+        }
     }
 
     #[test]

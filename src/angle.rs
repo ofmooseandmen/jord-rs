@@ -24,8 +24,14 @@ impl Angle {
     /// 90 degrees angle.
     pub const QUARTER_CIRCLE: Angle = Angle { radians: PI / 2.0 };
 
+    /// -90 degrees angle.
+    pub const NEG_QUARTER_CIRCLE: Angle = Angle { radians: -PI / 2.0 };
+
     /// 180 degrees angle.
     pub const HALF_CIRCLE: Angle = Angle { radians: PI };
+
+    /// -180 degrees angle.
+    pub const NEG_HALF_CIRCLE: Angle = Angle { radians: -PI };
 
     /// Converts this angle to a floating point value in degrees.
     pub fn as_degrees(&self) -> f64 {

@@ -10,7 +10,7 @@ The `jord` crate implements various geographical position calculations.
 
 ## Literature
 
-The following reference provide the theoretical basis of most of the algorithms:
+The following references provide the theoretical basis of most of the algorithms:
 
 - [Non-singular Horizontal Position Representation; Gade, K.; 2010](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
@@ -246,16 +246,16 @@ assert_eq!(Length::from_metres(11117.8), d.round_dm());
 - [side of a point w.r.t. 2 other points](crate::spherical::Sphere::side)
 - [angle turned from AB to BC](crate::spherical::Sphere::turn)
 
-### loops
+### kinematics
+
+- [time to closest point of approach between 2 vehicles](crate::spherical::Sphere::time_to_cpa)
+- [minimum speed for interception](crate::spherical::Sphere::max_time_to_intercept)
+- [time to intercept](crate::spherical::Sphere::time_to_intercept)
+
+### loops (simple polygons)
 
 - [loop clockwise?](crate::spherical::is_loop_clockwise)
 - [loop convex?](crate::spherical::Loop::is_convex)
 - [point inside loop?](crate::spherical::Loop::contains_point)
 - [loop triangulation](crate::spherical::Loop::triangulate)
 - [spherical excess](crate::spherical::Loop::spherical_excess)
-
-### kinematics
-
-- [time to closest point of approach between 2 vehicles](crate::spherical::Sphere::time_to_cpa)
-- [minimum speed for interception](crate::spherical::Sphere::max_time_to_intercept)
-- [time to intercept](crate::spherical::Sphere::time_to_intercept)
