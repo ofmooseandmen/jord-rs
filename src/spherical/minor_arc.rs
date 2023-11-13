@@ -229,7 +229,11 @@ impl MinorArc {
     /// assert_eq!(ma1, ma2.opposite());
     /// ```
     pub fn opposite(&self) -> MinorArc {
-        Self { start: self.end, end: self.start, normal: -self.normal }
+        Self {
+            start: self.end,
+            end: self.start,
+            normal: -self.normal,
+        }
     }
 
     /// Determines whether this minor arc contains the given point which is assumed to be on the great circle.
