@@ -31,7 +31,7 @@ pub struct LocalPositionVector {
 impl LocalPositionVector {
     /// Creates a [LocalPositionVector] from the given coordinates.
     /// Orientation: x = north (or forward), y = east (or right), z = down
-    pub fn new(x: Length, y: Length, z: Length) -> Self {
+    pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self::new_with_o(x, y, z, Orientation::Ned)
     }
 
@@ -46,7 +46,7 @@ impl LocalPositionVector {
         )
     }
 
-    fn new_with_o(x: Length, y: Length, z: Length, o: Orientation) -> Self {
+    const fn new_with_o(x: Length, y: Length, z: Length, o: Orientation) -> Self {
         Self { x, y, z, o }
     }
 

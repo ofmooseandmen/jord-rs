@@ -1,7 +1,9 @@
 use crate::{
     numbers::{eq_zero, gte, lte},
-    NVector, Vec3,
+    Angle, NVector, Vec3,
 };
+
+use super::base::angle_radians_between;
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
@@ -135,6 +137,99 @@ impl MinorArc {
     pub fn contains_point(&self, p: NVector) -> bool {
         let v = p.as_vec3();
         eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v)
+    }
+
+    /// Determines whether p if right of (negative integer), left of (positive integer) or on this
+    /// minor arc (zero).
+    ///
+    /// This is similar to [side(p, self.start, self.end)](crate::spherical::Sphere::side) but avoids the calculation of the orthogonal
+    /// vector to (`self.start`, `self.end`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::MinorArc;
+    ///
+    /// let p = NVector::from_lat_long_degrees(55.4295, 13.82);
+    /// let ma1 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(56.0465, 12.6945),
+    ///     NVector::from_lat_long_degrees(56.0294, 14.1567)
+    /// );
+    /// let ma2 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(56.0294, 14.1567),
+    ///     NVector::from_lat_long_degrees(56.0465, 12.6945)
+    /// );
+    ///
+    /// assert_eq!(-1, ma1.side_of(p));
+    /// assert_eq!(1, ma2.side_of(p));
+    /// ```
+    pub fn side_of(&self, p: NVector) -> i8 {
+        let side = p.as_vec3().dot_prod(self.normal);
+        if eq_zero(side) {
+            0
+        } else if side < 0.0 {
+            -1
+        } else {
+            1
+        }
+    }
+
+    /// Given `self` = (A, B) and `o` = (B, C): calculates the angle turned from AB to BC.
+    ///
+    /// Note: this function assumes that `self.end == o.start` and as such is similar to
+    /// [turn(self.start, self.end, o.start)](crate::spherical::Sphere::turn) but avoids the calculation of the orthogonal
+    /// vector to (`self.start`, `self.end`) and (`o.start`, `o.end`).
+    ///
+    /// # Exmaples
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::MinorArc;
+    ///
+    /// let ma1 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(45.0, 0.0)
+    /// );
+    /// let ma2 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(45.0, 0.0),
+    ///     NVector::from_lat_long_degrees(60.0, -10.0)
+    /// );
+    ///
+    /// assert_eq!(Angle::from_radians(0.3175226173130951), ma1.turn(ma2));
+    /// assert_eq!(-ma1.turn(ma2), ma2.turn(ma1));
+    /// ```
+    pub fn turn(&self, o: MinorArc) -> Angle {
+        Angle::from_radians(angle_radians_between(
+            self.normal,
+            o.normal,
+            Some(self.end.as_vec3()),
+        ))
+    }
+
+    /// Returns the minor arc opposite to this minor arc: if this minor arc is (a, b), the returned minor arc is (b, a).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::MinorArc;
+    ///
+    /// let p = NVector::from_lat_long_degrees(55.4295, 13.82);
+    /// let ma1 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(56.0465, 12.6945),
+    ///     NVector::from_lat_long_degrees(56.0294, 14.1567)
+    /// );
+    /// let ma2 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(56.0294, 14.1567),
+    ///     NVector::from_lat_long_degrees(56.0465, 12.6945)
+    /// );
+    ///
+    /// assert_eq!(ma2, ma1.opposite());
+    /// assert_eq!(ma1, ma2.opposite());
+    /// ```
+    pub fn opposite(&self) -> MinorArc {
+        Self { start: self.end, end: self.start, normal: -self.normal }
     }
 
     /// Determines whether this minor arc contains the given point which is assumed to be on the great circle.

@@ -218,9 +218,9 @@ impl Rectangle {
     }
 
     /// Returns the smallest rectangle containing the union of all the given rectangles.
-    pub fn from_union<'a>(it: impl Iterator<Item = &'a Self>) -> Self {
+    pub fn from_union(all: &[Rectangle]) -> Self {
         let mut res = Self::EMPTY;
-        for r in it {
+        for r in all {
             res.lat.mut_union(r.lat);
             res.lng.mut_union(r.lng);
         }
@@ -1224,7 +1224,7 @@ mod tests {
     #[test]
     fn from_union_all_empty() {
         let all = vec![Rectangle::EMPTY, Rectangle::EMPTY, Rectangle::EMPTY];
-        let union = Rectangle::from_union(all.iter());
+        let union = Rectangle::from_union(&all);
         assert_eq!(Rectangle::EMPTY, union);
     }
 
@@ -1250,7 +1250,7 @@ mod tests {
                 Angle::from_degrees(5.0),
             ),
         ];
-        let union = Rectangle::from_union(all.iter());
+        let union = Rectangle::from_union(&all);
         for r in all.iter() {
             assert!(union.contains_rectangle(*r));
         }

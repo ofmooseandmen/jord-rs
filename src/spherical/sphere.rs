@@ -233,18 +233,19 @@ impl Sphere {
     /// Computes the mean position of the given positions: the “center of gravity” of the given positions,
     /// which and can be compared to the centroid of a geometrical shape (n.b. other definitions of mean exist).
     ///
-    /// The mean position is undefined if either the given vector is empty or some of the given positions are
-    /// antipodals.
+    /// The mean position is undefined if:
+    /// - no position are given (i.e `ps` is empty), or
+    /// - any 2 given positions are the antipode of one another.
     ///
     /// # Examples
     ///
     /// ```
-    /// use jord::{LatLong, Length};
+    /// use jord::LatLong;
     /// use jord::spherical::Sphere;
     ///
     /// let ps = vec![
-    ///     LatLong::from_degrees( 10.0,  10.0).to_nvector(),
-    ///     LatLong::from_degrees( 10.0, -10.0).to_nvector(),
+    ///     LatLong::from_degrees(10.0,  10.0).to_nvector(),
+    ///     LatLong::from_degrees(10.0, -10.0).to_nvector(),
     ///     LatLong::from_degrees(-10.0, -10.0).to_nvector(),
     ///     LatLong::from_degrees(-10.0,  10.0).to_nvector()
     /// ];
@@ -265,6 +266,40 @@ impl Sphere {
             let vs = ps.iter().map(|nv| nv.as_vec3()).collect::<Vec<_>>();
             let m = Vec3::mean(&vs);
             Some(NVector::new(m))
+        }
+    }
+
+    /// Computes the mean position of the 3 given positions: the “center of gravity” of the given positions,
+    /// which and can be compared to the centroid of a geometrical shape (n.b. other definitions of mean exist).
+    ///
+    /// The mean position is undefined if any 2 given positions are the antipode of one another.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{LatLong, NVector};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let p1 = NVector::from_lat_long_degrees(10.0,  0.0);
+    /// let p2 = NVector::from_lat_long_degrees(0.0, -10.0);
+    /// let p3 = NVector::from_lat_long_degrees(0.0, 10.0);
+    ///
+    /// let o_m = Sphere::triangle_mean_position(p1, p2, p3);
+    /// assert!(o_m.is_some());
+    /// assert_eq!(
+    ///     LatLong::from_degrees(3.3637274, 0.0),
+    ///     LatLong::from_nvector(o_m.unwrap()).round_d7()
+    /// );
+    /// ```
+    pub fn triangle_mean_position(p1: NVector, p2: NVector, p3: NVector) -> Option<NVector> {
+        if p1.is_antipode_of(p2) || p1.is_antipode_of(p3) || p2.is_antipode_of(p3) {
+            None
+        } else {
+            Some(NVector::new(Vec3::mean(&[
+                p1.as_vec3(),
+                p2.as_vec3(),
+                p3.as_vec3(),
+            ])))
         }
     }
 
@@ -905,7 +940,7 @@ mod tests {
     fn initial_bearing_antipodal() {
         let np = NVector::from_lat_long_degrees(90.0, 0.0);
         let sp = NVector::from_lat_long_degrees(-90.0, 0.0);
-        assert_eq!(Angle::from_degrees(180.0), Sphere::initial_bearing(np, sp));
+        assert_eq!(Angle::ZERO, Sphere::initial_bearing(np, sp));
         assert_eq!(Angle::ZERO, Sphere::initial_bearing(sp, np));
     }
 

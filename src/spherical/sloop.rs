@@ -4,7 +4,7 @@ use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
 
 use super::{
     base::{angle_radians_between, exact_side},
-    MinorArc, Sphere,
+    MinorArc, Rectangle, Sphere,
 };
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
@@ -81,17 +81,17 @@ impl Loop {
         if len < 3 {
             Self::EMPTY
         } else {
-            let clockwise: bool = is_clockwise(opened);
-            let vertices = if clockwise {
-                in_order_vertices(opened)
+            let (edges, clockwise) = to_edges(opened);
+            let clockwise_edges = if clockwise {
+                edges
             } else {
-                reverse_vertices(opened)
+                reverse_edges(&edges)
             };
+            let vertices = clockwise_edges_to_vertices(&clockwise_edges);
             if vertices.iter().all(|v| v.1 == Classification::Both) {
                 // only collinear vertices.
                 Self::EMPTY
             } else {
-                let edges = to_edges(&vertices);
                 let insides = if len > 3 {
                     find_insides(&vertices)
                 } else {
@@ -100,7 +100,7 @@ impl Loop {
                 Self {
                     vertices,
                     insides,
-                    edges,
+                    edges: clockwise_edges,
                 }
             }
         }
@@ -306,6 +306,37 @@ impl Loop {
     /// Returns a iterator over the edges of this loop in clockwise order.
     pub fn iter_edges(&self) -> impl Iterator<Item = &MinorArc> {
         self.edges.iter()
+    }
+
+    /// Calculates the [minimum bounding rectangle](crate::spherical::Rectangle) of this loop. The returned bound is
+    /// conservative in that if this loop [contains](crate::spherical::Loop::contains_point) a point P,
+    /// then the bound also [contains](crate::spherical::Rectangle::contains_point) P.
+    // TODO(CL): tests (maybe expand bound by a small margin?) + examples
+    pub fn bounds(&self) -> Rectangle {
+        let all: Vec<Rectangle> = self
+            .edges
+            .iter()
+            .map(|e| Rectangle::from_minor_arc(*e))
+            .collect();
+        let mut mbr = Rectangle::from_union(&all);
+
+        // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
+        mbr = mbr.polar_closure();
+
+        static NP: NVector = NVector::new(Vec3::UNIT_Z);
+        static SP: NVector = NVector::new(Vec3::NEG_UNIT_Z);
+
+        if self.contains_point(NP) {
+            mbr = mbr.expand_to_north_pole();
+        }
+
+        // If a loop contains the south pole, then either it wraps entirely around the sphere (full longitude
+        // range), or it also contains the north pole in which case bounds#is_longitude_full() is true due to the
+        // test above. Either way, we only need to do the south pole containment test if bounds#is_longitude_full().
+        if mbr.is_longitude_full() && self.contains_point(SP) {
+            mbr = mbr.expand_to_south_pole();
+        }
+        mbr
     }
 
     /// Determines whether the **interior** of this loop contains the given point (i.e. excluding points which are
@@ -529,10 +560,20 @@ impl Loop {
 /// ```
 pub fn is_loop_clockwise(vs: &[NVector]) -> bool {
     let ovs = opened(vs);
-    if ovs.len() < 3 {
-        false
-    } else {
-        is_clockwise(ovs)
+    let len = ovs.len();
+    match len.cmp(&3) {
+        Ordering::Less => false,
+        Ordering::Equal => Sphere::side(ovs[0], ovs[1], ovs[2]) < 0,
+        Ordering::Greater => {
+            let mut turn: Angle = Angle::ZERO;
+            for i in 0..len {
+                let prev: NVector = ovs[(i + len - 1) % len];
+                let cur = ovs[i];
+                let next = ovs[(i + 1) % len];
+                turn = turn + Sphere::turn(prev, cur, next);
+            }
+            turn.as_radians() < 0.0
+        }
     }
 }
 
@@ -560,75 +601,54 @@ fn opened(vs: &[NVector]) -> &[NVector] {
     }
 }
 
-/// Determines whether given positions are in clockwise order, assuming that:
-/// - the loop is opened (first /= last)
-/// - the loop contains at least 3 vertices
-fn is_clockwise(vs: &[NVector]) -> bool {
+/// Builds vertices by iterating the given array of edges in order (i.e. edges are given in clockwise order).
+fn clockwise_edges_to_vertices(es: &[MinorArc]) -> Vec<Vertex> {
+    let len: usize = es.len();
+    let mut res: Vec<Vertex> = Vec::with_capacity(len);
+    for i in 0..len {
+        let prev = es[(i + len - 1) % len];
+        let cur = es[i];
+        let side = cur.side_of(prev.start());
+        let vertex = match side.cmp(&0) {
+            Ordering::Greater => Vertex(cur.start(), Classification::Reflex),
+            Ordering::Less => Vertex(cur.start(), Classification::Convex),
+            Ordering::Equal => Vertex(cur.start(), Classification::Both),
+        };
+        res.push(vertex);
+    }
+    res
+}
+
+/// Reveres the given edges.
+fn reverse_edges(es: &[MinorArc]) -> Vec<MinorArc> {
+    let len = es.len();
+    let last = len - 1;
+    let mut res: Vec<MinorArc> = Vec::with_capacity(len);
+    for i in (0..last).rev() {
+        res.push(es[i].opposite());
+    }
+    res.push(es[last].opposite());
+    res
+}
+
+/// vertices to edges: last edge connect last vertex to first vertex + are vertices given in clockwise order?.
+fn to_edges(vs: &[NVector]) -> (Vec<MinorArc>, bool) {
     let len: usize = vs.len();
-    if len == 3 {
-        Sphere::side(vs[0], vs[1], vs[2]) < 0
-    } else {
-        let mut turn = Angle::ZERO;
-        for i in 0..len {
-            let prev: NVector = vs[(i + len - 1) % len];
-            let cur = vs[i];
-            let next = vs[(i + 1) % len];
-            turn = turn + Sphere::turn(prev, cur, next);
+    let mut edges: Vec<MinorArc> = Vec::with_capacity(len);
+    let mut turn = Angle::ZERO;
+    for i in 0..len {
+        let cur = vs[i];
+        let next = vs[(i + 1) % len];
+        let e = MinorArc::new(cur, next);
+        edges.push(e);
+        if i > 0 {
+            turn = turn + edges[i - 1].turn(e);
         }
-        turn.as_radians() < 0.0
     }
-}
-
-/// Builds vertices by iterating the given array of horizontal
-/// positions in order (i.e. positions are given in clockwise order).
-fn in_order_vertices(vs: &[NVector]) -> Vec<Vertex> {
-    let len: usize = vs.len();
-    let mut res: Vec<Vertex> = Vec::with_capacity(len);
-    for i in 0..len {
-        let prev: NVector = vs[(i + len - 1) % len];
-        let cur = vs[i];
-        let next = vs[(i + 1) % len];
-        let side = Sphere::side(prev, cur, next);
-        let vertex = match side.cmp(&0) {
-            Ordering::Greater => Vertex(cur, Classification::Reflex),
-            Ordering::Less => Vertex(cur, Classification::Convex),
-            Ordering::Equal => Vertex(cur, Classification::Both),
-        };
-        res.push(vertex);
-    }
-    res
-}
-
-/// Builds vertices by iterating the given array of horizontal
-/// positions in reverse order (i.e. positions are given in anti-clockwise order).
-fn reverse_vertices(vs: &[NVector]) -> Vec<Vertex> {
-    let len: usize = vs.len();
-    let mut res: Vec<Vertex> = Vec::with_capacity(len);
-    for i in (0..len).rev() {
-        let prev: NVector = vs[(i + 1) % len];
-        let cur = vs[i];
-        let next = vs[(i + len - 1) % len];
-        let side = Sphere::side(prev, cur, next);
-        let vertex = match side.cmp(&0) {
-            Ordering::Greater => Vertex(cur, Classification::Reflex),
-            Ordering::Less => Vertex(cur, Classification::Convex),
-            Ordering::Equal => Vertex(cur, Classification::Both),
-        };
-        res.push(vertex);
-    }
-    res
-}
-
-/// vertices to edges: last edge connect last vertex to first vertex.
-fn to_edges(vs: &[Vertex]) -> Vec<MinorArc> {
-    let len: usize = vs.len();
-    let mut res: Vec<MinorArc> = Vec::with_capacity(len - 1);
-    for i in 0..len {
-        let cur = vs[i];
-        let next = vs[(i + 1) % len];
-        res.push(MinorArc::new(cur.0, next.0));
-    }
-    res
+    // turn from last edge to first edge.
+    turn = turn + edges[len - 1].turn(edges[0]);
+    let clockwise = turn.as_radians() < 0.0;
+    (edges, clockwise)
 }
 
 /// Triangulates given loop using ear-clipping method.
@@ -663,8 +683,8 @@ fn find_insides(vs: &[Vertex]) -> Option<(NVector, NVector)> {
 
     loop {
         if remaining.len() == 3 {
-            let t = vec![remaining[0].0, remaining[1].0, remaining[2].0];
-            let inside = Sphere::mean_position(&t);
+            let inside =
+                Sphere::triangle_mean_position(remaining[0].0, remaining[1].0, remaining[2].0);
             if let Some(p) = inside {
                 res.push(p);
             }
@@ -672,8 +692,7 @@ fn find_insides(vs: &[Vertex]) -> Option<(NVector, NVector)> {
         }
 
         if let Some(ear) = next_ear(&mut remaining) {
-            let t: Vec<NVector> = vec![ear.0, ear.1, ear.2];
-            let inside = Sphere::mean_position(&t);
+            let inside = Sphere::triangle_mean_position(ear.0, ear.1, ear.2);
             if let Some(p) = inside {
                 res.push(p);
                 if res.len() == 2 {
@@ -786,11 +805,8 @@ fn inside_or_edge(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> bool {
     if p == v1 || p == v2 || p == v3 {
         return false;
     }
-    let sign = if is_clockwise(&[v1, v2, v3]) {
-        -1.0
-    } else {
-        1.0
-    };
+    let clockwise = Sphere::side(v1, v2, v3) < 0;
+    let sign = if clockwise { -1.0 } else { 1.0 };
     let side_edge1 = exact_side(p.as_vec3(), v1.as_vec3(), v2.as_vec3()) * sign;
     let side_edge2 = exact_side(p.as_vec3(), v2.as_vec3(), v3.as_vec3()) * sign;
     let side_edge3 = exact_side(p.as_vec3(), v3.as_vec3(), v1.as_vec3()) * sign;

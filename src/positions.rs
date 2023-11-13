@@ -59,7 +59,7 @@ pub struct GeocentricPos {
 
 impl GeocentricPos {
     /// Creates a [GeocentricPos] from the given coordinates.
-    pub fn new(x: Length, y: Length, z: Length) -> Self {
+    pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
 
@@ -111,7 +111,7 @@ pub struct GeodeticPos {
 
 impl GeodeticPos {
     /// Creates a new [GeodeticPos] from the given horizontal coordinates and height above the surface.
-    pub fn new(hp: NVector, height: Length) -> Self {
+    pub const fn new(hp: NVector, height: Length) -> Self {
         Self { hp, height }
     }
 
@@ -139,7 +139,7 @@ impl LatLong {
     // TODO(CL): normalise?
 
     /// Creates a new [LatLong] from the given latitude and longitude.
-    pub fn new(latitude: Angle, longitude: Angle) -> Self {
+    pub const fn new(latitude: Angle, longitude: Angle) -> Self {
         Self {
             latitude,
             longitude,
@@ -226,7 +226,7 @@ pub struct NVector(Vec3);
 
 impl NVector {
     /// Creates a new [NVector] from the given [unit](crate::Vec3::new_unit) 3D vector.
-    pub fn new(v: Vec3) -> Self {
+    pub const fn new(v: Vec3) -> Self {
         Self(v)
     }
 
@@ -265,6 +265,12 @@ fn nvector_to_latlong(nvector: Vec3) -> (Angle, Angle) {
 }
 
 fn latlong_to_nvector(latitude: Angle, longitude: Angle) -> Vec3 {
+    if latitude == Angle::QUARTER_CIRCLE {
+        return Vec3::UNIT_Z;
+    }
+    if latitude == Angle::NEG_QUARTER_CIRCLE {
+        return Vec3::NEG_UNIT_Z;
+    }
     let latitude_rads = latitude.as_radians();
     let longitude_rads = longitude.as_radians();
     let cl = latitude_rads.cos();
@@ -301,4 +307,45 @@ pub(crate) fn assert_opt_nv_eq_d7(expected: NVector, actual: Option<NVector>) {
 pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPos, actual: GeodeticPos) {
     assert_nv_eq_d7(expected.horizontal_position(), actual.horizontal_position());
     assert_eq!(expected.height().round_mm(), actual.height().round_mm());
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{LatLong, NVector, Vec3};
+
+    #[test]
+    fn nvector_from_north_pole() {
+        for lng in -180..180 {
+            let nv = NVector::from_lat_long_degrees(90.0, lng as f64);
+            assert_eq!(Vec3::UNIT_Z, nv.0);
+            let ll: LatLong = LatLong::from_degrees(90.0, lng as f64);
+            assert_eq!(Vec3::UNIT_Z, ll.to_nvector().0);
+        }
+    }
+
+    #[test]
+    fn nvector_from_south_pole() {
+        for lng in -180..180 {
+            let nv = NVector::from_lat_long_degrees(-90.0, lng as f64);
+            assert_eq!(Vec3::NEG_UNIT_Z, nv.0);
+            let ll: LatLong = LatLong::from_degrees(-90.0, lng as f64);
+            assert_eq!(Vec3::NEG_UNIT_Z, ll.to_nvector().0);
+        }
+    }
+
+    #[test]
+    fn lat_long_from_unit_z() {
+        assert_eq!(
+            LatLong::from_degrees(90.0, 0.0),
+            LatLong::from_nvector(NVector::new(Vec3::UNIT_Z))
+        );
+    }
+
+    #[test]
+    fn lat_long_from_neg_unit_z() {
+        assert_eq!(
+            LatLong::from_degrees(-90.0, 0.0),
+            LatLong::from_nvector(NVector::new(Vec3::NEG_UNIT_Z))
+        );
+    }
 }
