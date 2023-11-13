@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, f64::consts::PI};
 
 use crate::{
     numbers::{eq_zero, gte, lte},
@@ -175,6 +175,26 @@ impl Rectangle {
         LatLong::new(self.lat.lo, self.lng.lo)
     }
 
+    /// Expands (`amount > 0`) or shrinks (`amount < 0`) this rectangle by the given amount
+    /// on each side in latitude and longitude direction.
+    /// - Latitudes are clampled to the range [-90, 90], as such the full latitude range
+    ///   remains full only if the margin is positive.
+    /// - Longitudes "wrap around" at +/-180 degrees, as such the full longitude range remains full.
+    /// - If either the latitude or longitude interval becomes empty after
+    ///   expansion by a negative margin, the result is [empty](crate::spherical::Rectangle::EMPTY).
+    pub fn expand(&self, amount: Angle) -> Self {
+        let lat = self.lat.expand(amount);
+        let lng = self.lng.expand(amount);
+        if lat.is_empty() || lng.is_empty() {
+            Self::EMPTY
+        } else {
+            Self {
+                lat: lat.intersection(LatitudeInterval::FULL),
+                lng,
+            }
+        }
+    }
+
     /// Expands this rectangle to include the north pole - the longitude interval becomes
     /// [full](crate::spherical::Rectangle::is_longitude_full) as a result.
     /// As such only the southermost latitude of this rectangle is kept.
@@ -293,6 +313,18 @@ impl LatitudeInterval {
         }
     }
 
+    /// Returns an interval that has been expanded/shrinked on each side by the given amount.
+    fn expand(&self, amount: Angle) -> Self {
+        if self.is_empty() {
+            *self
+        } else {
+            Self {
+                lo: self.lo - amount,
+                hi: self.hi + amount,
+            }
+        }
+    }
+
     /// Returns true if this latitude interval is empty.
     fn is_empty(&self) -> bool {
         self.lo > self.hi
@@ -301,6 +333,14 @@ impl LatitudeInterval {
     /// Returns true if this latitude interval is full.
     fn is_full(&self) -> bool {
         self.lo == -Angle::QUARTER_CIRCLE && self.hi == Angle::QUARTER_CIRCLE
+    }
+
+    /// Return the intersection of this interval with the given interval.
+    /// Empty intervals do not need to be special-cased.
+    fn intersection(&self, o: Self) -> Self {
+        let lo = if self.lo >= o.lo { self.lo } else { o.lo };
+        let hi = if self.hi <= o.hi { self.hi } else { o.hi };
+        Self { lo, hi }
     }
 
     /// Returns the smallest latitude interval that contains this latitude interval and the given latitude
@@ -379,6 +419,39 @@ impl LongitudeInterval {
         }
     }
 
+    /// Returns an interval that has been expanded/shrinked on each side by the given amount.
+    fn expand(&self, amount: Angle) -> Self {
+        if amount > Angle::ZERO {
+            if self.is_empty() {
+                return *self;
+            }
+            // Check whether this interval will be full after expansion, allowing
+            // for a 1-bit rounding error when computing each endpoint.
+            if self.len() + 2.0 * amount + 2.0 * Angle::DBL_EPSILON >= Angle::FULL_CIRCLE {
+                return Self::FULL;
+            }
+        } else {
+            if self.is_full() {
+                return *self;
+            }
+            // Check whether this interval will be empty after expansion, allowing
+            // for a 1-bit rounding error when computing each endpoint.
+            if self.len() + 2.0 * amount - 2.0 * Angle::DBL_EPSILON <= Angle::ZERO {
+                return Self::EMPTY;
+            }
+        }
+
+        let mut lo = (self.lo - amount).as_radians() % (2.0 * PI);
+        let hi = (self.hi + amount).as_radians() % (2.0 * PI);
+        if lo < -PI {
+            lo = PI;
+        }
+        Self {
+            lo: Angle::from_radians(lo),
+            hi: Angle::from_radians(hi),
+        }
+    }
+
     fn contains_lng(&self, longitude: Angle) -> bool {
         let lng = Self::normalised_longitude(longitude);
         if self.is_inverted() {
@@ -423,6 +496,21 @@ impl LongitudeInterval {
         let mut r = *self;
         r.mut_union(o);
         r
+    }
+
+    fn len(&self) -> Angle {
+        let mut len = self.hi - self.lo;
+        if len >= Angle::ZERO {
+            len
+        } else {
+            len = len + Angle::FULL_CIRCLE;
+            // Empty intervals have a negative length.
+            if len > Angle::ZERO {
+                len
+            } else {
+                Angle::from_radians(-1.0)
+            }
+        }
     }
 
     fn mut_union(&mut self, o: Self) {

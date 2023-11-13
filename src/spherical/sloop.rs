@@ -311,7 +311,28 @@ impl Loop {
     /// Calculates the [minimum bounding rectangle](crate::spherical::Rectangle) of this loop. The returned bound is
     /// conservative in that if this loop [contains](crate::spherical::Loop::contains_point) a point P,
     /// then the bound also [contains](crate::spherical::Rectangle::contains_point) P.
-    // TODO(CL): tests (maybe expand bound by a small margin?) + examples
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{LatLong, NVector};
+    /// use jord::spherical::Loop;
+    ///
+    /// let vs = vec![
+    ///     NVector::from_lat_long_degrees(55.605, 13.0038),
+    ///     NVector::from_lat_long_degrees(55.4295, 13.82),
+    ///     NVector::from_lat_long_degrees(56.0294, 14.1567),
+    ///     NVector::from_lat_long_degrees(56.0465, 12.6945),
+    ///     NVector::from_lat_long_degrees(55.7047, 13.191),
+    /// ];
+    ///
+    /// let l = Loop::new(&vs);
+    /// let b = l.bounds();
+    /// for v in vs.iter() {
+    ///     let ll = LatLong::from_nvector(*v);
+    ///     assert!(b.contains_point(ll));
+    /// }
+    /// ```
     pub fn bounds(&self) -> Rectangle {
         let all: Vec<Rectangle> = self
             .edges
@@ -319,6 +340,12 @@ impl Loop {
             .map(|e| Rectangle::from_minor_arc(*e))
             .collect();
         let mut mbr = Rectangle::from_union(&all);
+
+        // expand by 1e-7 degrees which is about 11.1 millimetres at the equator and
+        // is the near limit of GPS-based technique - this is to make sure that floating-point
+        // error introduced when converting NVector <-> LatLong does not break the bounds
+        // invariant: loop.contains_point(p) -> loop.bounds().contains_point(LatLong::from_nvector(p))
+        mbr = mbr.expand(Angle::from_degrees(1.0e-7));
 
         // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
         mbr = mbr.polar_closure();
@@ -852,7 +879,7 @@ fn vec3_eq(a: Vec3, b: Vec3) -> bool {
 mod tests {
     use crate::{
         spherical::{is_loop_clockwise, Loop},
-        Angle, NVector, Vec3,
+        Angle, LatLong, NVector, Vec3,
     };
 
     fn antananrivo() -> NVector {
@@ -1029,6 +1056,33 @@ mod tests {
         let mut rvs = vs.to_vec();
         rvs.reverse();
         assert_eq!(e, Loop::new(&rvs).is_convex());
+    }
+
+    // bounds
+
+    #[test]
+    fn bounds_expansion() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+            NVector::from_lat_long_degrees(5.0, 0.0),
+        ];
+
+        let l = Loop::new(&vs);
+        let b = l.bounds();
+
+        let ne = b.north_east();
+        assert_eq!(5.0000001, ne.latitude().as_degrees());
+        assert_eq!(10.0000001, ne.longitude().as_degrees());
+
+        let sw: LatLong = b.south_west();
+        assert_eq!(-0.0000001, sw.latitude().as_degrees());
+        assert_eq!(-0.0000001, sw.longitude().as_degrees());
+
+        for v in vs.iter() {
+            let ll = LatLong::from_nvector(*v);
+            assert!(b.contains_point(ll));
+        }
     }
 
     // contains_point.

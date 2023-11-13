@@ -33,6 +33,14 @@ impl Angle {
     /// -180 degrees angle.
     pub const NEG_HALF_CIRCLE: Angle = Angle { radians: -PI };
 
+    /// 360 degrees angle.
+    pub const FULL_CIRCLE: Angle = Angle { radians: 2.0 * PI };
+
+    /// `f64::EPSILON` radians.
+    pub(crate) const DBL_EPSILON: Angle = Angle {
+        radians: f64::EPSILON,
+    };
+
     /// Converts this angle to a floating point value in degrees.
     pub fn as_degrees(&self) -> f64 {
         self.radians.to_degrees()
@@ -98,7 +106,7 @@ impl Angle {
     }
 
     /// Rounds this angle to the nearest decimal degrees with 6 decimal places - when representing
-    /// an Earth latitude/longtiude this is approximately 0.111 metres at the equator.
+    /// an Earth latitude/longtiude this is approximately 111 millimetres at the equator.
     ///
     /// # Examples
     ///
@@ -114,7 +122,7 @@ impl Angle {
     }
 
     /// Rounds this angle to the nearest decimal degrees with 7 decimal places - when representing
-    /// an Earth latitude/longtiude this is approximately 1.11 centimetres at the equator.
+    /// an Earth latitude/longtiude this is approximately 11.1 millimetres at the equator.
     ///
     /// # Examples
     ///

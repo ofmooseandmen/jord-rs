@@ -180,7 +180,7 @@ impl LatLong {
     /// Rounds the latitude and longitude of this latlong to the nearest decimal degrees with 5 decimal places.
     ///
     /// The precision of the returned latlong corresponds to the accuracy achieved by commercial GPS
-    /// units with differential correction; it allows to distinguish 2 positions about 1.1 metres apart.
+    /// units with differential correction; it allows to distinguish 2 positions about 1.11 metres apart.
     ///
     /// See also: [Angle::round_d5](crate::Angle::round_d5).
     pub fn round_d5(&self) -> Self {
@@ -193,7 +193,7 @@ impl LatLong {
     /// Rounds the latitude and longitude of this latlong to the nearest decimal degrees with 6 decimal places.
     ///
     /// The precision of the returned latlong corresponds to the accuracy achieved by
-    /// differentially corrected GPS; it allows to distinguish 2 positions about 0.11 metres apart.
+    /// differentially corrected GPS; it allows to distinguish 2 positions about 111 millimetres apart.
     ///
     /// See also: [Angle::round_d6](crate::Angle::round_d6).
     pub fn round_d6(&self) -> Self {
@@ -206,7 +206,7 @@ impl LatLong {
     /// Rounds the latitude and longitude of this latlong to the nearest decimal degrees with 7 decimal places.
     ///
     /// The precision of the returned latlong corresponds to the near limit of GPS-based
-    /// techniques; it allows to distinguish 2 positions about 11 millimetres apart.
+    /// techniques; it allows to distinguish 2 positions about 11.1 millimetres apart.
     ///
     /// See also: [Angle::round_d7](crate::Angle::round_d7).
     pub fn round_d7(&self) -> Self {
