@@ -327,13 +327,13 @@ impl Loop {
     /// ];
     ///
     /// let l = Loop::new(&vs);
-    /// let b = l.bounds();
+    /// let b = l.bound();
     /// for v in vs.iter() {
     ///     let ll = LatLong::from_nvector(*v);
     ///     assert!(b.contains_point(ll));
     /// }
     /// ```
-    pub fn bounds(&self) -> Rectangle {
+    pub fn bound(&self) -> Rectangle {
         let all: Vec<Rectangle> = self
             .edges
             .iter()
@@ -367,7 +367,7 @@ impl Loop {
     }
 
     /// Determines whether the **interior** of this loop contains the given point (i.e. excluding points which are
-    /// vertices or on one of the edge of this loop).
+    /// vertices or on an edge of this loop).
     ///
     /// This function always returns false for [empty](crate::spherical::Loop::is_empty) loops, undefined for [non simple](crate::spherical::Loop::is_simple) loops.
     ///
@@ -1058,10 +1058,10 @@ mod tests {
         assert_eq!(e, Loop::new(&rvs).is_convex());
     }
 
-    // bounds
+    // bound
 
     #[test]
-    fn bounds_expansion() {
+    fn bound_expansion() {
         let vs = vec![
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
@@ -1069,7 +1069,7 @@ mod tests {
         ];
 
         let l = Loop::new(&vs);
-        let b = l.bounds();
+        let b = l.bound();
 
         let ne = b.north_east();
         assert_eq!(5.0000001, ne.latitude().as_degrees());

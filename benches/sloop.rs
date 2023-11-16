@@ -95,7 +95,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| black_box(l.contains_point(outside)));
     });
 
-    c.bench_function("Loop::bounds_5_vertices", |b: &mut Bencher<'_>| {
+    c.bench_function("Loop::bound_5_vertices", |b: &mut Bencher<'_>| {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(55.605, 13.0038),
             NVector::from_lat_long_degrees(55.4295, 13.82),
@@ -104,12 +104,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             NVector::from_lat_long_degrees(55.7047, 13.191),
         ];
         let l = Loop::new(&vertices);
-        b.iter(|| black_box(l.bounds()))
+        b.iter(|| black_box(l.bound()))
     });
 
-    c.bench_function("Loop::bounds_94_vertices", |b: &mut Bencher<'_>| {
+    c.bench_function("Loop::bound_94_vertices", |b: &mut Bencher<'_>| {
         let l = Loop::new(&vertices_94());
-        b.iter(|| black_box(l.bounds()))
+        b.iter(|| black_box(l.bound()))
     });
 }
 
