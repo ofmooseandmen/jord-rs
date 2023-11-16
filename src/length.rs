@@ -49,6 +49,9 @@ impl Length {
     /// Zero length.
     pub const ZERO: Length = Length { metres: 0.0 };
 
+    /// Maximum length.
+    pub const MAX: Length = Length { metres: f64::MAX };
+
     /// Creates a length from a floating point value in metres.
     pub const fn from_metres(metres: f64) -> Self {
         Length { metres }
