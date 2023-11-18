@@ -1,5 +1,7 @@
 ### 0.6.0
 
+- Geocentric Radius
+
 ### 0.5.0
 
 - Ellispoid: Radius of Curvature (Meridian & prime) + Radius at latitude

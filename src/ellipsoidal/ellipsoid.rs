@@ -83,14 +83,60 @@ impl Ellipsoid {
         self.flattening
     }
 
-    /// Returns the radius of this ellipsoid at the given geodetic latitude.
+    /// Returns the geocentric radius at the given geodetic latitude: the distance from the Earth's center
+    /// to a point on the spheroid surface at geodetic latitude.
     ///
-    /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
-    pub fn latitude_radius(&self, latitude: Angle) -> Length {
-        self.prime_vertical_radius(latitude) * latitude.as_radians().cos()
+    /// See: [Location-dependent radii](https://en.wikipedia.org/wiki/Earth_radius#Location-dependent_radii)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, Length};
+    /// use jord::ellipsoidal::Ellipsoid;
+    ///
+    /// assert_eq!(Ellipsoid::WGS84.equatorial_radius(), Ellipsoid::WGS84.geocentric_radius(Angle::ZERO));
+    /// assert_eq!(Ellipsoid::WGS84.polar_radius(), Ellipsoid::WGS84.geocentric_radius(Angle::from_degrees(90.0)));
+    /// assert_eq!(
+    ///     Length::from_metres(6_367_490.0),
+    ///     Ellipsoid::WGS84.geocentric_radius(Angle::from_degrees(45.0)).round_m()
+    /// );
+    /// ```
+    pub fn geocentric_radius(&self, latitude: Angle) -> Length {
+        let cos_lat = latitude.as_radians().cos();
+        let sin_lat = latitude.as_radians().sin();
+        let a = self.equatorial_radius.as_metres();
+        let b = self.polar_radius.as_metres();
+        let f1 = a * a * cos_lat;
+        let f2 = b * b * sin_lat;
+        let f3 = a * cos_lat;
+        let f4 = b * sin_lat;
+        let r = (((f1 * f1) + (f2 * f2)) / ((f3 * f3) + (f4 * f4))).sqrt();
+        Length::from_metres(r)
     }
 
-    /// Returns the radius of curvature of the ellipsoid perpendicular to the meridian at the given latitude (often denoted `N`).
+    /// Returns the radius of the parallel of the given geodetic latitude.
+    ///
+    /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, Length};
+    /// use jord::ellipsoidal::Ellipsoid;
+    ///
+    /// assert_eq!(Ellipsoid::WGS84.equatorial_radius(), Ellipsoid::WGS84.latitude_radius(Angle::ZERO));
+    /// assert_eq!(Length::ZERO, Ellipsoid::WGS84.latitude_radius(Angle::from_degrees(90.0)));
+    /// assert_eq!(Length::ZERO, Ellipsoid::WGS84.latitude_radius(Angle::from_degrees(-90.0)));
+    /// ```
+    pub fn latitude_radius(&self, latitude: Angle) -> Length {
+        if latitude == Angle::QUARTER_CIRCLE || latitude == Angle::NEG_QUARTER_CIRCLE {
+            Length::ZERO
+        } else {
+            self.prime_vertical_radius(latitude) * latitude.as_radians().cos()
+        }
+    }
+
+    /// Returns the radius of curvature of the ellipsoid perpendicular to the meridian at the given geodetic latitude (often denoted `N`).
     ///
     /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
     ///
@@ -114,7 +160,7 @@ impl Ellipsoid {
         Length::from_metres(r)
     }
 
-    /// Radius of curvature in the meridian at the given latitude (often denoted `M`).
+    /// Radius of curvature in the meridian at the given geodetic latitude (often denoted `M`).
     ///
     /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
     pub fn meridian_radius(&self, latitude: Angle) -> Length {
@@ -136,7 +182,6 @@ impl Ellipsoid {
     ///
     /// assert_eq!(Length::from_metres(6_371_008.8), Ellipsoid::WGS84.mean_radius().round_dm());
     /// ```
-    /// 6,371.0088
     pub fn mean_radius(&self) -> Length {
         let a = self.equatorial_radius();
         let b = self.polar_radius();
