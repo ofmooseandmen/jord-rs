@@ -1,3 +1,10 @@
+### 0.6.0
+
+### 0.5.0
+
+- Ellispoid: Radius of Curvature (Meridian & prime) + Radius at latitude
+- Doc & Typos
+
 ### 0.4.0
 
 - Performance improvements
