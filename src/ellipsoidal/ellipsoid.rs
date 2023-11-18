@@ -127,6 +127,16 @@ impl Ellipsoid {
     }
 
     /// Returns the mean radius (arithmetic mean) of this ellipsoid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::Length;
+    /// use jord::ellipsoidal::Ellipsoid;
+    ///
+    /// assert_eq!(Length::from_metres(6_371_008.8), Ellipsoid::WGS84.mean_radius().round_dm());
+    /// ```
+    /// 6,371.0088
     pub fn mean_radius(&self) -> Length {
         let a = self.equatorial_radius();
         let b = self.polar_radius();
@@ -139,10 +149,11 @@ impl Ellipsoid {
     ///
     /// ```
     /// use jord::Length;
+    /// use jord::spherical::Sphere;
     /// use jord::ellipsoidal::Ellipsoid;
     ///
     /// let r = (Ellipsoid::WGS84.volumetric_radius().as_metres() * 10.0).round() / 10.0;
-    /// assert_eq!(jord::spherical::Sphere::EARTH.radius().as_metres(), r);
+    /// assert_eq!(Sphere::EARTH.radius().as_metres(), r);
     /// ```
     pub fn volumetric_radius(&self) -> Length {
         let a = self.equatorial_radius().as_metres();
