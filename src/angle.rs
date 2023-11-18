@@ -15,9 +15,6 @@ pub struct Angle {
 }
 
 impl Angle {
-    /// 2 PI radians.
-    const TWO_PI: f64 = 2.0 * PI;
-
     /// Zero angle.
     pub const ZERO: Angle = Angle { radians: 0.0 };
 
@@ -71,18 +68,46 @@ impl Angle {
     /// ```
     /// use jord::Angle;
     ///
-    /// assert_eq!(Angle::from_degrees(-361.0).normalised().as_degrees(), 359.0);
-    /// assert_eq!(Angle::from_degrees(-2.0).normalised().as_degrees(), 358.0);
-    /// assert_eq!(Angle::from_degrees(154.0).normalised().as_degrees(), 154.0);
-    /// assert_eq!(Angle::from_degrees(360.0).normalised().as_degrees(), 0.0);
+    /// assert_eq!(Angle::from_degrees(359.0), Angle::from_degrees(-361.0).normalised());
+    /// assert_eq!(Angle::from_degrees(358.0), Angle::from_degrees(-2.0).normalised());
+    /// assert_eq!(Angle::from_degrees(154.0), Angle::from_degrees(154.0).normalised());
+    /// assert_eq!(Angle::ZERO, Angle::from_degrees(360.0).normalised());
     /// ```
     pub fn normalised(&self) -> Self {
-        if self.radians >= 0.0 && self.radians < Self::TWO_PI {
+        self.normalised_to(Self::FULL_CIRCLE)
+    }
+
+    /// Returns a new angle by normalising this angle to the range [0, `max`) degrees.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::Angle;
+    ///
+    /// assert_eq!(
+    ///     Angle::from_degrees(179.0),
+    ///     Angle::from_degrees(-181.0).normalised_to(Angle::HALF_CIRCLE).round_d7()
+    /// );
+    /// assert_eq!(
+    ///     Angle::from_degrees(1.0),
+    ///     Angle::from_degrees(181.0).normalised_to(Angle::HALF_CIRCLE).round_d7()
+    /// );
+    /// assert_eq!(
+    ///     Angle::from_degrees(154.0),
+    ///     Angle::from_degrees(154.0).normalised_to(Angle::HALF_CIRCLE)
+    /// );
+    /// assert_eq!(
+    ///     Angle::ZERO,
+    ///     Angle::from_degrees(180.0).normalised_to(Angle::HALF_CIRCLE)
+    /// );
+    /// ```
+    pub fn normalised_to(&self, max: Angle) -> Angle {
+        if self.radians >= 0.0 && self.radians < max.radians {
             *self
         } else {
-            let res = self.radians % Self::TWO_PI;
+            let res = self.radians % max.radians;
             if res < 0.0 {
-                Self::from_radians(res + Self::TWO_PI)
+                Self::from_radians(res + max.radians)
             } else {
                 Self::from_radians(res)
             }

@@ -76,6 +76,19 @@ impl Sphere {
 
     /// Computes the angle between the two given positions, which is also equal to the distance
     /// between these positions on the unit sphere.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, LatLong};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let a = Sphere::angle(
+    ///   LatLong::from_degrees(90.0, 0.0).to_nvector(),
+    ///   LatLong::from_degrees(-90.0, 0.0).to_nvector()
+    /// );
+    /// assert_eq!(Angle::HALF_CIRCLE, a);
+    /// ```
     pub fn angle(p1: NVector, p2: NVector) -> Angle {
         Angle::from_radians(angle_radians_between(p1.as_vec3(), p2.as_vec3(), None))
     }
@@ -154,6 +167,39 @@ impl Sphere {
     /// ```
     pub fn distance(&self, p1: NVector, p2: NVector) -> Length {
         Self::angle(p1, p2) * self.radius
+    }
+
+    /// Converts the given great circle distance to the equivalent central angle in the range [0, 180] degrees.
+    ///
+    /// The given distance is normalised to the range [0, `PI * Sphere::radius`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::f64::consts::PI;
+    /// use jord::{Angle, Length, NVector};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let p1 = NVector::from_lat_long_degrees(54.0, 154.0);
+    /// let p2 = NVector::from_lat_long_degrees(55.0, 155.0);
+    /// let d = Sphere::EARTH.distance(p1, p2);
+    ///
+    /// assert_eq!(
+    ///   Sphere::EARTH.distance_to_angle(d),
+    ///   Sphere::angle(p1, p2)
+    /// );
+    /// ```
+    pub fn distance_to_angle(&self, distance: Length) -> Angle {
+        let max_distance = PI * self.radius;
+        if distance == max_distance {
+            return Angle::HALF_CIRCLE;
+        }
+        let d = if distance > max_distance {
+            distance.as_metres() % max_distance.as_metres()
+        } else {
+            distance.as_metres()
+        };
+        Angle::from_radians(d / self.radius.as_metres())
     }
 
     /// Determines whether the 2 given positions define a unique great circle: i.e. they are

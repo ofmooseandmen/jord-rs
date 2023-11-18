@@ -1,5 +1,5 @@
 use crate::{
-    surface::Surface, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
 };
 
 /// An ellipsoid.
@@ -81,6 +81,49 @@ impl Ellipsoid {
     #[inline]
     pub fn flattening(&self) -> f64 {
         self.flattening
+    }
+
+    /// Returns the radius of this ellipsoid at the given geodetic latitude.
+    ///
+    /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
+    pub fn latitude_radius(&self, latitude: Angle) -> Length {
+        self.prime_vertical_radius(latitude) * latitude.as_radians().cos()
+    }
+
+    /// Returns the radius of curvature of the ellipsoid perpendicular to the meridian at the given latitude (often denoted `N`).
+    ///
+    /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, Length};
+    /// use jord::ellipsoidal::Ellipsoid;
+    ///
+    /// assert_eq!(Ellipsoid::WGS84.equatorial_radius(), Ellipsoid::WGS84.prime_vertical_radius(Angle::ZERO));
+    /// assert_eq!(
+    ///     Length::from_metres(6388838.29),
+    ///     Ellipsoid::WGS84.prime_vertical_radius(Angle::from_degrees(45.0)).round_mm()
+    /// );
+    /// ```
+    pub fn prime_vertical_radius(&self, latitude: Angle) -> Length {
+        let e2: f64 = self.eccentricity * self.eccentricity;
+        let sin_lat = latitude.as_radians().sin();
+        let sin_lat2 = sin_lat * sin_lat;
+        let r = self.equatorial_radius.as_metres() / (1.0 - e2 * sin_lat2).sqrt();
+        Length::from_metres(r)
+    }
+
+    /// Radius of curvature in the meridian at the given latitude (often denoted `M`).
+    ///
+    /// See: [Radius of the Earth](https://www.oc.nps.edu/oc2902w/geodesy/radiigeo.pdf)
+    pub fn meridian_radius(&self, latitude: Angle) -> Length {
+        let e2: f64 = self.eccentricity * self.eccentricity;
+        let sin_lat = latitude.as_radians().sin();
+        let sin_lat2 = sin_lat * sin_lat;
+        let r =
+            self.equatorial_radius.as_metres() * (1.0 - e2) / (1.0 - e2 * sin_lat2).powf(3.0 / 2.0);
+        Length::from_metres(r)
     }
 
     /// Returns the mean radius (arithmetic mean) of this ellipsoid.
