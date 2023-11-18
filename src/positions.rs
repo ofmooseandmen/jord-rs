@@ -218,6 +218,7 @@ impl LatLong {
 }
 
 /// An horizontal position represented by a n-vector: the unit and normal vector to the surface.
+///
 /// Orientation:
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the point where latitude = longitude = 0
