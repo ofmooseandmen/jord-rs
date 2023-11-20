@@ -1,5 +1,8 @@
 ### 0.7.0
 
+- Doc
+- Tests
+
 ### 0.6.0
 
 - Geocentric Radius
