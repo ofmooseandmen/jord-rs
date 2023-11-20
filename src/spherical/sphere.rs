@@ -395,7 +395,7 @@ impl Sphere {
         )
     }
 
-    ///  Computes the time at the closest point of approach (CPA) between the two given vehicles: the time at which the
+    ///  Computes the time to the closest point of approach (CPA) between the two given vehicles: the time at which the
     /// 2 vehicles will be the closest assuming they both maintain a constant course and heading.
     ///
     /// # Examples

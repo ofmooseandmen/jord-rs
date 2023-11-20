@@ -6,7 +6,14 @@
 
 > __Jord__ (_Swedish_) is __Earth__ (_English_)
 
-The `jord` crate implements various geographical position calculations.
+The `jord` crate implements various geographical position calculations, featuring:
+
+- Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) earth model,
+- [Local frames](crate::LocalFrame) - body; local level, wander azimuth; north, east, dow; east, north, up: delta between positions, target position from reference position and delta,
+- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of point...,
+- Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
+- [Spherical Loops](crate::spherical::Loop) ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains point, [bounds](crate::spherical::Rectangle), triangulation, spherical excess...,
+- Various local radii of an [ellispoid](crate::ellipsoidal::Ellipsoid)s.
 
 ## Literature
 
@@ -238,24 +245,3 @@ let d = Sphere::EARTH.cross_track_distance(b, a);
 
 assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ```
-
-## Other supported algorithms (spherical model)
-
-### great circle navigation
-
-- [side of a point w.r.t. 2 other points](crate::spherical::Sphere::side)
-- [angle turned from AB to BC](crate::spherical::Sphere::turn)
-
-### kinematics
-
-- [time to closest point of approach between 2 vehicles](crate::spherical::Sphere::time_to_cpa)
-- [minimum speed for interception](crate::spherical::Sphere::max_time_to_intercept)
-- [time to intercept](crate::spherical::Sphere::time_to_intercept)
-
-### loops (simple polygons)
-
-- [loop clockwise?](crate::spherical::is_loop_clockwise)
-- [loop convex?](crate::spherical::Loop::is_convex)
-- [point inside loop?](crate::spherical::Loop::contains_point)
-- [loop triangulation](crate::spherical::Loop::triangulate)
-- [spherical excess](crate::spherical::Loop::spherical_excess)
