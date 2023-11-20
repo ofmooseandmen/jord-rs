@@ -182,6 +182,25 @@ impl Rectangle {
     /// - Longitudes "wrap around" at +/-180 degrees, as such the full longitude range remains full.
     /// - If either the latitude or longitude interval becomes empty after
     ///   expansion by a negative margin, the result is [empty](crate::spherical::Rectangle::EMPTY).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let r: Rectangle = Rectangle::from_nesw(
+    ///     Angle::from_degrees(10.0),
+    ///     Angle::from_degrees(45.0),
+    ///     Angle::from_degrees(-10.0),
+    ///     Angle::from_degrees(10.0),
+    /// );
+    /// let expanded = r.expand(Angle::from_degrees(1.0));
+    /// let e = Rectangle::from_nesw(
+    ///     Angle::from_degrees(11.0),
+    ///     Angle::from_degrees(46.0),
+    ///     Angle::from_degrees(-11.0),
+    ///     Angle::from_degrees(9.0),
+    /// );
+    /// assert_eq!(e, expanded);
+    /// ```
     pub fn expand(&self, amount: Angle) -> Self {
         let lat = self.lat.expand(amount);
         let lng = self.lng.expand(amount);
@@ -1387,7 +1406,7 @@ mod tests {
 
     #[test]
     fn expand_to_south_pole() {
-        let r = Rectangle::from_nesw(
+        let r: Rectangle = Rectangle::from_nesw(
             Angle::from_degrees(10.0),
             Angle::from_degrees(45.0),
             Angle::from_degrees(-10.0),
@@ -1397,6 +1416,96 @@ mod tests {
         assert!(expanded.is_longitude_full());
         assert!(expanded.contains_point(ll(-90, 0)));
         assert!(expanded.contains_point(ll(10, 0)));
+    }
+
+    #[test]
+    fn expand_nominal() {
+        let r: Rectangle = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(1.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(46.0),
+            Angle::from_degrees(-11.0),
+            Angle::from_degrees(9.0),
+        );
+        assert_eq!(e, expanded);
+    }
+
+    #[test]
+    fn expand_full_lat_remains_full() {
+        let r: Rectangle = Rectangle::from_nesw(
+            Angle::from_degrees(90.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-90.0),
+            Angle::from_degrees(10.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(1.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(90.0),
+            Angle::from_degrees(46.0),
+            Angle::from_degrees(-90.0),
+            Angle::from_degrees(9.0),
+        );
+        assert_eq!(e, expanded);
+    }
+
+    #[test]
+    fn expand_full_lat_no_longer_full() {
+        let r: Rectangle = Rectangle::from_nesw(
+            Angle::from_degrees(90.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(-90.0),
+            Angle::from_degrees(10.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(-1.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(89.0),
+            Angle::from_degrees(44.0),
+            Angle::from_degrees(-89.0),
+            Angle::from_degrees(11.0),
+        );
+        assert_eq!(e, expanded);
+    }
+
+    #[test]
+    fn expand_full_lng_positive_amount() {
+        let r: Rectangle = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(180.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(-180.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(1.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(180.0),
+            Angle::from_degrees(-11.0),
+            Angle::from_degrees(-180.0),
+        );
+        assert_eq!(e, expanded);
+    }
+
+    #[test]
+    fn expand_full_lng_negative_amount() {
+        let r: Rectangle = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(180.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(-180.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(-1.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(180.0),
+            Angle::from_degrees(-9.0),
+            Angle::from_degrees(-180.0),
+        );
+        assert_eq!(e, expanded);
     }
 
     fn ll(lat: i64, lng: i64) -> LatLong {
