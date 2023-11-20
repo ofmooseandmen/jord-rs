@@ -186,6 +186,9 @@ impl Rectangle {
     /// # Examples
     ///
     /// ```
+    /// use jord::Angle;
+    /// use jord::spherical::Rectangle;
+    ///
     /// let r: Rectangle = Rectangle::from_nesw(
     ///     Angle::from_degrees(10.0),
     ///     Angle::from_degrees(45.0),
