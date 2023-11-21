@@ -130,3 +130,55 @@ impl ::std::ops::Mul<Duration> for Speed {
         Length::from_metres(metres)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{Length, Speed};
+    use std::time::Duration;
+
+    #[test]
+    fn conversions() {
+        assert_eq!(1.852, Speed::from_knots(1.0).as_kilometres_per_hour());
+        assert_eq_e6(0.514444, Speed::from_knots(1.0).as_metres_per_second());
+        assert_eq_e6(
+            0.277778,
+            Speed::from_kilometres_per_hour(1.0).as_metres_per_second(),
+        );
+        assert_eq_e6(0.539957, Speed::from_kilometres_per_hour(1.0).as_knots());
+        assert_eq_e6(
+            3.6,
+            Speed::from_metres_per_second(1.0).as_kilometres_per_hour(),
+        );
+        assert_eq_e6(1.943844, Speed::from_metres_per_second(1.0).as_knots());
+
+        fn assert_eq_e6(expected: f64, actual: f64) {
+            let d = (expected - actual).abs();
+            assert!(d < 1e-6, "expected {} but was {}", expected, actual);
+        }
+    }
+
+    #[test]
+    fn std_ops() {
+        assert_eq!(
+            Speed::from_metres_per_second(2.0),
+            2.0 * Speed::from_metres_per_second(1.0)
+        );
+        assert_eq!(
+            Speed::from_metres_per_second(2.0),
+            Speed::from_metres_per_second(1.0) + Speed::from_metres_per_second(1.0)
+        );
+        assert_eq!(
+            Speed::from_metres_per_second(0.0),
+            Speed::from_metres_per_second(1.0) - Speed::from_metres_per_second(1.0)
+        );
+        assert_eq!(
+            Speed::from_metres_per_second(1.0),
+            Length::from_metres(1.0) / Duration::from_secs(1)
+        );
+        assert_eq!(
+            Length::from_metres(1.0),
+            Speed::from_metres_per_second(1.0) * Duration::from_secs(1)
+        );
+    }
+}

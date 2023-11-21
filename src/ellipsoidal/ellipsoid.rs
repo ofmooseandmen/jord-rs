@@ -257,7 +257,7 @@ impl Surface for Ellipsoid {
 
 #[cfg(test)]
 mod tests {
-    use crate::Length;
+    use crate::{Angle, Length, spherical::Sphere};
 
     use super::Ellipsoid;
 
@@ -307,5 +307,67 @@ mod tests {
         assert_eq!(Ellipsoid::MOLA.polar_radius(), mola.polar_radius());
         assert_eq!(Ellipsoid::MOLA.eccentricity(), mola.eccentricity());
         assert_eq!(Ellipsoid::MOLA.flattening(), mola.flattening());
+    }
+
+    #[test]
+    fn geocentric_radius() {
+        assert_eq!(
+            Ellipsoid::WGS84.equatorial_radius(),
+            Ellipsoid::WGS84.geocentric_radius(Angle::ZERO)
+        );
+        assert_eq!(
+            Ellipsoid::WGS84.polar_radius(),
+            Ellipsoid::WGS84.geocentric_radius(Angle::from_degrees(90.0))
+        );
+        assert_eq!(
+            Length::from_metres(6_367_490.0),
+            Ellipsoid::WGS84
+                .geocentric_radius(Angle::from_degrees(45.0))
+                .round_m()
+        );
+    }
+
+    #[test]
+    fn latitude_radius() {
+        assert_eq!(
+            Ellipsoid::WGS84.equatorial_radius(),
+            Ellipsoid::WGS84.latitude_radius(Angle::ZERO)
+        );
+        assert_eq!(
+            Length::ZERO,
+            Ellipsoid::WGS84.latitude_radius(Angle::from_degrees(90.0))
+        );
+        assert_eq!(
+            Length::ZERO,
+            Ellipsoid::WGS84.latitude_radius(Angle::from_degrees(-90.0))
+        );
+    }
+
+    #[test]
+    fn prime_vertical_radius() {
+        assert_eq!(
+            Ellipsoid::WGS84.equatorial_radius(),
+            Ellipsoid::WGS84.prime_vertical_radius(Angle::ZERO)
+        );
+        assert_eq!(
+            Length::from_metres(6388838.29),
+            Ellipsoid::WGS84
+                .prime_vertical_radius(Angle::from_degrees(45.0))
+                .round_mm()
+        );
+    }
+
+    #[test]
+    fn mean_radius() {
+        assert_eq!(
+            Length::from_metres(6_371_008.8),
+            Ellipsoid::WGS84.mean_radius().round_dm()
+        );
+    }
+
+    #[test]
+    fn volumetric_radius() {
+        let r = (Ellipsoid::WGS84.volumetric_radius().as_metres() * 10.0).round() / 10.0;
+        assert_eq!(Sphere::EARTH.radius().as_metres(), r);
     }
 }
