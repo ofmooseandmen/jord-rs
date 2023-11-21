@@ -1,7 +1,8 @@
 # Jord - Geographical Position Calculations
 
-[![jord on Crates.io](https://img.shields.io/crates/v/jord.svg?color=brightgreen)](https://crates.io/crates/jord)
-[![GitHub CI](https://github.com/ofmooseandmen/jord-rs/workflows/CI/badge.svg)](https://github.com/ofmooseandmen/jord-rs/actions)
+[![crates.io](https://img.shields.io/crates/v/jord.svg?color=brightgreen)](https://crates.io/crates/jord)
+[![build](https://github.com/ofmooseandmen/jord-rs/workflows/CI/badge.svg)](https://github.com/ofmooseandmen/jord-rs/actions)
+[![coverage](https://codecov.io/gh/ofmooseandmen/jord-rs/graph/badge.svg?token=MEKNYZRK3V)](https://codecov.io/gh/ofmooseandmen/jord-rs)
 [![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://opensource.org/license/mit)
 
 > __Jord__ (_Swedish_) is __Earth__ (_English_)
