@@ -343,8 +343,8 @@ impl Loop {
 
         // expand by 1e-7 degrees which is about 11.1 millimetres at the equator and
         // is the near limit of GPS-based technique - this is to make sure that floating-point
-        // error introduced when converting NVector <-> LatLong does not break the bounds
-        // invariant: loop.contains_point(p) -> loop.bounds().contains_point(LatLong::from_nvector(p))
+        // error introduced when converting NVector <-> LatLong does not break the bound
+        // invariant: loop.contains_point(p) -> loop.bound().contains_point(LatLong::from_nvector(p))
         mbr = mbr.expand(Angle::from_degrees(1.0e-7));
 
         // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
@@ -358,8 +358,8 @@ impl Loop {
         }
 
         // If a loop contains the south pole, then either it wraps entirely around the sphere (full longitude
-        // range), or it also contains the north pole in which case bounds#is_longitude_full() is true due to the
-        // test above. Either way, we only need to do the south pole containment test if bounds#is_longitude_full().
+        // range), or it also contains the north pole in which case bound#is_longitude_full() is true due to the
+        // test above. Either way, we only need to do the south pole containment test if bound#is_longitude_full().
         if mbr.is_longitude_full() && self.contains_point(SP) {
             mbr = mbr.expand_to_south_pole();
         }
@@ -1067,19 +1067,48 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 10.0),
             NVector::from_lat_long_degrees(5.0, 0.0),
         ];
+        assert_bound(
+            &Loop::new(&vs),
+            5.0000001,
+            10.0000001,
+            -0.0000001,
+            -0.0000001,
+        );
+    }
 
-        let l = Loop::new(&vs);
+    #[test]
+    fn north_pole_cap_bound() {
+        let vs: Vec<NVector> = vec![
+            NVector::from_lat_long_degrees(85.0, 10.0),
+            NVector::from_lat_long_degrees(85.0, 170.0),
+            NVector::from_lat_long_degrees(85.0, -170.0),
+            NVector::from_lat_long_degrees(85.0, -10.0),
+        ];
+        assert_bound(&Loop::new(&vs), 90.0, 180.0, 84.9999999, -180.0);
+    }
+
+    #[test]
+    fn south_pole_cap_bound() {
+        let vs: Vec<NVector> = vec![
+            NVector::from_lat_long_degrees(-85.0, 10.0),
+            NVector::from_lat_long_degrees(-85.0, 170.0),
+            NVector::from_lat_long_degrees(-85.0, -170.0),
+            NVector::from_lat_long_degrees(-85.0, -10.0),
+        ];
+        assert_bound(&Loop::new(&vs), -84.9999999, 180.0, -90.0, -180.0);
+    }
+
+    fn assert_bound(l: &Loop, north: f64, east: f64, south: f64, west: f64) {
         let b = l.bound();
-
-        let ne = b.north_east();
-        assert_eq!(5.0000001, ne.latitude().as_degrees());
-        assert_eq!(10.0000001, ne.longitude().as_degrees());
+        let ne: LatLong = b.north_east();
+        assert_eq!(north, ne.latitude().as_degrees());
+        assert_eq!(east, ne.longitude().as_degrees());
 
         let sw: LatLong = b.south_west();
-        assert_eq!(-0.0000001, sw.latitude().as_degrees());
-        assert_eq!(-0.0000001, sw.longitude().as_degrees());
+        assert_eq!(south, sw.latitude().as_degrees());
+        assert_eq!(west, sw.longitude().as_degrees());
 
-        for v in vs.iter() {
+        for v in l.iter_vertices() {
             let ll = LatLong::from_nvector(*v);
             assert!(b.contains_point(ll));
         }

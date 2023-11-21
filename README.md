@@ -9,7 +9,7 @@
 The `jord` crate implements various geographical position calculations, featuring:
 
 - Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) earth model,
-- [Local frames](crate::LocalFrame) - body; local level, wander azimuth; north, east, dow; east, north, up: delta between positions, target position from reference position and delta,
+- [Local frames](crate::LocalFrame) - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
 - [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of point...,
 - Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
 - [Spherical Loops](crate::spherical::Loop) ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains point, [bounds](crate::spherical::Rectangle), triangulation, spherical excess...,
