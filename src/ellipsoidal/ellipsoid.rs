@@ -257,7 +257,7 @@ impl Surface for Ellipsoid {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Angle, Length, spherical::Sphere};
+    use crate::{spherical::Sphere, Angle, Length};
 
     use super::Ellipsoid;
 
