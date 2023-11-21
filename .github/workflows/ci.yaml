@@ -69,11 +69,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
-      - uses: taiki-e/install-action@cargo-hack
         with:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: taiki-e/install-action@cargo-hack
       - uses: actions-rs/cargo@v1
         with:
           command: llvm-cov
