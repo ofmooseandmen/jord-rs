@@ -73,7 +73,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: actions-rs/cargo@v1
         with:
           command: llvm-cov
