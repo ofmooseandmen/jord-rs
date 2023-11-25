@@ -12,8 +12,11 @@ pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64
         None => norm,
         Some(v) => {
             let d = p1xp2.dot_prod(v);
-            let sign = if d >= 0.0 { 1.0 } else { -1.0 };
-            sign * norm
+            if d >= 0.0 {
+                norm
+            } else {
+                -norm
+            }
         }
     };
     let cos_o = v1.dot_prod(v2);

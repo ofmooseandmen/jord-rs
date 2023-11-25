@@ -28,17 +28,13 @@ impl Sphere {
     /// Spherical Earth model using the [IUGG](https://iugg.org) (International Union of Geodesy and Geophysics) Earth volumic radius - generally accepted
     /// as the Earth radius when assuming a spherical model.
     /// Note: this is equal to the volumetric radius of the ubiquous WGS84 ellipsoid rounded to 1 decimal.
-    pub const EARTH: Sphere = Sphere {
-        radius: Length::from_metres(6_371_000.8f64),
-    };
+    pub const EARTH: Sphere = Sphere::new(Length::from_metres(6_371_000.8f64));
 
     /// Spherical Moon model using the [IAU/IAG](https://lunar.gsfc.nasa.gov/library/LunCoordWhitePaper-10-08.pdf) radius.
-    pub const MOON: Sphere = Sphere {
-        radius: Length::from_metres(1_737_400.0f64),
-    };
+    pub const MOON: Sphere = Sphere::new(Length::from_metres(1_737_400.0f64));
 
     /// Creates a new [Sphere] with the given radius.
-    pub fn new(radius: Length) -> Self {
+    pub const fn new(radius: Length) -> Self {
         Sphere { radius }
     }
 
@@ -754,6 +750,10 @@ where
         let v10dv2dt = -w2 * (v10v20 * sinw2t - v10c2 * cosw2t);
         let v10d2v2dt2 = (-1.0 * w2 * w2) * (v10v20 * cosw2t + v10c2 * sinw2t);
         let si = sep(ti_secs);
+        // if separation = 0, intercept takes place at ti_secs.
+        if si == 0.0 {
+            return ti_secs;
+        }
         let sin_si = si.sin();
         let a = -1.0 / sin_si;
         let b = si.cos() / (sin_si * sin_si);
@@ -1520,9 +1520,96 @@ mod tests {
             diff
         );
     }
+
     /// Time taken to cover a distance at a speed.
     fn elapsed_at_knots(knots: f64, nm: f64) -> Duration {
         let millis: u64 = (nm / knots * 60.0 * 60.0 * 1000.0).round() as u64;
         Duration::from_millis(millis)
+    }
+
+    // max_time_to_intercept
+
+    #[test]
+    fn max_time_to_intercept() {
+        let interceptor_pos = NVector::from_lat_long_degrees(20.0, -60.0);
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(34.0, -50.0),
+            Angle::from_degrees(220.0),
+            Speed::from_knots(600.0),
+        );
+
+        let opt_max_time: Option<Duration> =
+            Sphere::EARTH.max_time_to_intercept(interceptor_pos, intruder);
+        assert!(opt_max_time.is_some());
+
+        let max_time = opt_max_time.unwrap();
+        assert_eq!(5_993_823, max_time.as_millis());
+    }
+
+    #[test]
+    fn max_time_to_intercept_same_pos() {
+        let interceptor_pos = NVector::from_lat_long_degrees(20.0, -60.0);
+        let intruder = Vehicle::new(
+            interceptor_pos,
+            Angle::from_degrees(220.0),
+            Speed::from_knots(600.0),
+        );
+
+        let opt_max_time: Option<Duration> =
+            Sphere::EARTH.max_time_to_intercept(interceptor_pos, intruder);
+        assert!(opt_max_time.is_some());
+
+        let max_time = opt_max_time.unwrap();
+        assert_eq!(0, max_time.as_nanos());
+    }
+
+    #[test]
+    fn max_time_to_intercept_interceptor_behind() {
+        let interceptor_pos = NVector::from_lat_long_degrees(44.0, 66.0);
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(45.0, 67.0),
+            Angle::from_degrees(54.0),
+            Speed::from_knots(400.0),
+        );
+        assert!(Sphere::EARTH
+            .max_time_to_intercept(interceptor_pos, intruder)
+            .is_none());
+    }
+
+    #[test]
+    fn max_time_to_intercept_interceptor_in_front() {
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(20.0, 30.0),
+            Angle::from_degrees(12.0),
+            Speed::from_knots(400.0),
+        );
+        let interceptor_pos = Sphere::EARTH.position_after(intruder, Duration::from_secs(60));
+
+        let opt_max_time: Option<Duration> =
+            Sphere::EARTH.max_time_to_intercept(interceptor_pos, intruder);
+        assert!(opt_max_time.is_some());
+
+        let max_time = opt_max_time.unwrap();
+        assert_eq!(60, max_time.as_secs());
+    }
+
+    #[test]
+    fn time_to_intercept() {
+        let interceptor_pos = NVector::from_lat_long_degrees(20.0, -60.0);
+        let intruder = Vehicle::new(
+            NVector::from_lat_long_degrees(34.0, -50.0),
+            Angle::from_degrees(220.0),
+            Speed::from_knots(600.0),
+        );
+
+        // minimum interceptor speed to achieve intercept is ~ 53 knots
+        assert!(Sphere::EARTH
+            .time_to_intercept(interceptor_pos, Speed::from_knots(50.0), intruder)
+            .is_none());
+
+        let opt_time =
+            Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(700.0), intruder);
+        assert!(opt_time.is_some());
+        assert_eq!(2_764_688, opt_time.unwrap().as_millis());
     }
 }
