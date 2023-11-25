@@ -798,9 +798,70 @@ where
 #[cfg(test)]
 mod tests {
 
-    // TODO(CL): along_track_distance, cross_track_distance
-
     use std::{f64::consts::PI, time::Duration};
+
+    use crate::{
+        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
+        spherical::{GreatCircle, MinorArc, Sphere},
+        Angle, LatLong, Length, NVector, Speed, Vec3, Vehicle,
+    };
+
+    use super::newton_raphson;
+
+    // along_track_distance
+    #[test]
+    fn along_track_distance_positive() {
+        let p = NVector::from_lat_long_degrees(53.2611, -0.7972);
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(53.3206, -1.7297),
+            NVector::from_lat_long_degrees(53.1887, 0.1334),
+        );
+        let a = Sphere::EARTH.along_track_distance(p, ma);
+        assert_eq!(Length::from_metres(62331.501), a.round_mm());
+    }
+
+    #[test]
+    fn along_track_distance_negative() {
+        let p = NVector::from_lat_long_degrees(53.3206, -1.7297);
+        let ma = MinorArc::new(
+            NVector::from_lat_long_degrees(53.2611, -0.7972),
+            NVector::from_lat_long_degrees(53.1887, 0.1334),
+        );
+        let a = Sphere::EARTH.along_track_distance(p, ma);
+        assert_eq!(Length::from_metres(-62329.232), a.round_mm());
+    }
+
+    #[test]
+    fn along_track_distance_zero() {
+        let p = NVector::from_lat_long_degrees(53.3206, -1.7297);
+        let ma = MinorArc::new(p, NVector::from_lat_long_degrees(53.1887, 0.1334));
+        let a = Sphere::EARTH.along_track_distance(p, ma);
+        assert_eq!(Length::ZERO, a.round_mm());
+    }
+
+    // cross_track_distance
+
+    #[test]
+    fn cross_track_distance_negative() {
+        let p = NVector::from_lat_long_degrees(53.2611, -0.7972);
+        let gc = GreatCircle::from_heading(
+            NVector::from_lat_long_degrees(53.3206, -1.7297),
+            Angle::from_degrees(96.0),
+        );
+        let a = Sphere::EARTH.cross_track_distance(p, gc);
+        assert_eq!(Length::from_metres(-305.665), a.round_mm());
+    }
+
+    #[test]
+    fn cross_track_distance_positive() {
+        let p = NVector::from_lat_long_degrees(53.2611, -1.7972);
+        let gc = GreatCircle::from_heading(
+            NVector::from_lat_long_degrees(53.3206, -1.7297),
+            Angle::from_degrees(96.0),
+        );
+        let a = Sphere::EARTH.cross_track_distance(p, gc);
+        assert_eq!(Length::from_metres(7047.043), a.round_mm());
+    }
 
     // destination.
 
@@ -1153,14 +1214,6 @@ mod tests {
     }
 
     // mean
-
-    use crate::{
-        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::Sphere,
-        Angle, LatLong, Length, NVector, Speed, Vec3, Vehicle,
-    };
-
-    use super::newton_raphson;
 
     #[test]
     fn mean_antipodal() {
