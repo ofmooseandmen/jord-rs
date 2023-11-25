@@ -378,8 +378,8 @@ pub fn r2xyz(m: Mat33) -> (Angle, Angle, Angle) {
 /// Note that if A is a north-east-down frame and B is a body frame, we
 /// have that z=yaw, y=pitch and x=roll.
 pub fn r2zyx(m: Mat33) -> (Angle, Angle, Angle) {
-    let (a, b, c) = r2xyz(m.transpose());
-    (-a, -b, -c)
+    let (x, y, z) = r2xyz(m.transpose());
+    (-z, -y, -x)
 }
 
 /// Rotation matrix (direction cosine matrix) from 3 angles about new axes in the zyx-order.
@@ -451,8 +451,9 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 mod tests {
 
     use crate::{
-        ellipsoidal::Ellipsoid, positions::assert_geod_eq_d7_mm, Angle, Cartesian3DVector,
-        GeodeticPos, LatLong, Length, LocalFrame, LocalPositionVector, NVector,
+        ellipsoidal::Ellipsoid, positions::assert_geod_eq_d7_mm, r2xyz, r2zyx, Angle,
+        Cartesian3DVector, GeodeticPos, LatLong, Length, LocalFrame, LocalPositionVector, Mat33,
+        NVector, Vec3,
     };
 
     // geodetic_to_local_pos
@@ -706,5 +707,44 @@ mod tests {
             point_b,
             local_level.local_to_geodetic_pos(local_level.geodetic_to_local_pos(point_b)),
         )
+    }
+
+    #[test]
+    fn test_r2xyz() {
+        let m = Mat33::new(
+            Vec3::new(
+                0.7044160264027587,
+                -6.162841671621935e-2,
+                0.7071067811865475,
+            ),
+            Vec3::new(0.559725765762092, 0.6608381550289296, -0.5),
+            Vec3::new(0.43646893232965345, 0.7479938977765876, 0.5),
+        );
+        let (x, y, z) = r2xyz(m);
+        assert_eq!(Angle::from_degrees(45.0), x.round_d7());
+        assert_eq!(Angle::from_degrees(45.0), y.round_d7());
+        assert_eq!(Angle::from_degrees(5.0), z.round_d7());
+    }
+
+    #[test]
+    fn test_r2zyx() {
+        let m = Mat33::new(
+            Vec3::new(
+                0.9254165783983234,
+                1.802831123629725e-2,
+                0.37852230636979245,
+            ),
+            Vec3::new(
+                0.16317591116653482,
+                0.8825641192593856,
+                -0.44096961052988237,
+            ),
+            Vec3::new(-0.3420201433256687, 0.46984631039295416, 0.8137976813493738),
+        );
+
+        let (z, y, x) = r2zyx(m);
+        assert_eq!(Angle::from_degrees(10.0), z.round_d7());
+        assert_eq!(Angle::from_degrees(20.0), y.round_d7());
+        assert_eq!(Angle::from_degrees(30.0), x.round_d7());
     }
 }
