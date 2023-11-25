@@ -175,3 +175,71 @@ impl Measurement for Angle {
 }
 
 impl_measurement! { Angle }
+
+#[cfg(test)]
+mod tests {
+
+    use std::f64::consts::PI;
+
+    use crate::Angle;
+
+    #[test]
+    fn conversions() {
+        assert_eq!(PI, Angle::from_degrees(180.0).as_radians());
+        assert_eq!(180.0, Angle::from_radians(PI).as_degrees());
+    }
+
+    #[test]
+    fn std_ops() {
+        assert_eq!(Angle::from_degrees(2.0), 2.0 * Angle::from_degrees(1.0));
+        assert_eq!(
+            Angle::from_degrees(2.0),
+            Angle::from_degrees(1.0) + Angle::from_degrees(1.0)
+        );
+        assert_eq!(
+            Angle::from_degrees(0.0),
+            Angle::from_degrees(1.0) - Angle::from_degrees(1.0)
+        );
+    }
+
+    #[test]
+    fn normalised() {
+        assert_eq!(
+            Angle::from_degrees(359.0),
+            Angle::from_degrees(-361.0).normalised()
+        );
+        assert_eq!(
+            Angle::from_degrees(358.0),
+            Angle::from_degrees(-2.0).normalised()
+        );
+        assert_eq!(
+            Angle::from_degrees(154.0),
+            Angle::from_degrees(154.0).normalised()
+        );
+        assert_eq!(Angle::ZERO, Angle::from_degrees(360.0).normalised());
+    }
+
+    #[test]
+    fn normalised_to() {
+        assert_eq!(
+            Angle::from_degrees(179.0),
+            Angle::from_degrees(-181.0)
+                .normalised_to(Angle::HALF_CIRCLE)
+                .round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(181.0)
+                .normalised_to(Angle::HALF_CIRCLE)
+                .round_d7()
+        );
+        assert_eq!(
+            Angle::from_degrees(154.0),
+            Angle::from_degrees(154.0).normalised_to(Angle::HALF_CIRCLE)
+        );
+        assert_eq!(
+            Angle::ZERO,
+            Angle::from_degrees(180.0).normalised_to(Angle::HALF_CIRCLE)
+        );
+    }
+}

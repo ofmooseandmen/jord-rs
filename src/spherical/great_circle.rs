@@ -4,7 +4,7 @@ use super::base::easting;
 
 /// A circle on the surface of a sphere which lies in a plane
 // passing through the sphere centre. Every two distinct and non-antipodal points
-// define a unique Great Circle.
+// define a unique great circle.
 ///
 /// It is internally represented as its normal vector - i.e. the normal vector
 /// to the plane containing the great circle.
