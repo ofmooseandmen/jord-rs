@@ -76,7 +76,7 @@ impl GreatCircle {
 #[cfg(test)]
 mod tests {
 
-    use crate::{positions::assert_opt_nv_eq_d7, spherical::GreatCircle, NVector, Vec3};
+    use crate::{positions::assert_opt_nv_eq_d7, spherical::GreatCircle, Angle, NVector, Vec3};
 
     // projection
 
@@ -90,5 +90,16 @@ mod tests {
             NVector::new(Vec3::UNIT_Z),
             GreatCircle::new(start, end).projection(NVector::from_lat_long_degrees(0.0, 0.0)),
         );
+    }
+
+    #[test]
+    fn from_heading() {
+        let null_island = NVector::from_lat_long_degrees(0.0, 0.0);
+        let a = GreatCircle::from_heading(null_island, Angle::from_degrees(90.0));
+        let e = GreatCircle::new(null_island, NVector::from_lat_long_degrees(0.0, 10.0));
+        // both great circles are equal (accounting for floating point precision)
+        let d = e.normal - a.normal;
+        let n = d.norm();
+        assert!(n.abs() < 1e-15);
     }
 }
