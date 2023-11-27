@@ -64,6 +64,7 @@ jobs:
           args: -- -D warnings
 
   coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always

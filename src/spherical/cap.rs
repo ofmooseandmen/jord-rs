@@ -237,7 +237,7 @@ impl Cap {
 
 #[cfg(test)]
 mod tests {
-    use crate::{positions::assert_nv_eq_d7, spherical::Cap, Angle, NVector};
+    use crate::{positions::assert_nv_eq_d7, spherical::Cap, Angle, LatLong, NVector};
     use std::f64::consts::PI;
 
     #[test]
@@ -354,11 +354,11 @@ mod tests {
         // a and b have same centre, but radius of a  < radius of b.
         let a = Cap::from_centre_and_radius(
             NVector::from_lat_long_degrees(50.0, 10.0),
-            Angle::from_radians(0.2),
+            Angle::from_degrees(0.2),
         );
         let b = Cap::from_centre_and_radius(
             NVector::from_lat_long_degrees(50.0, 10.0),
-            Angle::from_radians(0.3),
+            Angle::from_degrees(0.3),
         );
 
         assert!(b.contains_cap(a));
@@ -370,10 +370,22 @@ mod tests {
         // a and c have different centers, one entirely encompasses the other.
         let c = Cap::from_centre_and_radius(
             NVector::from_lat_long_degrees(51.0, 11.0),
-            Angle::from_radians(1.5),
+            Angle::from_degrees(1.5),
         );
         assert!(c.contains_cap(a));
         assert_eq!(a.union(c).centre(), c.centre());
         assert_eq!(a.union(c).radius(), c.radius());
+
+        // e is partially overlapping a.
+        let e = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(50.3, 10.3),
+            Angle::from_degrees(0.2),
+        );
+        assert!(!e.contains_cap(a));
+        let u = a.union(e);
+        let c = LatLong::from_nvector(u.centre());
+        assert_eq!(Angle::from_degrees(50.1501), c.latitude().round_d5());
+        assert_eq!(Angle::from_degrees(10.14953), c.longitude().round_d5());
+        assert_eq!(Angle::from_degrees(0.37815), u.radius().round_d5());
     }
 }
