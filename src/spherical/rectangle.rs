@@ -149,7 +149,7 @@ impl Rectangle {
     ///
     /// assert!(a.interior_contains_point(LatLong::from_degrees(10.0, 10.0)));
     ///
-    /// /// point on boundary
+    /// // point on boundary
     /// assert!(!a.interior_contains_point(LatLong::from_degrees(30.0, 00.0)));
     ///
     /// // latitude above north.
@@ -661,6 +661,22 @@ mod tests {
 
     use super::Rectangle;
 
+    #[test]
+    fn full() {
+        assert!(Rectangle::FULL.is_full());
+        assert!(!Rectangle::FULL.is_empty());
+        assert!(Rectangle::FULL.contains_rectangle(Rectangle::EMPTY));
+        assert!(Rectangle::FULL.union(Rectangle::EMPTY).is_full());
+    }
+
+    #[test]
+    fn empty() {
+        assert!(Rectangle::EMPTY.is_empty());
+        assert!(!Rectangle::EMPTY.is_full());
+        assert!(!Rectangle::EMPTY.contains_rectangle(Rectangle::FULL));
+        assert!(Rectangle::EMPTY.union(Rectangle::FULL).is_full());
+    }
+
     // cmp_by_latitude
 
     #[test]
@@ -1067,6 +1083,35 @@ mod tests {
     fn assert_contains_rect(a: Rectangle, b: Rectangle, expected: bool) {
         assert_eq!(expected, a.contains_rectangle(b));
         assert_eq!(expected, a.union(b) == a);
+    }
+
+    // interior_contains_rect
+
+    #[test]
+    fn interior_contains_rect() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(30.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+
+        assert!(a.interior_contains_point(LatLong::from_degrees(10.0, 10.0)));
+
+        // point on boundary
+        assert!(!a.interior_contains_point(LatLong::from_degrees(30.0, 00.0)));
+
+        // latitude above north.
+        assert!(!a.interior_contains_point(LatLong::from_degrees(40.0, 10.0)));
+
+        // latitude below south.
+        assert!(!a.interior_contains_point(LatLong::from_degrees(-1.0, 10.0)));
+
+        // longitude after east.
+        assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, 40.0)));
+
+        // longitude after west.
+        assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, -10.0)));
     }
 
     // from_minor_arc
