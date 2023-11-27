@@ -14,6 +14,7 @@ The `jord` crate implements various geographical position calculations, featurin
 - [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of point...,
 - Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
 - [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains point, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
+- [Spherical Cap](crate::spherical::Cap)s and [Rectangular Region](crate::spherical::Rectangle)s
 - Location-dependent radii of [ellispoid](crate::ellipsoidal::Ellipsoid)s.
 
 ## Literature

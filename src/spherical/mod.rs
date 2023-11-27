@@ -2,6 +2,9 @@
 
 mod base;
 
+mod cap;
+pub use cap::Cap;
+
 mod great_circle;
 pub use great_circle::GreatCircle;
 

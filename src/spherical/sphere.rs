@@ -251,24 +251,41 @@ impl Sphere {
         }
     }
 
+    /// Returns the position at the given distance `a` from given point `p1` along the great circle `p1, p2`.
+    ///
+    /// ```
+    /// use std::f64::consts::PI;
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let r = Sphere::position_on_great_circle(
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 1.0),
+    ///     Angle::from_radians(PI / 4.0)
+    /// );
+    ///
+    /// assert_eq!(NVector::from_lat_long_degrees(0.0, 45.0), r);
+    /// ```
+    pub fn position_on_great_circle(p1: NVector, p2: NVector, a: Angle) -> NVector {
+        let rads = a.as_radians();
+        // direction from v0 to v1.
+        let dir = (p1.as_vec3().orthogonal_to(p2.as_vec3())).cross_prod_unit(p1.as_vec3());
+        let v = (p1.as_vec3() * rads.cos() + dir * rads.sin()).unit();
+        NVector::new(v)
+    }
+
     /// Computes the position at given fraction between this position and the given position.
-    /// Returns `None` if:
-    /// - the fraction is `< 0` or `> 1`,
-    /// - this position and the given position are the antipodes of one another.
+    /// Returns `None` if the given fraction is `< 0` or `> 1`.`
     pub fn interpolated_pos(p1: NVector, p2: NVector, f: f64) -> Option<NVector> {
-        if !(0.0..=1.0).contains(&f) || p1.is_antipode_of(p2) {
+        if !(0.0..=1.0).contains(&f) {
             None
         } else if f == 0.0 {
             Some(p1)
         } else if f == 1.0 {
             Some(p2)
         } else {
-            // angular distance in radians multiplied by the fraction: how far from v0.
-            let distance_radians = f * angle_radians_between(p1.as_vec3(), p2.as_vec3(), None);
-            //  a vector representing the direction from v0 to v1.
-            let dir = (p1.as_vec3().stable_cross_prod(p2.as_vec3())).cross_prod_unit(p1.as_vec3());
-            let v = (p1.as_vec3() * distance_radians.cos() + dir * distance_radians.sin()).unit();
-            Some(NVector::new(v))
+            let a = f * Self::angle(p1, p2);
+            Some(Self::position_on_great_circle(p1, p2, a))
         }
     }
 
@@ -866,7 +883,7 @@ mod tests {
     // destination.
 
     #[test]
-    fn destination_across_date_line() {
+    fn destination_pos_across_date_line() {
         let p = NVector::from_lat_long_degrees(0.0, 154.0);
         let actual = Sphere::EARTH.destination_pos(
             p,
@@ -878,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn destination_from_north_pole() {
+    fn destination_pos_from_north_pole() {
         let expected = NVector::from_lat_long_degrees(45.0, 0.0);
         let distance = Sphere::EARTH.radius() * (PI / 4.0);
         let actual = Sphere::EARTH.destination_pos(
@@ -890,7 +907,7 @@ mod tests {
     }
 
     #[test]
-    fn destination_from_south_pole() {
+    fn destination_pos_from_south_pole() {
         let expected = NVector::from_lat_long_degrees(-45.0, 0.0);
         let distance = Sphere::EARTH.radius() * (PI / 4.0);
         let actual = Sphere::EARTH.destination_pos(
@@ -902,7 +919,7 @@ mod tests {
     }
 
     #[test]
-    fn destination_negative_distance() {
+    fn destination_pos_negative_distance() {
         let p = NVector::from_lat_long_degrees(0.0, 0.0);
         // equivalent of -10 degree of longitude.
         let d = Sphere::EARTH.radius() * (-2.0 * PI / 36.0);
@@ -912,7 +929,7 @@ mod tests {
     }
 
     #[test]
-    fn destination_travelled_longitude_greater_than_90() {
+    fn destination_pos_travelled_longitude_greater_than_90() {
         let p = NVector::from_lat_long_degrees(60.2, 11.1);
         let d = Sphere::EARTH.destination_pos(
             p,
@@ -924,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn destination_zero_distance() {
+    fn destination_pos_zero_distance() {
         let p = NVector::from_lat_long_degrees(55.6050, 13.0038);
         assert_eq!(
             p,
@@ -1153,27 +1170,30 @@ mod tests {
     // interpolated
 
     #[test]
-    fn interpolated_antipodal() {
+    fn interpolated_pos_antipodal() {
         let p = NVector::from_lat_long_degrees(90.0, 0.0);
-        assert!(Sphere::interpolated_pos(p, p.antipode(), 0.5).is_none());
+        assert_opt_nv_eq_d7(
+            NVector::from_lat_long_degrees(0.0, 90.0),
+            Sphere::interpolated_pos(p, p.antipode(), 0.5),
+        );
     }
 
     #[test]
-    fn interpolated_f0() {
+    fn interpolated_pos_f0() {
         let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
         assert_eq!(Some(p1), Sphere::interpolated_pos(p1, p2, 0.0));
     }
 
     #[test]
-    fn interpolated_f1() {
+    fn interpolated_pos_f1() {
         let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
         assert_eq!(Some(p2), Sphere::interpolated_pos(p1, p2, 1.0));
     }
 
     #[test]
-    fn interpolated_invalid_f() {
+    fn interpolated_pos_invalid_f() {
         let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(1.0, 0.0);
         assert!(Sphere::interpolated_pos(p1, p2, -0.1).is_none());
@@ -1181,19 +1201,19 @@ mod tests {
     }
 
     #[test]
-    fn interpolated_half() {
-        assert_eq!(
-            Some(NVector::from_lat_long_degrees(0.0, 0.0)),
+    fn interpolated_pos_half() {
+        assert_opt_nv_eq_d7(
+            NVector::from_lat_long_degrees(0.0, 0.0),
             Sphere::interpolated_pos(
                 NVector::from_lat_long_degrees(10.0, 0.0),
                 NVector::from_lat_long_degrees(-10.0, 0.0),
-                0.5
-            )
+                0.5,
+            ),
         );
     }
 
     #[test]
-    fn interpolated_side() {
+    fn interpolated_pos_side() {
         let p0 = NVector::from_lat_long_degrees(154.0, 54.0);
         let p1 = NVector::from_lat_long_degrees(155.0, 55.0);
         let i = Sphere::interpolated_pos(p0, p1, 0.25).unwrap();
@@ -1201,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn interpolated_transitivity() {
+    fn interpolated_pos_transitivity() {
         let p0 = NVector::from_lat_long_degrees(10.0, 0.0);
         let p1 = NVector::from_lat_long_degrees(-10.0, 0.0);
         let expected = Sphere::interpolated_pos(p0, p1, 0.5).unwrap();

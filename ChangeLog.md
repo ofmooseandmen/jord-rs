@@ -1,3 +1,7 @@
+### 0.10.0
+
+- Spherical caps
+
 ### 0.9.0
 
 - Tests

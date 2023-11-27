@@ -16,15 +16,15 @@ pub struct Rectangle {
     lng: LongitudeInterval,
 }
 
-// TODO(CL): Exmaples
+// TODO(CL): Exmaples + (Interior)Intersection
 impl Rectangle {
-    /// Empty rectangle.
+    /// Empty rectangle: contains no point.
     pub const EMPTY: Rectangle = Self {
         lat: LatitudeInterval::EMPTY,
         lng: LongitudeInterval::EMPTY,
     };
 
-    /// Creates a full rectangle.
+    /// Full rectangle: contains all points.
     pub const FULL: Rectangle = Self {
         lat: LatitudeInterval::FULL,
         lng: LongitudeInterval::FULL,
@@ -97,7 +97,7 @@ impl Rectangle {
         }
     }
 
-    /// Determines whether this rectangle contains the given point.
+    /// Determines whether this rectangle contains the given point (boundaries included).
     ///
     /// # Examples
     ///
@@ -113,6 +113,9 @@ impl Rectangle {
     /// );
     ///
     /// assert!(a.contains_point(LatLong::from_degrees(10.0, 10.0)));
+    ///
+    /// /// point on boundary
+    /// assert!(a.contains_point(LatLong::from_degrees(30.0, 00.0)));
     ///
     /// // latitude above north.
     /// assert!(!a.contains_point(LatLong::from_degrees(40.0, 10.0)));
@@ -130,9 +133,50 @@ impl Rectangle {
         self.lat.contains_lat(p.latitude()) && self.lng.contains_lng(p.longitude())
     }
 
+    /// Determines whether the interior of this rectangle contains the given point (i.e. boundaries excluded).
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, LatLong};
+    /// use jord::spherical::Rectangle;
+    ///
+    /// let a = Rectangle::from_nesw(
+    ///     Angle::from_degrees(30.0),
+    ///     Angle::from_degrees(30.0),
+    ///     Angle::ZERO,
+    ///     Angle::ZERO
+    /// );
+    ///
+    /// assert!(a.interior_contains_point(LatLong::from_degrees(10.0, 10.0)));
+    ///
+    /// /// point on boundary
+    /// assert!(!a.interior_contains_point(LatLong::from_degrees(30.0, 00.0)));
+    ///
+    /// // latitude above north.
+    /// assert!(!a.interior_contains_point(LatLong::from_degrees(40.0, 10.0)));
+    ///
+    /// // latitude below south.
+    /// assert!(!a.interior_contains_point(LatLong::from_degrees(-1.0, 10.0)));
+    ///
+    /// // longitude after east.
+    /// assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, 40.0)));
+    ///
+    /// // longitude after west.
+    /// assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, -10.0)));
+    /// ```
+    pub fn interior_contains_point(&self, p: LatLong) -> bool {
+        self.lat.interior_contains_lat(p.latitude())
+            && self.lng.interior_contains_lng(p.longitude())
+    }
+
     /// Determines whether this rectangle contains the given rectangle.
     pub fn contains_rectangle(&self, r: Rectangle) -> bool {
         self.lat.contains_int(r.lat) && self.lng.contains_int(r.lng)
+    }
+
+    /// Determines whether the interior of this rectangle contains the given rectangle (including its boundary).
+    pub fn interior_contains_rectangle(&self, r: Rectangle) -> bool {
+        self.lat.interior_contains_int(r.lat) && self.lng.interior_contains_int(r.lng)
     }
 
     /// Determines whether this rectangle is [full](crate::spherical::Rectangle::FULL).
@@ -321,9 +365,14 @@ impl LatitudeInterval {
         Self::new(lo, hi)
     }
 
-    /// Returns true if and only if this latitude interval contains the given latitude.
+    /// Returns true if and only if this latitude interval (closed) contains the given latitude.
     fn contains_lat(&self, latitude: Angle) -> bool {
         latitude >= self.lo && latitude <= self.hi
+    }
+
+    /// Returns true if and only if this latitude interval (opened) contains the given latitude.
+    fn interior_contains_lat(&self, latitude: Angle) -> bool {
+        latitude > self.lo && latitude < self.hi
     }
 
     /// Returns true if and only if this latitude interval contains the given latitude interval.
@@ -332,6 +381,15 @@ impl LatitudeInterval {
             true
         } else {
             o.lo >= self.lo && o.hi <= self.hi
+        }
+    }
+
+    /// Returns true if and only if the interior of this latitude interval contains the given latitude interval.
+    fn interior_contains_int(&self, o: Self) -> bool {
+        if o.is_empty() {
+            true
+        } else {
+            o.lo > self.lo && o.hi < self.hi
         }
     }
 
@@ -474,12 +532,23 @@ impl LongitudeInterval {
         }
     }
 
+    /// Returns true if and only if this longitude interval (closed) contains the given longitude.
     fn contains_lng(&self, longitude: Angle) -> bool {
-        let lng = Self::normalised_longitude(longitude);
+        let lng: Angle = Self::normalised_longitude(longitude);
         if self.is_inverted() {
             (lng >= self.lo || lng <= self.hi) && !self.is_empty()
         } else {
             lng >= self.lo && lng <= self.hi
+        }
+    }
+
+    /// Returns true if and only if this longitude interval (opened) contains the given longitude.
+    fn interior_contains_lng(&self, longitude: Angle) -> bool {
+        let lng: Angle = Self::normalised_longitude(longitude);
+        if self.is_inverted() {
+            lng > self.lo || lng < self.hi
+        } else {
+            (lng > self.lo && lng < self.hi) || self.is_full()
         }
     }
 
@@ -495,6 +564,20 @@ impl LongitudeInterval {
             return self.is_full() || o.is_empty();
         }
         o.lo >= self.lo && o.hi <= self.hi
+    }
+
+    /// Returns true if and only if the interior of this longitude interval contains the given longitude interval.
+    fn interior_contains_int(&self, o: Self) -> bool {
+        if self.is_inverted() {
+            if !o.is_inverted() {
+                return o.lo > self.lo || o.hi < self.hi;
+            }
+            return (o.lo > self.lo && o.hi < self.hi) || o.is_empty();
+        }
+        if o.is_inverted() {
+            return self.is_full() || o.is_empty();
+        }
+        (o.lo > self.lo && o.hi < self.hi) || self.is_full()
     }
 
     /// Returns true if this longitude interval is full.
