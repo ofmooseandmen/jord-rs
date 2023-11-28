@@ -181,8 +181,8 @@ impl Sphere {
     /// let d = Sphere::EARTH.distance(p1, p2);
     ///
     /// assert_eq!(
-    ///   Sphere::EARTH.distance_to_angle(d),
-    ///   Sphere::angle(p1, p2)
+    ///   Sphere::angle(p1, p2),
+    ///   Sphere::EARTH.distance_to_angle(d)
     /// );
     /// ```
     pub fn distance_to_angle(&self, distance: Length) -> Angle {
@@ -820,7 +820,7 @@ mod tests {
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
         spherical::{GreatCircle, MinorArc, Sphere},
-        Angle, LatLong, Length, NVector, Speed, Vec3, Vehicle,
+        Angle, GeocentricPos, GeodeticPos, LatLong, Length, NVector, Speed, Surface, Vec3, Vehicle,
     };
 
     use super::newton_raphson;
@@ -1684,5 +1684,40 @@ mod tests {
             Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(700.0), intruder);
         assert!(opt_time.is_some());
         assert_eq!(2_764_688, opt_time.unwrap().as_millis());
+    }
+
+    // distance_to_angle
+    #[test]
+    fn distance_to_angle() {
+        assert_eq!(
+            Angle::HALF_CIRCLE,
+            Sphere::EARTH.distance_to_angle(PI * Sphere::EARTH.radius())
+        );
+
+        assert_eq!(
+            Angle::QUARTER_CIRCLE,
+            Sphere::EARTH.distance_to_angle(3.0 * PI / 2.0 * Sphere::EARTH.radius())
+        );
+
+        let p1 = NVector::from_lat_long_degrees(54.0, 154.0);
+        let p2 = NVector::from_lat_long_degrees(55.0, 155.0);
+        let d = Sphere::EARTH.distance(p1, p2);
+        assert_eq!(Sphere::angle(p1, p2), Sphere::EARTH.distance_to_angle(d));
+    }
+
+    // geodetic <-> geocentric
+    #[test]
+    fn geodetic_to_from_geocentric() {
+        let np = GeodeticPos::new(
+            NVector::from_lat_long_degrees(90.0, 0.0),
+            Length::from_kilometres(2.0),
+        );
+        let s = Sphere::new(Length::from_kilometres(1.0));
+        let geoc: crate::GeocentricPos = s.geodetic_to_geocentric(np);
+        assert_eq!(
+            GeocentricPos::new(Length::ZERO, Length::ZERO, Length::from_kilometres(3.0)),
+            geoc
+        );
+        assert_eq!(np, s.geocentric_to_geodetic(geoc));
     }
 }
