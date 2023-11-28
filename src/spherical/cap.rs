@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use crate::{Angle, NVector, Vec3};
+use crate::{Angle, LatLong, Mat33, NVector, Vec3};
 
 use super::Sphere;
 
@@ -222,6 +222,76 @@ impl Cap {
         }
     }
 
+    /// Returns the list of vertices defining the boundary of this cap. If this cap is [empty](crate::spherical::Cap::EMPTY)
+    /// or [full](crate::spherical::Cap::FULL) the returned vector is empty, otherwise it contains `max(3, nb_vertices)` vertices.
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::{Cap, Sphere};
+    ///
+    /// let centre = NVector::from_lat_long_degrees(55.6050, 13.0038);
+    /// let radius = Angle::from_degrees(1.0);
+    /// let cap = Cap::from_centre_and_radius(centre, radius);
+    ///
+    /// let vs = cap.boundary(10);
+    /// for v in vs {
+    ///     assert_eq!(radius, Sphere::angle(centre, v).round_d7());
+    /// }
+    /// ```
+    pub fn boundary(&self, nb_vertices: usize) -> Vec<NVector> {
+        if self.is_empty() || self.is_full() {
+            return Vec::new();
+        }
+
+        let radius = self.radius().as_radians();
+        let rm = radius.sin();
+        let z = (1.0 - rm * rm).sqrt();
+
+        let ll = LatLong::from_nvector(self.centre);
+        let lat = ll.latitude().as_radians();
+        let lon = ll.longitude().as_radians();
+
+        let rya = PI / 2.0 - lat;
+        let cy = rya.cos();
+        let sy = rya.sin();
+        let ry = Mat33::new(
+            Vec3::new(cy, 0.0, sy),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(-sy, 0.0, cy),
+        );
+
+        let rza = lon;
+        let cz = rza.cos();
+        let sz = rza.sin();
+        let rz = Mat33::new(
+            Vec3::new(cz, -sz, 0.0),
+            Vec3::new(sz, cz, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        );
+
+        let n = nb_vertices.max(3);
+
+        let mut angles = Vec::with_capacity(n);
+        let mut r = 0.0;
+        let inc = (2.0 * PI) / (n as f64);
+        for _i in 0..n {
+            angles.push(r);
+            r += inc;
+        }
+
+        let mut res = Vec::with_capacity(n);
+        for a in angles {
+            // arc at north pole.
+            let a_np = Vec3::new(-rm * a.cos(), rm * a.sin(), z);
+            // rotate each point to arc centre.
+            let a_cen = (a_np * ry) * rz;
+
+            let p = NVector::new(a_cen.unit());
+            res.push(p);
+        }
+        res
+    }
+
     fn chord_radius2(a: NVector, b: NVector) -> f64 {
         (a.as_vec3() - b.as_vec3())
             .squared_norm()
@@ -275,8 +345,8 @@ mod tests {
     fn complement() {
         let np = NVector::from_lat_long_degrees(90.0, 0.0);
         let sp = NVector::from_lat_long_degrees(-90.0, 0.0);
-        let northern = Cap::from_centre_and_radius(sp, Angle::QUARTER_CIRCLE);
-        let southern = Cap::from_centre_and_radius(np, Angle::QUARTER_CIRCLE);
+        let northern = Cap::from_centre_and_radius(np, Angle::QUARTER_CIRCLE);
+        let southern = Cap::from_centre_and_radius(sp, Angle::QUARTER_CIRCLE);
 
         let northern_complement = northern.complement();
         assert_eq!(southern.centre, northern_complement.centre);
@@ -387,5 +457,40 @@ mod tests {
         assert_eq!(Angle::from_degrees(50.1501), c.latitude().round_d5());
         assert_eq!(Angle::from_degrees(10.14953), c.longitude().round_d5());
         assert_eq!(Angle::from_degrees(0.37815), u.radius().round_d5());
+    }
+
+    #[test]
+    fn boundary() {
+        assert!(Cap::EMPTY.boundary(1).is_empty());
+        assert!(Cap::FULL.boundary(1).is_empty());
+        let northern = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(90.0, 0.0),
+            Angle::QUARTER_CIRCLE,
+        );
+        assert_eq!(
+            vec![
+                LatLong::from_degrees(0.0, 180.0),
+                LatLong::from_degrees(0.0, 90.0),
+                LatLong::from_degrees(0.0, 0.0),
+                LatLong::from_degrees(0.0, -90.0)
+            ],
+            northern
+                .boundary(4)
+                .iter()
+                .map(|v| LatLong::from_nvector(*v).round_d7())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            vec![
+                LatLong::from_degrees(0.0, 180.0),
+                LatLong::from_degrees(0.0, 60.0),
+                LatLong::from_degrees(0.0, -60.0)
+            ],
+            northern
+                .boundary(2)
+                .iter()
+                .map(|v| LatLong::from_nvector(*v).round_d7())
+                .collect::<Vec<_>>()
+        );
     }
 }

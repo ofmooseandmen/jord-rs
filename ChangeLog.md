@@ -1,3 +1,7 @@
+### 0.11.0
+
+- Spherical cap boundary
+
 ### 0.10.0
 
 - Spherical caps
