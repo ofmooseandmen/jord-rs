@@ -1,6 +1,7 @@
 ### 0.11.0
 
 - Spherical cap boundary
+- Tests
 
 ### 0.10.0
 

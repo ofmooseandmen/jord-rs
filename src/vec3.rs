@@ -355,12 +355,6 @@ impl Vec3 {
     }
 }
 
-impl std::fmt::Display for Vec3 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}, {}, {}]", self.x, self.y, self.z)
-    }
-}
-
 impl ::std::ops::Add for Vec3 {
     type Output = Self;
 
@@ -419,6 +413,25 @@ impl ::std::ops::Neg for Vec3 {
 mod tests {
 
     use crate::Vec3;
+
+    #[test]
+    fn cross_prod() {
+        let v1: Vec3 = (1.0, 5.0, 4.0).into();
+        let v2: Vec3 = (2.0, 6.0, 5.0).into();
+        assert_eq!(Vec3::new(1.0, 3.0, -4.0), v1.cross_prod(v2));
+
+        let v3: Vec3 = (2.0, 0.0, 0.0).into();
+        let v4 = (0.0, 2.0, 0.0).into();
+        assert_eq!(Vec3::new(0.0, 0.0, 8.0), v3.stable_cross_prod(v4));
+
+        assert_eq!(Vec3::new(0.0, 0.0, 1.0), v3.stable_cross_prod_unit(v4));
+    }
+
+    #[test]
+    fn unit() {
+        assert_eq!(Vec3::ZERO, Vec3::ZERO.unit());
+        assert_eq!(Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, 8.0).unit());
+    }
 
     #[test]
     fn orthogonal_x_largest() {
