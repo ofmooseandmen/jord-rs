@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use jord::spherical::{is_loop_clockwise, Loop};
-use jord::NVector;
+use jord::{Angle, NVector};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Loop::new_5_vertices", |b| {
@@ -111,6 +111,17 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let l = Loop::new(&vertices_94());
         b.iter(|| black_box(l.bound()))
     });
+
+    c.bench_function(
+        "Loop::is_pos_within_distance_to_boundary_false__94_vertices",
+        |b: &mut Bencher<'_>| {
+            let l = Loop::new(&vertices_94());
+            let max = Angle::from_degrees(1.0);
+            let p = NVector::from_lat_long_degrees(0.0, 0.0);
+            assert!(!l.is_pos_within_distance_to_boundary(p, max));
+            b.iter(|| black_box(l.is_pos_within_distance_to_boundary(p, max)))
+        },
+    );
 }
 
 criterion_group!(benches, criterion_benchmark);

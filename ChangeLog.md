@@ -1,3 +1,7 @@
+### 0.12.0
+
+- Is position within distance to the boundary of loop?
+
 ### 0.11.0
 
 - Spherical cap boundary

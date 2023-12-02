@@ -1,10 +1,14 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
-use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
+use crate::{
+    numbers::eq,
+    numbers::{eq_zero, lte},
+    Angle, NVector, Vec3,
+};
 
 use super::{
     base::{angle_radians_between, exact_side},
-    MinorArc, Rectangle, Sphere,
+    Cap, MinorArc, Rectangle, Sphere,
 };
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
@@ -474,6 +478,58 @@ impl Loop {
         }
     }
 
+    /// Determines whether the given position is within the given maximum distance to the
+    /// boundary of this loop (including inside the loop).
+    ///
+    /// This method returns true if either:
+    /// - The position is within any of the [cap](crate::spherical::Cap)s centred at
+    ///   each vertex of this loop and having the given distance as a radius, or,
+    /// - The position can be [projected](crate::spherical::MinorArc::projection) on
+    ///   any edge of this loop and the distance between the position and the projection
+    ///   is less than or equal to the given distance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::{Loop, Sphere};
+    ///
+    /// let l = Loop::new(&vec![
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 0.0)
+    /// ]);
+    ///
+    /// assert!(l.is_pos_within_distance_to_boundary(
+    ///     NVector::from_lat_long_degrees(-0.1, -0.1),
+    ///     Angle::from_degrees(0.5)
+    /// ));
+    ///
+    /// assert!(l.is_pos_within_distance_to_boundary(
+    ///     NVector::from_lat_long_degrees(-0.1, 5.0),
+    ///     Angle::from_degrees(0.5)
+    /// ));
+    /// ```
+    pub fn is_pos_within_distance_to_boundary(&self, p: NVector, max: Angle) -> bool {
+        for v in &self.vertices {
+            let c = Cap::from_centre_and_radius(v.0, max);
+            if c.contains_point(p) {
+                return true;
+            }
+        }
+        for e in &self.edges {
+            let close = match e.projection(p) {
+                None => false,
+                Some(proj) => lte(Sphere::angle(p, proj).as_radians(), max.as_radians()),
+            };
+            if close {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
     ///  
     /// This method returns either ([loop number vertices](crate::spherical::Loop::num_vertices) - 2) triangles - as triples of [NVector]s, if
@@ -878,8 +934,8 @@ fn vec3_eq(a: Vec3, b: Vec3) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::{
-        spherical::{is_loop_clockwise, Loop},
-        Angle, LatLong, NVector, Vec3,
+        spherical::{is_loop_clockwise, Loop, Sphere},
+        Angle, LatLong, Length, NVector, Vec3,
     };
 
     fn antananrivo() -> NVector {
@@ -1275,6 +1331,43 @@ mod tests {
         let one_mas: f64 = 1.0 / 3_600_000_000.0;
         let p = NVector::from_lat_long_degrees(-one_mas, 0.0);
         assert!(!l.contains_point(p));
+    }
+
+    // is_pos_within_distance_to_boundary
+
+    #[test]
+    fn is_pos_within_distance_to_boundary_vertex() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 0.0),
+        ]);
+
+        for v in l.iter_vertices() {
+            let p = Sphere::EARTH.destination_pos(*v, Angle::ZERO, Length::from_metres(10.0));
+            let max = Sphere::angle(*v, p);
+            assert!(l.is_pos_within_distance_to_boundary(p, max));
+            assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
+        }
+    }
+
+    #[test]
+    fn is_pos_within_distance_to_boundary_edge() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 0.0),
+        ]);
+
+        for e in l.iter_edges() {
+            let m = Sphere::mean_position(&vec![e.start(), e.end()]).unwrap();
+            let p = Sphere::EARTH.destination_pos(m, Angle::ZERO, Length::from_metres(10.0));
+            let max = Sphere::angle(m, p);
+            assert!(l.is_pos_within_distance_to_boundary(p, max));
+            assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
+        }
     }
 
     // triangulate.
