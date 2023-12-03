@@ -481,7 +481,7 @@ impl Loop {
     /// Determines whether the given position is within the given maximum distance to the
     /// boundary of this loop (including inside the loop).
     ///
-    /// This method returns true if either:
+    /// More formally, this method returns true if either:
     /// - The position is within any of the [cap](crate::spherical::Cap)s centred at
     ///   each vertex of this loop and having the given distance as a radius, or,
     /// - The position can be [projected](crate::spherical::MinorArc::projection) on
