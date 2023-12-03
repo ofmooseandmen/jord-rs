@@ -1344,11 +1344,20 @@ mod tests {
             NVector::from_lat_long_degrees(10.0, 0.0),
         ]);
 
+        let bearings: Vec<Angle> = vec![
+            Angle::from_degrees(225.0),
+            Angle::from_degrees(135.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(315.0),
+        ];
+
+        let mut i = 0;
         for v in l.iter_vertices() {
-            let p = Sphere::EARTH.destination_pos(*v, Angle::ZERO, Length::from_metres(10.0));
+            let p = Sphere::EARTH.destination_pos(*v, bearings[i], Length::from_metres(10.0));
             let max = Sphere::angle(*v, p);
             assert!(l.is_pos_within_distance_to_boundary(p, max));
             assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
+            i += 1;
         }
     }
 
@@ -1361,12 +1370,21 @@ mod tests {
             NVector::from_lat_long_degrees(10.0, 0.0),
         ]);
 
+        let bearings: Vec<Angle> = vec![
+            Angle::ZERO,
+            Angle::from_degrees(90.0),
+            Angle::ZERO,
+            Angle::from_degrees(90.0),
+        ];
+
+        let mut i = 0;
         for e in l.iter_edges() {
             let m = Sphere::mean_position(&vec![e.start(), e.end()]).unwrap();
-            let p = Sphere::EARTH.destination_pos(m, Angle::ZERO, Length::from_metres(10.0));
+            let p = Sphere::EARTH.destination_pos(m, bearings[i], Length::from_metres(10.0));
             let max = Sphere::angle(m, p);
             assert!(l.is_pos_within_distance_to_boundary(p, max));
             assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
+            i += 1;
         }
     }
 
