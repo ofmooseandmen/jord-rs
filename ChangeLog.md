@@ -1,6 +1,7 @@
 ### 0.12.0
 
 - Is position within distance to the boundary of loop?
+- Renamed Cap::from_points to Cap::from_triangle
 
 ### 0.11.0
 

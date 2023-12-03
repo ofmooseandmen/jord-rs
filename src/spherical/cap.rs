@@ -51,7 +51,7 @@ impl Cap {
 
     /// Constructs a new cap whose boundary passes by the 3 given points: the returned cap is the circumcircle of the
     /// triangle defined by the 3 given points.
-    pub fn from_points(a: NVector, b: NVector, c: NVector) -> Self {
+    pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
         // 3 points must be in anti-clockwise order
         let clockwise = Sphere::side(a, b, c) < 0;
@@ -327,16 +327,16 @@ mod tests {
     }
 
     #[test]
-    fn from_points() {
+    fn from_triangle() {
         let a = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(20.0, 0.0);
         let c = NVector::from_lat_long_degrees(10.0, 10.0);
-        let cap = Cap::from_points(a, b, c);
+        let cap = Cap::from_triangle(a, b, c);
         assert!(cap.contains_point(a));
         assert!(cap.contains_point(b));
         assert!(cap.contains_point(c));
 
-        let o = Cap::from_points(c, b, a);
+        let o = Cap::from_triangle(c, b, a);
         assert_nv_eq_d7(o.centre, cap.centre);
         assert!((o.chord_radius2 - cap.chord_radius2).abs() < 1e-16);
     }
