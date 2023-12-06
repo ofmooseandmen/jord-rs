@@ -93,6 +93,15 @@ impl Length {
         self.metres / Self::NM_TO_M
     }
 
+    /// Computes the absolute value of this length.
+    pub fn abs(&self) -> Self {
+        if self.metres >= 0.0 {
+            *self
+        } else {
+            Self::from_metres(-self.metres)
+        }
+    }
+
     /// Rounds this length to the nearest metre.
     ///
     /// # Examples

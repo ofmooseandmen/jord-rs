@@ -16,7 +16,8 @@ pub struct Rectangle {
     lng: LongitudeInterval,
 }
 
-// TODO(CL): Exmaples + (Interior)Intersection
+// TODO(CL): Examples
+// TODO(CL): (Interior)Intersection
 impl Rectangle {
     /// Empty rectangle: contains no point.
     pub const EMPTY: Rectangle = Self {
@@ -1080,6 +1081,24 @@ mod tests {
         assert_contains_rect(a, b, true);
     }
 
+    #[test]
+    fn contains_rectangle_lng_union_would_be_full() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(19.0),
+        );
+        assert!(!b.contains_rectangle(a));
+        assert!(!a.contains_rectangle(b));
+    }
+
     fn assert_contains_rect(a: Rectangle, b: Rectangle, expected: bool) {
         assert_eq!(expected, a.contains_rectangle(b));
         assert_eq!(expected, a.union(b) == a);
@@ -1457,6 +1476,23 @@ mod tests {
         assert!(union.contains_point(pb));
     }
 
+    #[test]
+    fn contains_rectangle_lng_becomes_full() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(19.0),
+        );
+        assert!(a.union(b).is_longitude_full());
+    }
+
     // from_union
 
     #[test]
@@ -1635,6 +1671,72 @@ mod tests {
             Angle::from_degrees(180.0),
             Angle::from_degrees(-9.0),
             Angle::from_degrees(-180.0),
+        );
+        assert_eq!(e, expanded);
+    }
+
+    #[test]
+    fn expand_lat_becomes_empty() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(0.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-10.0)));
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-11.0)));
+    }
+
+    #[test]
+    fn expand_lat_was_empty() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(0.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-10.0)));
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(10.0)));
+    }
+
+    #[test]
+    fn expand_lng_becomes_empty() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(10.0),
+        );
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-10.0)));
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-11.0)));
+    }
+
+    #[test]
+    fn expand_lng_was_empty() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(-180.0),
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(180.0),
+        );
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(-10.0)));
+        assert_eq!(Rectangle::EMPTY, r.expand(Angle::from_degrees(10.0)));
+    }
+
+    #[test]
+    fn expand_lng_west_wraps_to_180() {
+        let r = Rectangle::from_nesw(
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(170.0),
+            Angle::from_degrees(0.0),
+            Angle::from_degrees(-179.0),
+        );
+        let expanded = r.expand(Angle::from_degrees(2.0));
+        let e = Rectangle::from_nesw(
+            Angle::from_degrees(47.0),
+            Angle::from_degrees(172.0),
+            Angle::from_degrees(-2.0),
+            Angle::from_degrees(180.0),
         );
         assert_eq!(e, expanded);
     }

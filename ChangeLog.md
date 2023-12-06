@@ -1,3 +1,8 @@
+### 0.13.0
+
+- Fixed: Sphere::distance_to_angle returns always a angle in [0, 180]
+- Tests
+
 ### 0.12.0
 
 - Is position within distance to the boundary of loop?

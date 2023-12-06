@@ -186,14 +186,15 @@ impl Sphere {
     /// );
     /// ```
     pub fn distance_to_angle(&self, distance: Length) -> Angle {
+        let abs_dist = distance.abs();
         let max_distance = PI * self.radius;
-        if distance == max_distance {
+        if abs_dist == max_distance {
             return Angle::HALF_CIRCLE;
         }
-        let d = if distance > max_distance {
-            distance.as_metres() % max_distance.as_metres()
+        let d = if abs_dist > max_distance {
+            abs_dist.as_metres() % max_distance.as_metres()
         } else {
-            distance.as_metres()
+            abs_dist.as_metres()
         };
         Angle::from_radians(d / self.radius.as_metres())
     }
@@ -1703,6 +1704,7 @@ mod tests {
         let p2 = NVector::from_lat_long_degrees(55.0, 155.0);
         let d = Sphere::EARTH.distance(p1, p2);
         assert_eq!(Sphere::angle(p1, p2), Sphere::EARTH.distance_to_angle(d));
+        assert_eq!(Sphere::angle(p1, p2), Sphere::EARTH.distance_to_angle(-d));
     }
 
     // geodetic <-> geocentric
