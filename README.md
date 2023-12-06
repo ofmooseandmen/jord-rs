@@ -25,7 +25,7 @@ The following references provide the theoretical basis of most of the algorithms
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
 - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
 
-## Solutions to the 10 examples from [NavLab](https:://www.navlab.net/nvector)
+## Solutions to the 10 examples from [NavLab](https://www.navlab.net/nvector)
 
 ### Example 1: A and B to delta
 Given two positions A and B. Find the exact vector from A to B in meters north, east and down, and find the direction (azimuth/bearing) to B, relative to north. Use WGS-84 ellipsoid.
