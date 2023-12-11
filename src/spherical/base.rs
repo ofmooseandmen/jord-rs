@@ -1,5 +1,8 @@
 use crate::Vec3;
 
+/// epsilon below which expensive side is called.
+const TRIAGE_SIDE_EPS: f64 = 10.0 * f64::EPSILON;
+
 /// Computes the signed angle in radians between the given vectors.
 ///
 /// - if vn is `None; the angle is always in [0..PI],
@@ -43,8 +46,15 @@ pub(crate) fn easting(v: Vec3) -> Vec3 {
 /// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
 /// - otherwise, v0 is left of (v1, v2)
 pub(crate) fn exact_side(v0: Vec3, v1: Vec3, v2: Vec3) -> f64 {
-    let ortho = v1.orthogonal_to(v2);
-    v0.dot_prod(ortho)
+    let triage_side = v0.dot_prod(v1.cross_prod(v2));
+    // The side of v0 w.r.t. (v1, v2) is given by the triple scalar product (v0 . (v1 x v2))
+    // However the cross product of v1 and v2 becomes unstable if v1 and v2 are nearly parallel (coincidental or antipodal).
+    // If the result if too close to 0 (using 10 * f64::EPSILON), then call the more expensive function `orthogonal_to`.`
+    if triage_side <= TRIAGE_SIDE_EPS {
+        v0.dot_prod(v1.orthogonal_to(v2))
+    } else {
+        triage_side
+    }
 }
 
 #[cfg(test)]

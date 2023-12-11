@@ -240,17 +240,14 @@ impl MinorArc {
     fn contains_vec3(&self, v: Vec3) -> bool {
         // v is left of (normal, start)
         // and
-        // v if right of (normal, end)
+        // v is right of (normal, end)
 
-        // effectively this is base#side(v, normal, start) >=0 && base#side(v, normal, end) <= 0
-        // however since normal is never eq or opposite to start or end, using
-        // Vec3::cross_prod_unit is enough (base#side make no assumption about it's inputs and
-        // therefore calls the more expensive function Vec3::orthogonal_to).
+        // effectively this is base#exact_side(v, normal, start) >=0 && base#exact_side(v, normal, end) <= 0
+        // however since normal is never equal or opposite to start or end, using Vec3::cross_prod is enough.
         let start = self.start.as_vec3();
         let end = self.end.as_vec3();
         let n = self.normal;
-        gte(v.dot_prod(n.cross_prod_unit(start)), 0.0)
-            && lte(v.dot_prod(n.cross_prod_unit(end)), 0.0)
+        gte(v.dot_prod(n.cross_prod(start)), 0.0) && lte(v.dot_prod(n.cross_prod(end)), 0.0)
     }
 }
 
