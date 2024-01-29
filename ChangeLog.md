@@ -1,3 +1,7 @@
+### 0.14.0
+
+- Performance improvements
+
 ### 0.13.0
 
 - Fixed: Sphere::distance_to_angle returns always a angle in [0, 180]
