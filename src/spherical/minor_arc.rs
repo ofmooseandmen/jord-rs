@@ -1,9 +1,9 @@
 use crate::{
-    numbers::{eq_zero, gte, lte},
+    numbers::{eq_zero, gte},
     Angle, NVector, Vec3,
 };
 
-use super::base::angle_radians_between;
+use super::base::{angle_radians_between, exact_side};
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
@@ -241,13 +241,10 @@ impl MinorArc {
         // v is left of (normal, start)
         // and
         // v is right of (normal, end)
-
-        // effectively this is base#exact_side(v, normal, start) >=0 && base#exact_side(v, normal, end) <= 0
-        // however since normal is never equal or opposite to start or end, using Vec3::cross_prod is enough.
         let start = self.start.as_vec3();
         let end = self.end.as_vec3();
         let n = self.normal;
-        gte(v.dot_prod(n.cross_prod(start)), 0.0) && lte(v.dot_prod(n.cross_prod(end)), 0.0)
+        gte(exact_side(v, n, start), 0.0) && gte(exact_side(end, n, v), 0.0)
     }
 }
 
@@ -335,6 +332,20 @@ mod tests {
         );
 
         assert_intersection(NVector::from_lat_long_degrees(0.0, 0.0), arc1, arc2);
+    }
+
+    #[test]
+    fn intersection_at_shared() {
+        let shared = NVector::from_lat_long_degrees(-25.0, 130.0);
+        let arc1 = MinorArc::new(
+            shared,
+            NVector::from_lat_long_degrees(-24.950243870277777, 133.85817408527777),
+        );
+        let arc2 = MinorArc::new(
+            shared,
+            NVector::from_lat_long_degrees(-25.857954033055556, 133.75470594055557),
+        );
+        assert_intersection(shared, arc1, arc2);
     }
 
     #[test]

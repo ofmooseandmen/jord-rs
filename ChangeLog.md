@@ -1,3 +1,7 @@
+### 0.15.0
+
+- Fixed: intersection at shared vertex of both minor arcs
+
 ### 0.14.0
 
 - Performance improvements
