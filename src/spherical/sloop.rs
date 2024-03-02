@@ -822,7 +822,7 @@ fn next_ear(remaining: &mut Vec<Vertex>) -> Option<(NVector, NVector, NVector)> 
 /// - a vertex is a reflex if left of [previous, next],
 /// - a vertex is a convex if right of [previous, next],
 /// - otherwise it's both
-fn re_classify(vertices: &mut Vec<Vertex>, ear_index: usize) {
+fn re_classify(vertices: &mut [Vertex], ear_index: usize) {
     let len = vertices.len();
     let last = len - 1;
     if ear_index == 0 || ear_index == len {
