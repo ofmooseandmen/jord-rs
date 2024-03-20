@@ -3,16 +3,18 @@ name = "jord"
 version = "0.15.0"
 edition = "2021"
 rust-version = "1.65"
-authors = ["Cedric Liegeois <omam.github@gmail.com>",
-          ]
+authors = ["Cedric Liegeois <omam.github@gmail.com>"]
 repository = "https://github.com/ofmooseandmen/jord-rs"
 documentation = "https://docs.rs/jord"
 keywords = ["geo", "geography", "geospatial", "n-vector"]
 description = "Geographical Position Calculations (Ellipsoidal and Spherical models)"
 license = "MIT"
 readme = "README.md"
+[features]
+serde = ["dep:serde"]
 
 [dependencies]
+serde = { version = "1", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
