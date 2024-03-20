@@ -14,6 +14,7 @@ use super::{
 ///
 /// [Sphere] implements several usefull navigation algorithms.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Sphere {
     radius: Length,
 }
