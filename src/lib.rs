@@ -1,5 +1,5 @@
 #![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))]
-#![forbid(
+#![deny(
     anonymous_parameters,
     illegal_floating_point_literal_pattern,
     late_bound_lifetime_arguments,

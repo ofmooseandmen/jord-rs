@@ -8,6 +8,7 @@ use super::base::{angle_radians_between, exact_side};
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MinorArc {
     start: NVector,
     end: NVector,

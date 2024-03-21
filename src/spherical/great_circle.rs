@@ -9,6 +9,7 @@ use super::base::easting;
 /// It is internally represented as its normal vector - i.e. the normal vector
 /// to the plane containing the great circle.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GreatCircle {
     normal: Vec3,
 }
