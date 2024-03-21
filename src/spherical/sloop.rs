@@ -532,7 +532,7 @@ impl Loop {
     }
 
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
-    ///  
+    ///
     /// This method returns either ([loop number vertices](crate::spherical::Loop::num_vertices) - 2) triangles - as triples of [NVector]s, if
     /// the triangulation succeeds, or [empty](Vec::new) if the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
     ///

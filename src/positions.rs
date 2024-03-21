@@ -226,7 +226,7 @@ impl LatLong {
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the point where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NVector(Vec3);
 
 impl NVector {
