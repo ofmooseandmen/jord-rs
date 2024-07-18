@@ -76,7 +76,7 @@ impl LocalPositionVector {
     }
 
     /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
-    /// local north-eastr-down (NED) Cartesian coordinates.
+    /// local north-east-down (NED) Cartesian coordinates.
     ///
     /// # Examples
     ///
@@ -197,7 +197,7 @@ impl<S> LocalFrame<S>
 where
     S: Surface,
 {
-    /// East-North-Up (local level) frame. This frame is usefull for many targeting and tracking applications.
+    /// East-North-Up (local level) frame. This frame is useful for many targeting and tracking applications.
     ///
     /// - Orientation: The x-axis points towards east, the y-axis points towards north (both are
     /// horizontal), and the z-axis is pointing up.

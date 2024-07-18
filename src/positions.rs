@@ -49,7 +49,7 @@ pub trait Cartesian3DVector: Sized {
         F: Fn(Length) -> Length;
 }
 
-/// A geocentric position or Earth Centred Earthy Fixed (ECEF) vector.
+/// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 pub struct GeocentricPos {
     x: Length,
