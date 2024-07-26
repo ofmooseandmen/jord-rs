@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 enum Orientation {
     // x = north (or forward), y = east (or right), z = down.
     #[default]
@@ -22,7 +22,7 @@ enum Orientation {
 /// However, the [azimuth](crate::LocalPositionVector::azimuth) is always relative to 'north' and the elevation is always positive if above the local
 /// tangent plane and negative if below.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LocalPositionVector {
     x: Length,
     y: Length,
@@ -187,7 +187,7 @@ impl Cartesian3DVector for LocalPositionVector {
 /// calculations are needed in a limited area, position calculations can be performed
 /// relative to this system to get approximate horizontal and vertical components
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LocalFrame<S> {
     origin: Vec3,
     dir_rm: Mat33,
@@ -307,7 +307,7 @@ where
     }
 
     /// Converts the given [GeodeticPos] into a [LocalPositionVector]: the exact vector between this frame
-    /// origin and the given position. The resulting [LocalPositionVector] orientation is the one of this frame.   
+    /// origin and the given position. The resulting [LocalPositionVector] orientation is the one of this frame.
     pub fn geodetic_to_local_pos(&self, p: GeodeticPos) -> LocalPositionVector {
         let p_geocentric = self.surface.geodetic_to_geocentric(p).as_metres();
         // delta in 'Earth' frame.

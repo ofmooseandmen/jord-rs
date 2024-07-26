@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{impl_measurement, Length, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A speed.
 ///
 /// It primarely exists to unambigously represent a speed as opposed to a bare
@@ -55,7 +55,7 @@ use crate::{impl_measurement, Length, Measurement};
 ///     Length::from_nautical_miles(2.0),
 ///     (Speed::from_knots(1.0) * Duration::from_secs(7200)).round_mm()
 /// );
-///  
+///
 /// ```
 pub struct Speed {
     mps: f64,

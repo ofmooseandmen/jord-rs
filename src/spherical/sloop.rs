@@ -17,7 +17,7 @@ use super::{
 /// - [simple](crate::spherical::Loop::is_simple) - this property is not enforced at runtime, therefore operations are undefined on non-simple loops
 /// - or, [empty](crate::spherical::Loop::is_empty).
 #[derive(PartialEq, Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Loop {
     /// vertices in clockwise order.
     vertices: Vec<Vertex>,
@@ -662,7 +662,7 @@ pub fn is_loop_clockwise(vs: &[NVector]) -> bool {
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 enum Classification {
     Convex,
     Reflex,
@@ -672,7 +672,7 @@ enum Classification {
 
 /// A vertex of a loop: position + classification.
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 struct Vertex(NVector, Classification);
 
 /// if first == last, returns [first ... last - 1] otherwise returns given array.

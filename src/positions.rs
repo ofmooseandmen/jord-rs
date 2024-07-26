@@ -51,7 +51,7 @@ pub trait Cartesian3DVector: Sized {
 
 /// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct GeocentricPos {
     x: Length,
     y: Length,
@@ -105,7 +105,7 @@ impl Cartesian3DVector for GeocentricPos {
 
 /// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct GeodeticPos {
     hp: NVector,
     height: Length,
@@ -132,7 +132,7 @@ impl GeodeticPos {
 
 /// An horizontal position represented by a pair of latitude-longitude.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LatLong {
     latitude: Angle,
     longitude: Angle,
@@ -226,7 +226,7 @@ impl LatLong {
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the point where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct NVector(Vec3);
 
 impl NVector {

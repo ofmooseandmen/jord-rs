@@ -2,7 +2,7 @@ use crate::{Angle, NVector, Speed};
 
 /// The state of a vehicle: its horizontal position and velocity (bearing and speed).
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Vehicle {
     position: NVector,
     bearing: Angle,

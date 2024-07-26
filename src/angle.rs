@@ -2,7 +2,7 @@ use crate::{impl_measurement, Measurement};
 use std::f64::consts::PI;
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A one-dimensional angle.
 ///
 /// It primarely exists to unambigously represent an angle as opposed to a bare
