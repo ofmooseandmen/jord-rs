@@ -19,6 +19,7 @@ enum Orientation {
 /// The orientation of the x, y and z axis depends on the [local Cartesian coordinate frame](crate::LocalFrame):
 /// - x = north (or forward), y = east (or right), z = down: [NED](crate::LocalFrame::ned), [Body](crate::LocalFrame::body) and [Local Level](crate::LocalFrame::local_level),
 /// - x = east, y = north, z = up: [ENU](crate::LocalFrame::enu).
+///
 /// However, the [azimuth](crate::LocalPositionVector::azimuth) is always relative to 'north' and the elevation is always positive if above the local
 /// tangent plane and negative if below.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
@@ -203,7 +204,7 @@ where
     /// East-North-Up (local level) frame. This frame is useful for many targeting and tracking applications.
     ///
     /// - Orientation: The x-axis points towards east, the y-axis points towards north (both are
-    /// horizontal), and the z-axis is pointing up.
+    ///   horizontal), and the z-axis is pointing up.
     ///
     /// See also [NED](crate::LocalFrame::ned)
     pub fn enu(origin: GeodeticPos, surface: S) -> Self {
@@ -231,7 +232,7 @@ where
     ///
     /// - The origin is directly beneath or above the vehicle (B), at Earth’s surface.
     /// - Orientation: The x-axis points towards north, the y-axis points towards east (both are
-    /// horizontal), and the z-axis is pointing down.
+    ///   horizontal), and the z-axis is pointing down.
     ///
     /// Note: When moving relative to the Earth, the frame rotates about its z-axis to allow the
     /// x-axis to always point towards north. When getting close to the poles this rotation rate
@@ -282,10 +283,10 @@ where
     ///
     /// - The origin is directly beneath or above the vehicle (B), at Earth’s surface.
     /// - Orientation: The z-axis is pointing down. Initially, the x-axis points towards north, and the
-    /// y-axis points towards east, but as the vehicle moves they are not rotating about the z-axis
-    /// (their angular velocity relative to the Earth has zero component along the z-axis).
-    /// (Note: Any initial horizontal direction of the x- and y-axes is valid for L, but if the
-    /// initial position is outside the poles, north and east are usually chosen for convenience.)
+    ///   y-axis points towards east, but as the vehicle moves they are not rotating about the z-axis
+    ///   (their angular velocity relative to the Earth has zero component along the z-axis).
+    ///   (Note: Any initial horizontal direction of the x- and y-axes is valid for L, but if the
+    ///   initial position is outside the poles, north and east are usually chosen for convenience.)
     ///
     /// Notes: The L-frame is equal to the N-frame except for the rotation about the z-axis,
     /// which is always zero for this frame (relative to Earth). Hence, at a given time, the only
