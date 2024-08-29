@@ -11,6 +11,7 @@ use super::MinorArc;
 ///
 /// This struct and implementation is very much based on [S2LatLngRect](https://github.com/google/s2geometry/blob/master/src/s2/s2latlng_rect.h).
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Rectangle {
     lat: LatitudeInterval,
     lng: LongitudeInterval,
@@ -317,6 +318,7 @@ impl Rectangle {
 
 /// latitude interval: {@link #lo} is assumed to be less than {@link #hi}, otherwise the interval is empty.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 struct LatitudeInterval {
     lo: Angle,
     hi: Angle,
@@ -450,6 +452,7 @@ impl LatitudeInterval {
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 struct LongitudeInterval {
     lo: Angle,
     hi: Angle,
