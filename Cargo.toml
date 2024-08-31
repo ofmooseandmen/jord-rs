@@ -10,6 +10,8 @@ keywords = ["geo", "geography", "geospatial", "n-vector"]
 description = "Geographical Position Calculations (Ellipsoidal and Spherical models)"
 license = "MIT"
 readme = "README.md"
+categories = ["science::geo"]
+
 [features]
 serde = ["dep:serde"]
 
