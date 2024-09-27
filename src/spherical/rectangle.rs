@@ -71,7 +71,7 @@ impl Rectangle {
         }
     }
 
-    /// Compares the latitude intervalsof this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as
+    /// Compares the latitude intervals of this rectangle and the given one: the [greater](Ordering::Greater) latitude interval is defined as
     /// the interval that is northernmost overall (including both low and high latitudes).
     pub fn cmp_by_latitude(&self, o: Self) -> Ordering {
         let a = self.lat.lo.as_radians() + self.lat.hi.as_radians();
