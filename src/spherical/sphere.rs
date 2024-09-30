@@ -1,12 +1,12 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    numbers::eq_zero, surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos,
-    LatLong, Length, Mat33, NVector, Speed, Vec3, Vehicle,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
+    NVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
-    base::{angle_radians_between, easting, exact_side},
+    base::{angle_radians_between, easting, side},
     GreatCircle, MinorArc,
 };
 
@@ -88,6 +88,27 @@ impl Sphere {
     /// ```
     pub fn angle(p1: NVector, p2: NVector) -> Angle {
         Angle::from_radians(angle_radians_between(p1.as_vec3(), p2.as_vec3(), None))
+    }
+
+    /// Converts the given central angle to the equivalent great circle distance.
+    /// The given angle is normalised to the range [0, PI].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, LatLong};
+    /// use jord::spherical::Sphere;
+    ///
+    /// let s = Sphere::EARTH;
+    /// let a = s.angle_to_distance(Angle::HALF_CIRCLE);
+    /// assert_eq!(s.radius() * 2.0, a);
+    /// ```
+    pub fn angle_to_distance(&self, angle: Angle) -> Length {
+        let abs_angle: Angle = angle.abs();
+        if abs_angle == Angle::HALF_CIRCLE {
+            return self.radius * 2.0;
+        }
+        self.radius * abs_angle.normalised_to(Angle::HALF_CIRCLE)
     }
 
     /// Computes the signed distance from the given position to the given great circle.
@@ -381,14 +402,7 @@ impl Sphere {
     /// assert_eq!(1, Sphere::side(p1, p3, p2));
     /// ```
     pub fn side(p0: NVector, p1: NVector, p2: NVector) -> i8 {
-        let side = exact_side(p0.as_vec3(), p1.as_vec3(), p2.as_vec3());
-        if eq_zero(side) {
-            0
-        } else if side < 0.0 {
-            -1
-        } else {
-            1
-        }
+        side(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
     }
 
     /// Returns the angle turned from AB to BC. Angle is positive for left turn,
@@ -1584,8 +1598,8 @@ mod tests {
 
     fn assert_time_to_cpa(expected: Duration, actual: Option<Duration>) {
         assert!(actual.is_some());
-        let a_ms = actual.unwrap().as_millis() as i128;
-        let e_ms = expected.as_millis() as i128;
+        let a_ms: i128 = actual.unwrap().as_millis() as i128;
+        let e_ms: i128 = expected.as_millis() as i128;
         let diff = (a_ms - e_ms).abs();
         assert!(
             diff < 100,
@@ -1686,6 +1700,27 @@ mod tests {
             Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(700.0), intruder);
         assert!(opt_time.is_some());
         assert_eq!(2_764_688, opt_time.unwrap().as_millis());
+    }
+
+    // angle_to_distance
+    #[test]
+    fn angle_to_distance() {
+        let s = Sphere::EARTH;
+        assert_eq!(s.radius() * 2.0, s.angle_to_distance(Angle::HALF_CIRCLE));
+        assert_eq!(
+            s.radius() * Angle::QUARTER_CIRCLE,
+            s.angle_to_distance(Angle::QUARTER_CIRCLE)
+        );
+        // angles greater than PI wrap around
+        assert_eq!(
+            s.angle_to_distance(Angle::from_degrees(90.0)),
+            s.angle_to_distance(Angle::from_degrees(270.0))
+        );
+        // absolute value of the angle is used.
+        assert_eq!(
+            s.angle_to_distance(Angle::from_degrees(45.0)),
+            s.angle_to_distance(Angle::from_degrees(-45.0))
+        );
     }
 
     // distance_to_angle

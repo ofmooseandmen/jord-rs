@@ -1,4 +1,4 @@
-use crate::Vec3;
+use crate::{numbers::eq_zero, Vec3};
 
 /// epsilon below which expensive side is called.
 const TRIAGE_SIDE_EPS: f64 = 10.0 * f64::EPSILON;
@@ -37,24 +37,24 @@ pub(crate) fn easting(v: Vec3) -> Vec3 {
     Vec3::new_unit(-v.y(), v.x(), 0.0)
 }
 
-/// Determines whether v0 if right (negative f64) or left (positive f64) of the
-/// great circle from v1 to v2.
-///
-/// This function returns the value of the dot product between v0 and the orthogonal
-/// unit-length vector to v1 and v2:
-/// - if the dot product is nearly-zero or zero, the 3 positions are collinear
-/// - otherwise, if the dot product is negative, v0 is right of (v1, v2)
-/// - otherwise, v0 is left of (v1, v2)
-pub(crate) fn exact_side(v0: Vec3, v1: Vec3, v2: Vec3) -> f64 {
+/// Determines whether v0 if right (negative integer), left (positive integer) or on the great circle (0), from v1 to v2.
+pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
     let triage_side = v0.dot_prod(v1.cross_prod(v2));
     // The side of v0 w.r.t. (v1, v2) is given by the triple scalar product (v0 . (v1 x v2))
     // However the cross product of v1 and v2 becomes unstable if v1 and v2 are nearly parallel (coincidental or antipodal).
     // If the result if too close to 0 (using 10 * f64::EPSILON), then call the more expensive function `orthogonal_to`.`
-    if triage_side <= TRIAGE_SIDE_EPS {
+    let side = if triage_side <= TRIAGE_SIDE_EPS {
         v0.dot_prod(v1.orthogonal_to(v2))
     } else {
         triage_side
+    };
+    if eq_zero(side) {
+        return 0;
     }
+    if side < 0.0 {
+        return -1;
+    }
+    1
 }
 
 #[cfg(test)]

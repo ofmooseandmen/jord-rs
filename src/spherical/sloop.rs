@@ -1,15 +1,8 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
-use crate::{
-    numbers::eq,
-    numbers::{eq_zero, lte},
-    Angle, NVector, Vec3,
-};
+use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
 
-use super::{
-    base::{angle_radians_between, exact_side},
-    Cap, MinorArc, Rectangle, Sphere,
-};
+use super::{base::angle_radians_between, ChordLength, MinorArc, Rectangle, Sphere};
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
@@ -479,21 +472,15 @@ impl Loop {
         }
     }
 
-    /// Determines whether the given position is within the given maximum distance to the
-    /// boundary of this loop (including inside the loop).
-    ///
-    /// More formally, this method returns true if either:
-    /// - The position is within any of the [cap](crate::spherical::Cap)s centred at
-    ///   each vertex of this loop and having the given distance as a radius, or,
-    /// - The position can be [projected](crate::spherical::MinorArc::projection) on
-    ///   any edge of this loop and the distance between the position and the projection
-    ///   is less than or equal to the given distance.
+    /// Computes the distance from the given position to the boundary of this polygon.
+    /// Note: if the given position is inside this polygon a non-zero length is returned. If this is not desirable,
+    /// use [contains_point](crate::spherical::Loop::contains_point) beforehand.
     ///
     /// # Examples
     ///
     /// ```
     /// use jord::{Angle, NVector};
-    /// use jord::spherical::{Loop, Sphere};
+    /// use jord::spherical::{ChordLength, Loop, MinorArc ,Sphere};
     ///
     /// let l = Loop::new(&vec![
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
@@ -502,33 +489,32 @@ impl Loop {
     ///     NVector::from_lat_long_degrees(10.0, 0.0)
     /// ]);
     ///
-    /// assert!(l.is_pos_within_distance_to_boundary(
-    ///     NVector::from_lat_long_degrees(-0.1, -0.1),
-    ///     Angle::from_degrees(0.5)
-    /// ));
+    /// // closest to first vertex.
+    /// let p1 = NVector::from_lat_long_degrees(-0.1, -0.1);
+    /// assert_eq!(
+    ///     ChordLength::new(p1, NVector::from_lat_long_degrees(0.0, 0.0)),
+    ///     l.distance_to_boundary(p1)
+    /// );
     ///
-    /// assert!(l.is_pos_within_distance_to_boundary(
-    ///     NVector::from_lat_long_degrees(-0.1, 5.0),
-    ///     Angle::from_degrees(0.5)
-    /// ));
+    /// // closest to first edge.
+    /// let p2 = NVector::from_lat_long_degrees(-1.0, 5.0);
+    /// let e = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    /// let proj = e.projection(p2).unwrap();
+    /// assert_eq!(
+    ///     ChordLength::new(p2, proj),
+    ///     l.distance_to_boundary(p2)
+    /// );
     /// ```
-    pub fn is_pos_within_distance_to_boundary(&self, p: NVector, max: Angle) -> bool {
-        for v in &self.vertices {
-            let c = Cap::from_centre_and_radius(v.0, max);
-            if c.contains_point(p) {
-                return true;
-            }
-        }
+    pub fn distance_to_boundary(&self, p: NVector) -> ChordLength {
+        let mut res = ChordLength::MAX;
         for e in &self.edges {
-            let close = match e.projection(p) {
-                None => false,
-                Some(proj) => lte(Sphere::angle(p, proj).as_radians(), max.as_radians()),
-            };
-            if close {
-                return true;
-            }
+            let cl = e.distance_to(p);
+            res = res.min(cl);
         }
-        false
+        res
     }
 
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
@@ -886,48 +872,52 @@ fn all_outside(v1: NVector, v2: NVector, v3: NVector, vertices: &[Vertex]) -> bo
     true
 }
 
+fn clockwise_side(clockwise: bool, v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
+    if clockwise {
+        super::base::side(v0, v2, v1)
+    } else {
+        super::base::side(v0, v1, v2)
+    }
+}
 /// if p inside triangle (v1, v2, v3) or on any edge of that triangle.
 fn inside_or_edge(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> bool {
     if p == v1 || p == v2 || p == v3 {
         return false;
     }
     let clockwise = Sphere::side(v1, v2, v3) < 0;
-    let sign = if clockwise { -1.0 } else { 1.0 };
-    let side_edge1 = exact_side(p.as_vec3(), v1.as_vec3(), v2.as_vec3()) * sign;
-    let side_edge2 = exact_side(p.as_vec3(), v2.as_vec3(), v3.as_vec3()) * sign;
-    let side_edge3 = exact_side(p.as_vec3(), v3.as_vec3(), v1.as_vec3()) * sign;
+    let side_edge1 = clockwise_side(clockwise, p.as_vec3(), v1.as_vec3(), v2.as_vec3());
+    let side_edge2 = clockwise_side(clockwise, p.as_vec3(), v2.as_vec3(), v3.as_vec3());
+    let side_edge3 = clockwise_side(clockwise, p.as_vec3(), v3.as_vec3(), v1.as_vec3());
 
-    let on_edge1 = eq_zero(side_edge1);
-    let on_edge2 = eq_zero(side_edge2);
-    let on_edge3 = eq_zero(side_edge3);
+    let on_edge1 = side_edge1 == 0;
+    let on_edge2 = side_edge2 == 0;
+    let on_edge3 = side_edge3 == 0;
 
-    let mut on_edge = false;
-    if on_edge1 && side_edge2 > 0.0 && side_edge3 > 0.0 {
-        on_edge = true;
+    if on_edge1 && on_edge2 {
+        // position is detected on (vertex1, vertex2) and (vertex2, vertex3), assume it is vertex2.
+        return false;
     }
 
-    if on_edge2 && side_edge1 > 0.0 && side_edge3 > 0.0 {
-        if on_edge {
-            // position is detected on (vertex1, vertex2) and (vertex2, vertex3), assume it is vertex2.
-            return false;
-        }
-        on_edge = true;
+    if on_edge1 && on_edge3 {
+        // position is detected on (vertex1, vertex2) and (vertex3, vertex1), assume it is vertex1.
+        return false;
     }
 
-    if on_edge3 && side_edge1 > 0.0 && side_edge2 > 0.0 {
-        if on_edge {
-            // position is detected on (vertex1, vertex2) or (vertex2, vertex3)
-            // and (vertex3, vertex1), assume it is vertex3 or vertex1.
-            return false;
-        }
-        on_edge = true;
+    if on_edge2 && on_edge3 {
+        // position is detected on (vertex2, vertex3) and (vertex3, vertex1), assume it is vertex3.
+        return false;
     }
 
-    if on_edge {
+    if on_edge1 && side_edge2 > 0 && side_edge3 > 0 {
         return true;
     }
-
-    side_edge1 > 0.0 && side_edge2 > 0.0 && side_edge3 > 0.0
+    if on_edge2 && side_edge1 > 0 && side_edge3 > 0 {
+        return true;
+    }
+    if on_edge3 && side_edge1 > 0 && side_edge2 > 0 {
+        return true;
+    }
+    side_edge1 > 0 && side_edge2 > 0 && side_edge3 > 0
 }
 
 fn vec3_eq(a: Vec3, b: Vec3) -> bool {
@@ -937,7 +927,7 @@ fn vec3_eq(a: Vec3, b: Vec3) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::{
-        spherical::{is_loop_clockwise, Loop, Sphere},
+        spherical::{is_loop_clockwise, ChordLength, Loop, Sphere},
         Angle, LatLong, Length, NVector, Vec3,
     };
 
@@ -1336,36 +1326,10 @@ mod tests {
         assert!(!l.contains_point(p));
     }
 
-    // is_pos_within_distance_to_boundary
+    // distance_to_boundary
 
     #[test]
-    fn is_pos_within_distance_to_boundary_vertex() {
-        let l = Loop::new(&vec![
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            NVector::from_lat_long_degrees(0.0, 10.0),
-            NVector::from_lat_long_degrees(10.0, 10.0),
-            NVector::from_lat_long_degrees(10.0, 0.0),
-        ]);
-
-        let bearings: Vec<Angle> = vec![
-            Angle::from_degrees(225.0),
-            Angle::from_degrees(135.0),
-            Angle::from_degrees(45.0),
-            Angle::from_degrees(315.0),
-        ];
-
-        let mut i = 0;
-        for v in l.iter_vertices() {
-            let p = Sphere::EARTH.destination_pos(*v, bearings[i], Length::from_metres(10.0));
-            let max = Sphere::angle(*v, p);
-            assert!(l.is_pos_within_distance_to_boundary(p, max));
-            assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
-            i += 1;
-        }
-    }
-
-    #[test]
-    fn is_pos_within_distance_to_boundary_edge() {
+    fn distance_to_boundary_edge() {
         let l = Loop::new(&vec![
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
@@ -1384,9 +1348,34 @@ mod tests {
         for e in l.iter_edges() {
             let m = Sphere::mean_position(&vec![e.start(), e.end()]).unwrap();
             let p = Sphere::EARTH.destination_pos(m, bearings[i], Length::from_metres(10.0));
-            let max = Sphere::angle(m, p);
-            assert!(l.is_pos_within_distance_to_boundary(p, max));
-            assert!(!l.is_pos_within_distance_to_boundary(p, max - Angle::from_degrees(0.0001)));
+            let expected = ChordLength::new(m, p).to_angle().round_d7();
+            assert_eq!(expected, l.distance_to_boundary(p).to_angle().round_d7());
+            i += 1;
+        }
+    }
+
+    #[test]
+    fn distance_to_boundary_vertex() {
+        // define loop in clockwise order.
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(10.0, 0.0),
+            NVector::from_lat_long_degrees(10.0, 10.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        ]);
+
+        let bearings: Vec<Angle> = vec![
+            Angle::from_degrees(225.0),
+            Angle::from_degrees(315.0),
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(135.0),
+        ];
+
+        let mut i = 0;
+        for v in l.iter_vertices() {
+            let p = Sphere::EARTH.destination_pos(*v, bearings[i], Length::from_metres(10.0));
+            let expected = ChordLength::new(*v, p);
+            assert_eq!(expected, l.distance_to_boundary(p));
             i += 1;
         }
     }

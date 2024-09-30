@@ -5,6 +5,9 @@ mod base;
 mod cap;
 pub use cap::Cap;
 
+mod chord_length;
+pub use chord_length::ChordLength;
+
 mod great_circle;
 pub use great_circle::GreatCircle;
 
