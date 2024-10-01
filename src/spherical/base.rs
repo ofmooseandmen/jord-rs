@@ -48,10 +48,18 @@ pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
         if eq_zero(side) {
             return 0;
         }
-        if side > 0.0 { 1 } else { -1 }
+        if side > 0.0 {
+            1
+        } else {
+            -1
+        }
     } else {
         // either right or left.
-        if triage_side > 0.0 { 1 } else { -1 }
+        if triage_side > 0.0 {
+            1
+        } else {
+            -1
+        }
     }
 }
 
