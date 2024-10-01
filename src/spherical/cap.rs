@@ -14,20 +14,20 @@ pub struct Cap {
 }
 
 impl Cap {
-    /// Empty spherical cap: contains no point.
+    /// Empty spherical cap: contains no position.
     pub const EMPTY: Cap = Self {
         centre: NVector::new(Vec3::UNIT_Z),
         radius: ChordLength::NEGATIVE,
     };
 
-    /// Full spherical cap: contains all points.
+    /// Full spherical cap: contains all positions.
     pub const FULL: Cap = Self {
         centre: NVector::new(Vec3::UNIT_Z),
         radius: ChordLength::MAX,
     };
 
     /// Constructs a new cap from the given centre and given radius expressed as the angle between the
-    /// centre and all points on the boundary of the cap.
+    /// centre and all positions on the boundary of the cap.
     pub fn from_centre_and_radius(centre: NVector, radius: Angle) -> Self {
         Self {
             centre,
@@ -35,19 +35,19 @@ impl Cap {
         }
     }
 
-    /// Constructs a new cap from the given centre and a given point on the boundary of the cap.
-    pub fn from_centre_and_boundary_point(centre: NVector, boundary_point: NVector) -> Self {
+    /// Constructs a new cap from the given centre and a given position on the boundary of the cap.
+    pub fn from_centre_and_boundary_position(centre: NVector, boundary_position: NVector) -> Self {
         Self {
             centre,
-            radius: ChordLength::new(centre, boundary_point),
+            radius: ChordLength::new(centre, boundary_position),
         }
     }
 
-    /// Constructs a new cap whose boundary passes by the 3 given points: the returned cap is the circumcircle of the
-    /// triangle defined by the 3 given points.
+    /// Constructs a new cap whose boundary passes by the 3 given positions: the returned cap is the circumcircle of the
+    /// triangle defined by the 3 given positions.
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
-        // 3 points must be in anti-clockwise order
+        // 3 positions must be in anti-clockwise order
         let clockwise = Sphere::side(a, b, c) < 0;
         let v1 = a.as_vec3();
         let v2 = if clockwise { c.as_vec3() } else { b.as_vec3() };
@@ -88,7 +88,7 @@ impl Cap {
         }
     }
 
-    /// Determines whether this cap contains the given point (including the boundary).
+    /// Determines whether this cap contains the given position (including the boundary).
     ///
     /// # Examples
     ///
@@ -96,19 +96,19 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// assert!(cap.contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-    /// assert!(cap.contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+    /// assert!(cap.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+    /// assert!(cap.contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     /// ```
-    pub fn contains_point(&self, p: NVector) -> bool {
+    pub fn contains_position(&self, p: NVector) -> bool {
         ChordLength::new(self.centre, p) <= self.radius
     }
 
-    /// Determines whether the interior of this cap contains the given point.
+    /// Determines whether the interior of this cap contains the given position.
     ///
     /// # Examples
     ///
@@ -116,15 +116,15 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// assert!(!cap.interior_contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-    /// assert!(cap.interior_contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+    /// assert!(!cap.interior_contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+    /// assert!(cap.interior_contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     /// ```
-    pub fn interior_contains_point(&self, p: NVector) -> bool {
+    pub fn interior_contains_position(&self, p: NVector) -> bool {
         ChordLength::new(self.centre, p) < self.radius
     }
 
@@ -137,12 +137,12 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap1 = Cap::from_centre_and_boundary_point(
+    /// let cap1 = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// let cap2 = Cap::from_centre_and_boundary_point(
+    /// let cap2 = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(45.0, 0.0)
     /// );
@@ -188,9 +188,9 @@ impl Cap {
     }
 
     /// Returns the radius of this cap: central angle between the centre of this cap and
-    /// any point on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
+    /// any position on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
     /// The returned value may not exactly equal the value passed
-    /// to [from_centre_and_boundary_point](crate::spherical::Cap::from_centre_and_boundary_point).
+    /// to [from_centre_and_boundary_position](crate::spherical::Cap::from_centre_and_boundary_position).
     ///
     /// # Examples
     ///
@@ -200,7 +200,7 @@ impl Cap {
     /// use jord::{Angle, NVector};
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///      NVector::from_lat_long_degrees(90.0, 0.0),
     ///      NVector::from_lat_long_degrees(45.0, 45.0)
     /// );
@@ -272,7 +272,7 @@ impl Cap {
         for a in angles {
             // arc at north pole.
             let a_np = Vec3::new(-rm * a.cos(), rm * a.sin(), z);
-            // rotate each point to arc centre.
+            // rotate each position to arc centre.
             let a_cen = (a_np * ry) * rz;
 
             let p = NVector::new(a_cen.unit());
@@ -289,16 +289,16 @@ mod tests {
 
     #[test]
     fn full() {
-        assert!(Cap::FULL.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
-        assert!(Cap::FULL.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(Cap::FULL.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(Cap::FULL.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
         assert_eq!(Angle::from_radians(PI), Cap::FULL.radius());
         assert_eq!(Cap::EMPTY, Cap::FULL.complement());
     }
 
     #[test]
     fn empty() {
-        assert!(!Cap::EMPTY.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
-        assert!(!Cap::EMPTY.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(!Cap::EMPTY.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(!Cap::EMPTY.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
         assert_eq!(Angle::from_radians(-1.0), Cap::EMPTY.radius());
         assert_eq!(Cap::FULL, Cap::EMPTY.complement());
     }
@@ -309,9 +309,9 @@ mod tests {
         let b = NVector::from_lat_long_degrees(20.0, 0.0);
         let c = NVector::from_lat_long_degrees(10.0, 10.0);
         let cap = Cap::from_triangle(a, b, c);
-        assert!(cap.contains_point(a));
-        assert!(cap.contains_point(b));
-        assert!(cap.contains_point(c));
+        assert!(cap.contains_position(a));
+        assert!(cap.contains_position(b));
+        assert!(cap.contains_position(c));
 
         let o = Cap::from_triangle(c, b, a);
         assert_nv_eq_d7(o.centre, cap.centre);
@@ -335,23 +335,23 @@ mod tests {
     }
 
     #[test]
-    fn contains_point() {
-        let cap = Cap::from_centre_and_boundary_point(
+    fn contains_position() {
+        let cap = Cap::from_centre_and_boundary_position(
             NVector::from_lat_long_degrees(90.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 0.0),
         );
-        assert!(cap.contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-        assert!(cap.contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+        assert!(cap.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert!(cap.contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     }
 
     #[test]
-    fn interior_contains_point() {
-        let cap = Cap::from_centre_and_boundary_point(
+    fn interior_contains_position() {
+        let cap = Cap::from_centre_and_boundary_position(
             NVector::from_lat_long_degrees(90.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 0.0),
         );
-        assert!(!cap.interior_contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-        assert!(cap.interior_contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+        assert!(!cap.interior_contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert!(cap.interior_contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod tests {
     fn radius() {
         assert_eq!(
             Angle::QUARTER_CIRCLE,
-            Cap::from_centre_and_boundary_point(
+            Cap::from_centre_and_boundary_position(
                 NVector::from_lat_long_degrees(90.0, 0.0),
                 NVector::from_lat_long_degrees(0.0, 0.0)
             )
@@ -384,7 +384,7 @@ mod tests {
         );
         assert_eq!(
             Angle::from_radians(PI / 4.0),
-            Cap::from_centre_and_boundary_point(
+            Cap::from_centre_and_boundary_position(
                 NVector::from_lat_long_degrees(90.0, 0.0),
                 NVector::from_lat_long_degrees(45.0, 45.0)
             )

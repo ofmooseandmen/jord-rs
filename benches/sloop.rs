@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use jord::spherical::{is_loop_clockwise, Loop};
-use jord::{Angle, NVector};
+use jord::NVector;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Loop::new_5_vertices", |b| {
@@ -27,7 +27,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| black_box(Loop::new(&vertices)))
     });
 
-    c.bench_function("Loop::contains_point_true_5_vertices", |b| {
+    c.bench_function("Loop::contains_position_true_5_vertices", |b| {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(55.605, 13.0038),
             NVector::from_lat_long_degrees(55.4295, 13.82),
@@ -37,11 +37,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         ];
         let l = Loop::new(&vertices);
         let inside = NVector::from_lat_long_degrees(55.9295, 13.5297);
-        assert!(l.contains_point(inside));
-        b.iter(|| black_box(l.contains_point(inside)))
+        assert!(l.contains_position(inside));
+        b.iter(|| black_box(l.contains_position(inside)))
     });
 
-    c.bench_function("Loop::contains_point_false_5_vertices", |b| {
+    c.bench_function("Loop::contains_position_false_5_vertices", |b| {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(55.605, 13.0038),
             NVector::from_lat_long_degrees(55.4295, 13.82),
@@ -51,48 +51,48 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         ];
         let l = Loop::new(&vertices);
         let outside: NVector = NVector::from_lat_long_degrees(56.1589, 13.7668);
-        assert!(!l.contains_point(outside));
-        b.iter(|| black_box(l.contains_point(outside)))
+        assert!(!l.contains_position(outside));
+        b.iter(|| black_box(l.contains_position(outside)))
     });
 
     c.bench_function(
-        "Loop::contains_point_true_94_vertices",
+        "Loop::contains_position_true_94_vertices",
         |b: &mut Bencher<'_>| {
             let l = Loop::new(&vertices_94());
             let inside: NVector = NVector::from_lat_long_degrees(-14.0, 130.0);
-            assert!(l.contains_point(inside));
-            b.iter(|| black_box(l.contains_point(inside)))
+            assert!(l.contains_position(inside));
+            b.iter(|| black_box(l.contains_position(inside)))
         },
     );
 
     c.bench_function(
-        "Loop::contains_point_false_94_vertices",
+        "Loop::contains_position_false_94_vertices",
         |b: &mut Bencher<'_>| {
             let l = Loop::new(&vertices_94());
             let outside: NVector = NVector::from_lat_long_degrees(90.0, 0.0);
-            assert!(!l.contains_point(outside));
-            b.iter(|| black_box(l.contains_point(outside)))
+            assert!(!l.contains_position(outside));
+            b.iter(|| black_box(l.contains_position(outside)))
         },
     );
 
-    c.bench_function("Loop::triangle_contains_point_true", |b| {
+    c.bench_function("Loop::triangle_contains_position_true", |b| {
         let inside = NVector::from_lat_long_degrees(15.0, 30.0);
         let v1 = NVector::from_lat_long_degrees(20.0, 20.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
         let l = Loop::new(&vec![v1, v2, v3]);
-        assert!(l.contains_point(inside));
-        b.iter(|| black_box(l.contains_point(inside)));
+        assert!(l.contains_position(inside));
+        b.iter(|| black_box(l.contains_position(inside)));
     });
 
-    c.bench_function("Loop::triangle_contains_point_false", |b| {
+    c.bench_function("Loop::triangle_contains_position_false", |b| {
         let outside = NVector::from_lat_long_degrees(15.0, 30.0).antipode();
         let v1 = NVector::from_lat_long_degrees(20.0, 20.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
         let l = Loop::new(&vec![v1, v2, v3]);
-        assert!(!l.contains_point(outside));
-        b.iter(|| black_box(l.contains_point(outside)));
+        assert!(!l.contains_position(outside));
+        b.iter(|| black_box(l.contains_position(outside)));
     });
 
     c.bench_function("Loop::bound_5_vertices", |b: &mut Bencher<'_>| {

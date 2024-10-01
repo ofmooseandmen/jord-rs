@@ -1,5 +1,6 @@
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Vec3,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, Length,
+    NVector, Vec3,
 };
 
 /// An ellipsoid.
@@ -85,7 +86,7 @@ impl Ellipsoid {
     }
 
     /// Returns the geocentric radius at the given geodetic latitude: the distance from the Earth's center
-    /// to a point on the spheroid surface at geodetic latitude.
+    /// to a position on the spheroid surface at geodetic latitude.
     ///
     /// See: [Location-dependent radii](https://en.wikipedia.org/wiki/Earth_radius#Location-dependent_radii)
     ///
@@ -210,7 +211,7 @@ impl Ellipsoid {
 }
 
 impl Surface for Ellipsoid {
-    fn geodetic_to_geocentric(&self, pos: GeodeticPos) -> GeocentricPos {
+    fn geodetic_to_geocentric_position(&self, pos: GeodeticPosition) -> GeocentricPosition {
         let nv = pos.horizontal_position().as_vec3();
         let nx = nv.x();
         let ny = nv.y();
@@ -223,10 +224,10 @@ impl Surface for Ellipsoid {
         let cx = n * m * nx + h * nx;
         let cy = n * m * ny + h * ny;
         let cz = n * nz + h * nz;
-        GeocentricPos::from_metres(cx, cy, cz)
+        GeocentricPosition::from_metres(cx, cy, cz)
     }
 
-    fn geocentric_to_geodetic(&self, pos: GeocentricPos) -> GeodeticPos {
+    fn geocentric_to_geodetic_position(&self, pos: GeocentricPosition) -> GeodeticPosition {
         let pv = pos.as_metres();
         let px = pv.x();
         let py = pv.y();
@@ -252,7 +253,7 @@ impl Surface for Ellipsoid {
         let nx = fs * fa * px;
         let ny = fs * fa * py;
         let nz = fs * pz;
-        GeodeticPos::new(NVector::new(Vec3::new(nx, ny, nz)), Length::from_metres(h))
+        GeodeticPosition::new(NVector::new(Vec3::new(nx, ny, nz)), Length::from_metres(h))
     }
 }
 

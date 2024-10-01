@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 
-use crate::{GeocentricPos, GeodeticPos};
+use crate::{GeocentricPosition, GeodeticPosition};
 
 /// The reference surface for a celestial body (e.g. Earth) on which calculations are done.
 pub trait Surface: Clone + Copy + Debug + Sized {
-    /// Converts the given [GeodeticPos] into a [GeocentricPos].
-    fn geodetic_to_geocentric(&self, pos: GeodeticPos) -> GeocentricPos;
+    /// Converts the given [GeodeticPosition] into a [GeocentricPosition].
+    fn geodetic_to_geocentric_position(&self, pos: GeodeticPosition) -> GeocentricPosition;
 
-    /// Converts the given [GeocentricPos] into a [GeodeticPos].
-    fn geocentric_to_geodetic(&self, pos: GeocentricPos) -> GeodeticPos;
+    /// Converts the given [GeocentricPosition] into a [GeodeticPosition].
+    fn geocentric_to_geodetic_position(&self, pos: GeocentricPosition) -> GeodeticPosition;
 }

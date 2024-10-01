@@ -279,11 +279,11 @@ impl Loop {
     ///     NVector::from_lat_long_degrees(10.0, 0.0),
     /// ]);
     ///
-    /// assert!(l.any_edge_contains_point(NVector::from_lat_long_degrees(0.0, 5.0)));
-    /// assert!(!l.any_edge_contains_point(NVector::from_lat_long_degrees(0.0, 11.0)));
+    /// assert!(l.any_edge_contains_position(NVector::from_lat_long_degrees(0.0, 5.0)));
+    /// assert!(!l.any_edge_contains_position(NVector::from_lat_long_degrees(0.0, 11.0)));
     /// ```
-    pub fn any_edge_contains_point(&self, p: NVector) -> bool {
-        self.edges.iter().any(|e| e.contains_point(p))
+    pub fn any_edge_contains_position(&self, p: NVector) -> bool {
+        self.edges.iter().any(|e| e.contains_position(p))
     }
 
     /// Returns the number of vertices of this loop.
@@ -307,8 +307,8 @@ impl Loop {
     }
 
     /// Calculates the [minimum bounding rectangle](crate::spherical::Rectangle) of this loop. The returned bound is
-    /// conservative in that if this loop [contains](crate::spherical::Loop::contains_point) a point P,
-    /// then the bound also [contains](crate::spherical::Rectangle::contains_point) P.
+    /// conservative in that if this loop [contains](crate::spherical::Loop::contains_position) the position `P`,
+    /// then the bound also [contains](crate::spherical::Rectangle::contains_position) `P`.
     ///
     /// # Examples
     ///
@@ -328,7 +328,7 @@ impl Loop {
     /// let b = l.bound();
     /// for v in vs.iter() {
     ///     let ll = LatLong::from_nvector(*v);
-    ///     assert!(b.contains_point(ll));
+    ///     assert!(b.contains_position(ll));
     /// }
     /// ```
     pub fn bound(&self) -> Rectangle {
@@ -342,7 +342,7 @@ impl Loop {
         // expand by 1e-7 degrees which is about 11.1 millimetres at the equator and
         // is the near limit of GPS-based technique - this is to make sure that floating-point
         // error introduced when converting NVector <-> LatLong does not break the bound
-        // invariant: loop.contains_point(p) -> loop.bound().contains_point(LatLong::from_nvector(p))
+        // invariant: loop.contains_position(p) -> loop.bound().contains_position(LatLong::from_nvector(p))
         mbr = mbr.expand(Angle::from_degrees(1.0e-7));
 
         // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
@@ -351,20 +351,20 @@ impl Loop {
         static NP: NVector = NVector::new(Vec3::UNIT_Z);
         static SP: NVector = NVector::new(Vec3::NEG_UNIT_Z);
 
-        if self.contains_point(NP) {
+        if self.contains_position(NP) {
             mbr = mbr.expand_to_north_pole();
         }
 
         // If a loop contains the south pole, then either it wraps entirely around the sphere (full longitude
         // range), or it also contains the north pole in which case bound#is_longitude_full() is true due to the
         // test above. Either way, we only need to do the south pole containment test if bound#is_longitude_full().
-        if mbr.is_longitude_full() && self.contains_point(SP) {
+        if mbr.is_longitude_full() && self.contains_position(SP) {
             mbr = mbr.expand_to_south_pole();
         }
         mbr
     }
 
-    /// Determines whether the **interior** of this loop contains the given point (i.e. excluding points which are
+    /// Determines whether the **interior** of this loop contains the given position (i.e. excluding positions which are
     /// vertices or on an edge of this loop).
     ///
     /// This function always returns false for [empty](crate::spherical::Loop::is_empty) loops, undefined for [non simple](crate::spherical::Loop::is_simple) loops.
@@ -384,10 +384,10 @@ impl Loop {
     ///
     /// let l = Loop::new(&vs);
     ///
-    /// assert!(l.contains_point(NVector::from_lat_long_degrees(5.0, 5.0)));
-    /// assert!(!l.contains_point(NVector::from_lat_long_degrees(11.0, 11.0)));
+    /// assert!(l.contains_position(NVector::from_lat_long_degrees(5.0, 5.0)));
+    /// assert!(!l.contains_position(NVector::from_lat_long_degrees(11.0, 11.0)));
     /// ```
-    pub fn contains_point(&self, p: NVector) -> bool {
+    pub fn contains_position(&self, p: NVector) -> bool {
         match self.insides {
             Some((a, b)) => {
                 if p == a || p == b {
@@ -474,7 +474,7 @@ impl Loop {
 
     /// Computes the distance from the given position to the boundary of this polygon.
     /// Note: if the given position is inside this polygon a non-zero length is returned. If this is not desirable,
-    /// use [contains_point](crate::spherical::Loop::contains_point) beforehand.
+    /// use [contains_position](crate::spherical::Loop::contains_position) beforehand.
     ///
     /// # Examples
     ///
@@ -1159,11 +1159,11 @@ mod tests {
 
         for v in l.iter_vertices() {
             let ll = LatLong::from_nvector(*v);
-            assert!(b.contains_point(ll));
+            assert!(b.contains_position(ll));
         }
     }
 
-    // contains_point.
+    // contains_position.
 
     #[test]
     fn triangle_does_not_contain_antipode() {
@@ -1173,8 +1173,8 @@ mod tests {
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
         let l = Loop::new(&vec![v1, v2, v3]);
-        assert!(l.contains_point(inside));
-        assert!(!l.contains_point(antipode));
+        assert!(l.contains_position(inside));
+        assert!(!l.contains_position(antipode));
     }
 
     #[test]
@@ -1184,7 +1184,7 @@ mod tests {
         let v2 = NVector::from_lat_long_degrees(10.0, -150.0);
         let v3 = NVector::from_lat_long_degrees(-85.0, -150.0);
         let l = Loop::new(&vec![v1, v2, v3]);
-        assert!(!l.contains_point(position));
+        assert!(!l.contains_position(position));
     }
 
     #[test]
@@ -1199,12 +1199,12 @@ mod tests {
         let l = Loop::new(&vertices);
         let i1: NVector = l.insides.unwrap().0;
         let i2: NVector = l.insides.unwrap().1;
-        assert!(l.contains_point(i1));
-        assert!(l.contains_point(i2));
+        assert!(l.contains_position(i1));
+        assert!(l.contains_position(i2));
     }
 
     #[test]
-    fn contains_point_north_pole_cap() {
+    fn contains_position_north_pole_cap() {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(85.0, 10.0),
             NVector::from_lat_long_degrees(85.0, 170.0),
@@ -1212,14 +1212,14 @@ mod tests {
             NVector::from_lat_long_degrees(85.0, -10.0),
         ];
         let l = Loop::new(&vertices);
-        assert!(l.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
-        assert!(l.contains_point(NVector::from_lat_long_degrees(89.0, 160.0)));
-        assert!(!l.contains_point(NVector::from_lat_long_degrees(84.0, 160.0)));
-        assert!(!l.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(l.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(l.contains_position(NVector::from_lat_long_degrees(89.0, 160.0)));
+        assert!(!l.contains_position(NVector::from_lat_long_degrees(84.0, 160.0)));
+        assert!(!l.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
     }
 
     #[test]
-    fn contains_point_south_pole_cap() {
+    fn contains_position_south_pole_cap() {
         let vertices: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(-85.0, 10.0),
             NVector::from_lat_long_degrees(-85.0, 170.0),
@@ -1227,27 +1227,27 @@ mod tests {
             NVector::from_lat_long_degrees(-85.0, -10.0),
         ];
         let l = Loop::new(&vertices);
-        assert!(l.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
-        assert!(l.contains_point(NVector::from_lat_long_degrees(-89.0, 160.0)));
-        assert!(!l.contains_point(NVector::from_lat_long_degrees(-84.0, 160.0)));
-        assert!(!l.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(l.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(l.contains_position(NVector::from_lat_long_degrees(-89.0, 160.0)));
+        assert!(!l.contains_position(NVector::from_lat_long_degrees(-84.0, 160.0)));
+        assert!(!l.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
     }
 
     #[test]
-    fn contains_point_concave_polygon() {
+    fn contains_position_concave_polygon() {
         let vertices: Vec<NVector> = vec![malmo(), ystad(), kristianstad(), helsingborg(), lund()];
         let l = Loop::new(&vertices);
         let hoor = NVector::from_lat_long_degrees(55.9295, 13.5297);
         let hassleholm = NVector::from_lat_long_degrees(56.1589, 13.7668);
-        assert!(l.contains_point(hoor));
-        assert!(!l.contains_point(hassleholm));
+        assert!(l.contains_position(hoor));
+        assert!(!l.contains_position(hassleholm));
         for v in vertices {
-            assert!(!l.contains_point(v));
+            assert!(!l.contains_position(v));
         }
     }
 
     #[test]
-    fn does_not_contain_point_on_edge() {
+    fn does_not_contain_position_on_edge() {
         let vertices = vec![
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
@@ -1259,12 +1259,12 @@ mod tests {
 
         // (0.0, 5.0) is on the (0.0, 0.0) -> (0.0, 10.0)
         let p = NVector::from_lat_long_degrees(0.0, 5.0);
-        assert!(!l.contains_point(p));
-        assert!(l.any_edge_contains_point(p));
+        assert!(!l.contains_position(p));
+        assert!(l.any_edge_contains_position(p));
     }
 
     #[test]
-    fn does_not_contain_point_on_edge_2() {
+    fn does_not_contain_position_on_edge_2() {
         let v2 = NVector::from_lat_long_degrees(0.0, 0.0);
         let one_mas: f64 = 1.0 / 3_600_000_000.0;
         let two_mas = 2.0 * one_mas;
@@ -1275,13 +1275,13 @@ mod tests {
 
         let l = Loop::new(&vec![v1, v2, v3]);
 
-        assert!(!l.contains_point(p));
-        assert!(l.any_edge_contains_point(p));
+        assert!(!l.contains_position(p));
+        assert!(l.any_edge_contains_position(p));
     }
 
     // see: https://github.com/spacetelescope/spherical_geometry/blob/master/spherical_geometry/tests/test_basic.py
     #[test]
-    fn does_not_contain_point_outside() {
+    fn does_not_contain_position_outside() {
         let p = NVector::new(Vec3::new_unit(-0.27475449, 0.47588873, -0.83548781));
         let vs = vec![
             NVector::new(Vec3::new_unit(0.04821217, -0.29877206, 0.95310589)),
@@ -1291,7 +1291,7 @@ mod tests {
             NVector::new(Vec3::new_unit(0.04821217, -0.29877206, 0.95310589)),
         ];
         let l = Loop::new(&vs);
-        assert!(!l.contains_point(p));
+        assert!(!l.contains_position(p));
     }
 
     #[test]
@@ -1307,7 +1307,7 @@ mod tests {
 
         let one_mas = 1.0 / 3_600_000_000.0;
         let p = NVector::from_lat_long_degrees(one_mas, one_mas);
-        assert!(l.contains_point(p));
+        assert!(l.contains_position(p));
     }
 
     #[test]
@@ -1323,7 +1323,7 @@ mod tests {
 
         let one_mas: f64 = 1.0 / 3_600_000_000.0;
         let p = NVector::from_lat_long_degrees(-one_mas, 0.0);
-        assert!(!l.contains_point(p));
+        assert!(!l.contains_position(p));
     }
 
     // distance_to_boundary
@@ -1347,7 +1347,7 @@ mod tests {
         let mut i = 0;
         for e in l.iter_edges() {
             let m = Sphere::mean_position(&vec![e.start(), e.end()]).unwrap();
-            let p = Sphere::EARTH.destination_pos(m, bearings[i], Length::from_metres(10.0));
+            let p = Sphere::EARTH.destination_position(m, bearings[i], Length::from_metres(10.0));
             let expected = ChordLength::new(m, p).to_angle().round_d7();
             assert_eq!(expected, l.distance_to_boundary(p).to_angle().round_d7());
             i += 1;
@@ -1373,7 +1373,7 @@ mod tests {
 
         let mut i = 0;
         for v in l.iter_vertices() {
-            let p = Sphere::EARTH.destination_pos(*v, bearings[i], Length::from_metres(10.0));
+            let p = Sphere::EARTH.destination_position(*v, bearings[i], Length::from_metres(10.0));
             let expected = ChordLength::new(*v, p);
             assert_eq!(expected, l.distance_to_boundary(p));
             i += 1;

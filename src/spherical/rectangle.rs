@@ -20,13 +20,13 @@ pub struct Rectangle {
 // TODO(CL): Examples
 // TODO(CL): (Interior)Intersection
 impl Rectangle {
-    /// Empty rectangle: contains no point.
+    /// Empty rectangle: contains no position.
     pub const EMPTY: Rectangle = Self {
         lat: LatitudeInterval::EMPTY,
         lng: LongitudeInterval::EMPTY,
     };
 
-    /// Full rectangle: contains all points.
+    /// Full rectangle: contains all positions.
     pub const FULL: Rectangle = Self {
         lat: LatitudeInterval::FULL,
         lng: LongitudeInterval::FULL,
@@ -62,7 +62,7 @@ impl Rectangle {
     /// - latitude: south to north
     /// - longitude: west to east
     ///
-    /// The northern parallel shall be north of the southern parallel, otherwise all points are outside.
+    /// The northern parallel shall be north of the southern parallel, otherwise all positions are outside.
     /// Note: this method does not check that the given angles define valid latitudes/longitudes.
     pub fn from_nesw(north: Angle, east: Angle, south: Angle, west: Angle) -> Self {
         Self {
@@ -99,7 +99,7 @@ impl Rectangle {
         }
     }
 
-    /// Determines whether this rectangle contains the given point (boundaries included).
+    /// Determines whether this rectangle contains the given position (boundaries included).
     ///
     /// # Examples
     ///
@@ -114,28 +114,28 @@ impl Rectangle {
     ///     Angle::ZERO
     /// );
     ///
-    /// assert!(a.contains_point(LatLong::from_degrees(10.0, 10.0)));
+    /// assert!(a.contains_position(LatLong::from_degrees(10.0, 10.0)));
     ///
-    /// /// point on boundary
-    /// assert!(a.contains_point(LatLong::from_degrees(30.0, 00.0)));
+    /// /// position on boundary
+    /// assert!(a.contains_position(LatLong::from_degrees(30.0, 00.0)));
     ///
     /// // latitude above north.
-    /// assert!(!a.contains_point(LatLong::from_degrees(40.0, 10.0)));
+    /// assert!(!a.contains_position(LatLong::from_degrees(40.0, 10.0)));
     ///
     /// // latitude below south.
-    /// assert!(!a.contains_point(LatLong::from_degrees(-1.0, 10.0)));
+    /// assert!(!a.contains_position(LatLong::from_degrees(-1.0, 10.0)));
     ///
     /// // longitude after east.
-    /// assert!(!a.contains_point(LatLong::from_degrees(10.0, 40.0)));
+    /// assert!(!a.contains_position(LatLong::from_degrees(10.0, 40.0)));
     ///
     /// // longitude after west.
-    /// assert!(!a.contains_point(LatLong::from_degrees(10.0, -10.0)));
+    /// assert!(!a.contains_position(LatLong::from_degrees(10.0, -10.0)));
     /// ```
-    pub fn contains_point(&self, p: LatLong) -> bool {
+    pub fn contains_position(&self, p: LatLong) -> bool {
         self.lat.contains_lat(p.latitude()) && self.lng.contains_lng(p.longitude())
     }
 
-    /// Determines whether the interior of this rectangle contains the given point (i.e. boundaries excluded).
+    /// Determines whether the interior of this rectangle contains the given position (i.e. boundaries excluded).
     /// # Examples
     ///
     /// ```
@@ -149,24 +149,24 @@ impl Rectangle {
     ///     Angle::ZERO
     /// );
     ///
-    /// assert!(a.interior_contains_point(LatLong::from_degrees(10.0, 10.0)));
+    /// assert!(a.interior_contains_position(LatLong::from_degrees(10.0, 10.0)));
     ///
-    /// // point on boundary
-    /// assert!(!a.interior_contains_point(LatLong::from_degrees(30.0, 00.0)));
+    /// // position on boundary
+    /// assert!(!a.interior_contains_position(LatLong::from_degrees(30.0, 00.0)));
     ///
     /// // latitude above north.
-    /// assert!(!a.interior_contains_point(LatLong::from_degrees(40.0, 10.0)));
+    /// assert!(!a.interior_contains_position(LatLong::from_degrees(40.0, 10.0)));
     ///
     /// // latitude below south.
-    /// assert!(!a.interior_contains_point(LatLong::from_degrees(-1.0, 10.0)));
+    /// assert!(!a.interior_contains_position(LatLong::from_degrees(-1.0, 10.0)));
     ///
     /// // longitude after east.
-    /// assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, 40.0)));
+    /// assert!(!a.interior_contains_position(LatLong::from_degrees(10.0, 40.0)));
     ///
     /// // longitude after west.
-    /// assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, -10.0)));
+    /// assert!(!a.interior_contains_position(LatLong::from_degrees(10.0, -10.0)));
     /// ```
-    pub fn interior_contains_point(&self, p: LatLong) -> bool {
+    pub fn interior_contains_position(&self, p: LatLong) -> bool {
         self.lat.interior_contains_lat(p.latitude())
             && self.lng.interior_contains_lng(p.longitude())
     }
@@ -211,12 +211,12 @@ impl Rectangle {
         self.lng.is_empty()
     }
 
-    /// Northernmost and easternmost - or 'high', point of this rectangle.
+    /// Northernmost and easternmost - or 'high', position of this rectangle.
     pub fn north_east(&self) -> LatLong {
         LatLong::new(self.lat.hi, self.lng.hi)
     }
 
-    /// Southernmost and westernmost - or 'low', point of this rectangle.
+    /// Southernmost and westernmost - or 'low', position of this rectangle.
     pub fn south_west(&self) -> LatLong {
         LatLong::new(self.lat.lo, self.lng.lo)
     }
@@ -803,32 +803,32 @@ mod tests {
         assert_eq!(Ordering::Less, b.cmp_by_longitude(a));
     }
 
-    // contains_point
+    // contains_position
 
     #[test]
-    fn contains_point_east() {
+    fn contains_position_east() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
         );
-        assert!(a.contains_point(LatLong::from_degrees(10.0, 30.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, 30.0)));
     }
 
     #[test]
-    fn contains_point_north() {
+    fn contains_position_north() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
         );
-        assert!(a.contains_point(LatLong::from_degrees(30.0, 20.0)));
+        assert!(a.contains_position(LatLong::from_degrees(30.0, 20.0)));
     }
 
     #[test]
-    fn contains_point_north_pole() {
+    fn contains_position_north_pole() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(90.0),
             Angle::from_degrees(30.0),
@@ -836,23 +836,23 @@ mod tests {
             Angle::ZERO,
         );
         let np: LatLong = LatLong::from_degrees(90.0, 160.0);
-        assert!(!a.contains_point(np));
-        assert!(a.polar_closure().contains_point(np));
+        assert!(!a.contains_position(np));
+        assert!(a.polar_closure().contains_position(np));
     }
 
     #[test]
-    fn contains_point_south() {
+    fn contains_position_south() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
         );
-        assert!(a.contains_point(LatLong::from_degrees(0.0, 20.0)));
+        assert!(a.contains_position(LatLong::from_degrees(0.0, 20.0)));
     }
 
     #[test]
-    fn contains_south_pole() {
+    fn contains_position_south_pole() {
         let a = Rectangle::from_nesw(
             Angle::ZERO,
             Angle::from_degrees(30.0),
@@ -860,90 +860,90 @@ mod tests {
             Angle::ZERO,
         );
         let sp = LatLong::from_degrees(-90.0, 50.0);
-        assert!(!a.contains_point(sp));
-        assert!(a.polar_closure().contains_point(sp));
+        assert!(!a.contains_position(sp));
+        assert!(a.polar_closure().contains_position(sp));
     }
 
     #[test]
-    fn contains_point_west() {
+    fn contains_position_west() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
         );
-        assert!(a.contains_point(LatLong::from_degrees(10.0, 0.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, 0.0)));
     }
 
     #[test]
-    fn contains_point_date_line() {
+    fn contains_position_date_line() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(-170.0),
             Angle::ZERO,
             Angle::from_degrees(170.0),
         );
-        assert!(a.contains_point(LatLong::from_degrees(10.0, 180.0)));
-        assert!(a.contains_point(LatLong::from_degrees(10.0, -180.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, 180.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, -180.0)));
     }
 
     #[test]
-    fn contains_point_empty() {
-        assert!(!Rectangle::EMPTY.contains_point(LatLong::from_degrees(0.0, 0.0)));
+    fn contains_position_empty() {
+        assert!(!Rectangle::EMPTY.contains_position(LatLong::from_degrees(0.0, 0.0)));
     }
 
     #[test]
-    fn contains_point_empty_longitude_interval() {
+    fn contains_position_empty_longitude_interval() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(-180.0),
             Angle::ZERO,
             Angle::from_degrees(180.0),
         );
-        assert!(!a.contains_point(LatLong::from_degrees(10.0, 180.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(10.0, 180.0)));
     }
 
     #[test]
-    fn contains_point_inverted() {
+    fn contains_position_inverted() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
             Angle::from_degrees(30.0),
         );
-        assert!(a.contains_point(LatLong::from_degrees(10.0, 40.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, 40.0)));
 
         // latitude above north.
-        assert!(!a.contains_point(LatLong::from_degrees(40.0, 40.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(40.0, 40.0)));
 
         // latitude below south.
-        assert!(!a.contains_point(LatLong::from_degrees(-1.0, 40.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(-1.0, 40.0)));
 
         // outside longitude.
-        assert!(!a.contains_point(LatLong::from_degrees(10.0, 10.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(10.0, 10.0)));
     }
 
     #[test]
-    fn contains_point_nominal() {
+    fn contains_position_nominal() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
             Angle::ZERO,
             Angle::ZERO,
         );
-        assert!(a.contains_point(LatLong::from_degrees(10.0, 10.0)));
+        assert!(a.contains_position(LatLong::from_degrees(10.0, 10.0)));
 
         // latitude above north.
-        assert!(!a.contains_point(LatLong::from_degrees(40.0, 10.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(40.0, 10.0)));
 
         // latitude below south.
-        assert!(!a.contains_point(LatLong::from_degrees(-1.0, 10.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(-1.0, 10.0)));
 
         // longitude after east.
-        assert!(!a.contains_point(LatLong::from_degrees(10.0, 40.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(10.0, 40.0)));
 
         // longitude after west.
-        assert!(!a.contains_point(LatLong::from_degrees(10.0, -10.0)));
+        assert!(!a.contains_position(LatLong::from_degrees(10.0, -10.0)));
     }
 
     // contains_rectangle
@@ -1107,10 +1107,10 @@ mod tests {
         assert_eq!(expected, a.union(b) == a);
     }
 
-    // interior_contains_rect
+    // interior_contains_position
 
     #[test]
-    fn interior_contains_rect() {
+    fn interior_contains_position() {
         let a = Rectangle::from_nesw(
             Angle::from_degrees(30.0),
             Angle::from_degrees(30.0),
@@ -1118,22 +1118,22 @@ mod tests {
             Angle::ZERO,
         );
 
-        assert!(a.interior_contains_point(LatLong::from_degrees(10.0, 10.0)));
+        assert!(a.interior_contains_position(LatLong::from_degrees(10.0, 10.0)));
 
-        // point on boundary
-        assert!(!a.interior_contains_point(LatLong::from_degrees(30.0, 00.0)));
+        // position on boundary
+        assert!(!a.interior_contains_position(LatLong::from_degrees(30.0, 00.0)));
 
         // latitude above north.
-        assert!(!a.interior_contains_point(LatLong::from_degrees(40.0, 10.0)));
+        assert!(!a.interior_contains_position(LatLong::from_degrees(40.0, 10.0)));
 
         // latitude below south.
-        assert!(!a.interior_contains_point(LatLong::from_degrees(-1.0, 10.0)));
+        assert!(!a.interior_contains_position(LatLong::from_degrees(-1.0, 10.0)));
 
         // longitude after east.
-        assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, 40.0)));
+        assert!(!a.interior_contains_position(LatLong::from_degrees(10.0, 40.0)));
 
         // longitude after west.
-        assert!(!a.interior_contains_point(LatLong::from_degrees(10.0, -10.0)));
+        assert!(!a.interior_contains_position(LatLong::from_degrees(10.0, -10.0)));
     }
 
     // from_minor_arc
@@ -1220,9 +1220,9 @@ mod tests {
             let lat_f = lat as f64;
             let p = LatLong::from_degrees(lat_f / 10.0, 0.0);
             if lat >= 0 && lat <= 100 {
-                assert!(actual.contains_point(p));
+                assert!(actual.contains_position(p));
             } else {
-                assert!(!actual.contains_point(p));
+                assert!(!actual.contains_position(p));
             }
         }
     }
@@ -1241,8 +1241,8 @@ mod tests {
             Angle::from_degrees(-10.0),
         );
         assert_rect_eq_d7(expected, actual);
-        assert!(actual.contains_point(LatLong::from_degrees(45.5, -5.0)));
-        assert!(!actual.contains_point(LatLong::from_degrees(45.5, 1.0)));
+        assert!(actual.contains_position(LatLong::from_degrees(45.5, -5.0)));
+        assert!(!actual.contains_position(LatLong::from_degrees(45.5, 1.0)));
     }
 
     fn assert_rect_eq_d7(e: Rectangle, a: Rectangle) {
@@ -1340,14 +1340,14 @@ mod tests {
         check_nesw(false, ll(11, 10), 10, 10, 10, 10);
     }
 
-    fn check_nesw(expected: bool, test_point: LatLong, n: i64, e: i64, s: i64, w: i64) {
+    fn check_nesw(expected: bool, test_pos: LatLong, n: i64, e: i64, s: i64, w: i64) {
         let rect = Rectangle::from_nesw(
             Angle::from_degrees(n as f64),
             Angle::from_degrees(e as f64),
             Angle::from_degrees(s as f64),
             Angle::from_degrees(w as f64),
         );
-        let actual = rect.contains_point(test_point);
+        let actual = rect.contains_position(test_pos);
         assert_eq!(expected, actual);
     }
 
@@ -1376,12 +1376,12 @@ mod tests {
         // full longitude range.
         assert!(actual.is_longitude_full());
 
-        assert!(actual.contains_point(ll(90, 0)));
-        assert!(actual.contains_point(ll(85, 45)));
+        assert!(actual.contains_position(ll(90, 0)));
+        assert!(actual.contains_position(ll(85, 45)));
         // all longitudes are in
-        assert!(actual.contains_point(ll(85, 35)));
+        assert!(actual.contains_position(ll(85, 35)));
         // out by latitude
-        assert!(!actual.contains_point(ll(76, 0)));
+        assert!(!actual.contains_position(ll(76, 0)));
     }
 
     #[test]
@@ -1397,12 +1397,12 @@ mod tests {
         // full longitude range.
         assert!(actual.is_longitude_full());
 
-        assert!(actual.contains_point(ll(-90, 0)));
-        assert!(actual.contains_point(ll(-85, 45)));
+        assert!(actual.contains_position(ll(-90, 0)));
+        assert!(actual.contains_position(ll(-85, 45)));
         // all longitudes are in
-        assert!(actual.contains_point(ll(-85, 35)));
+        assert!(actual.contains_position(ll(-85, 35)));
         // out by latitude
-        assert!(!actual.contains_point(ll(-76, 0)));
+        assert!(!actual.contains_position(ll(-76, 0)));
     }
 
     // union
@@ -1431,9 +1431,9 @@ mod tests {
 
         //p is neither in a nor b, but is in their union.
         let p = ll(25, 25);
-        assert!(!a.contains_point(p));
-        assert!(!b.contains_point(p));
-        assert!(union.contains_point(p));
+        assert!(!a.contains_position(p));
+        assert!(!b.contains_position(p));
+        assert!(union.contains_position(p));
     }
 
     #[test]
@@ -1468,15 +1468,15 @@ mod tests {
 
         //pa is only in a, but is in the union.
         let pa = ll(14, 14);
-        assert!(a.contains_point(pa));
-        assert!(!b.contains_point(pa));
-        assert!(union.contains_point(pa));
+        assert!(a.contains_position(pa));
+        assert!(!b.contains_position(pa));
+        assert!(union.contains_position(pa));
 
         //pb is only in a, but is in the union.
         let pb = ll(25, 25);
-        assert!(!a.contains_point(pb));
-        assert!(b.contains_point(pb));
-        assert!(union.contains_point(pb));
+        assert!(!a.contains_position(pb));
+        assert!(b.contains_position(pb));
+        assert!(union.contains_position(pb));
     }
 
     #[test]
@@ -1570,8 +1570,8 @@ mod tests {
         );
         let expanded = r.expand_to_north_pole();
         assert!(expanded.is_longitude_full());
-        assert!(expanded.contains_point(ll(90, 0)));
-        assert!(expanded.contains_point(ll(-10, 0)));
+        assert!(expanded.contains_position(ll(90, 0)));
+        assert!(expanded.contains_position(ll(-10, 0)));
     }
 
     #[test]
@@ -1584,8 +1584,8 @@ mod tests {
         );
         let expanded = r.expand_to_south_pole();
         assert!(expanded.is_longitude_full());
-        assert!(expanded.contains_point(ll(-90, 0)));
-        assert!(expanded.contains_point(ll(10, 0)));
+        assert!(expanded.contains_position(ll(-90, 0)));
+        assert!(expanded.contains_position(ll(10, 0)));
     }
 
     #[test]

@@ -1,8 +1,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, Length, Mat33,
-    NVector, Speed, Vec3, Vehicle,
+    surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong,
+    Length, Mat33, NVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
@@ -47,7 +47,7 @@ impl Sphere {
 
     /// Computes how far the given position is along a path described by the given minor arc: if a
     /// perpendicular is drawn from the position to the path, the along-track distance is the
-    /// signed distance from the start point to where the perpendicular crosses the path.
+    /// signed distance from the start position to where the perpendicular crosses the path.
     ///
     /// # Examples
     ///
@@ -145,11 +145,11 @@ impl Sphere {
     ///
     /// let distance = Sphere::EARTH.radius() * PI / 4.0;
     /// let p = LatLong::from_degrees(90.0, 0.0).to_nvector();
-    /// let dest = Sphere::EARTH.destination_pos(p, Angle::from_degrees(180.0), distance);
+    /// let dest = Sphere::EARTH.destination_position(p, Angle::from_degrees(180.0), distance);
     ///
     /// assert_eq!(LatLong::from_degrees(45.0, 0.0), LatLong::from_nvector(dest).round_d7());
     /// ```
-    pub fn destination_pos(&self, p0: NVector, bearing: Angle, distance: Length) -> NVector {
+    pub fn destination_position(&self, p0: NVector, bearing: Angle, distance: Length) -> NVector {
         if distance == Length::ZERO {
             p0
         } else {
@@ -274,7 +274,7 @@ impl Sphere {
         }
     }
 
-    /// Returns the position at the given distance `a` from given point `p1` along the great circle `p1, p2`.
+    /// Returns the position at the given distance `a` from given position `p1` along the great circle `p1, p2`.
     ///
     /// ```
     /// use std::f64::consts::PI;
@@ -299,7 +299,7 @@ impl Sphere {
 
     /// Computes the position at given fraction between this position and the given position.
     /// Returns `None` if the given fraction is `< 0` or `> 1`.`
-    pub fn interpolated_pos(p1: NVector, p2: NVector, f: f64) -> Option<NVector> {
+    pub fn interpolated_position(p1: NVector, p2: NVector, f: f64) -> Option<NVector> {
         if !(0.0..=1.0).contains(&f) {
             None
         } else if f == 0.0 {
@@ -417,7 +417,7 @@ impl Sphere {
 
     /// Calculates the position that the given vehicle will reach after the given time.
     pub fn position_after(&self, vehicle: Vehicle, duration: Duration) -> NVector {
-        Sphere::EARTH.destination_pos(
+        Sphere::EARTH.destination_position(
             vehicle.position(),
             vehicle.bearing(),
             vehicle.speed() * duration,
@@ -609,14 +609,14 @@ impl Sphere {
 }
 
 impl Surface for Sphere {
-    fn geodetic_to_geocentric(&self, pos: GeodeticPos) -> GeocentricPos {
+    fn geodetic_to_geocentric_position(&self, pos: GeodeticPosition) -> GeocentricPosition {
         let h = self.radius + pos.height();
-        GeocentricPos::from_vec3_metres(h.as_metres() * pos.horizontal_position().as_vec3())
+        GeocentricPosition::from_vec3_metres(h.as_metres() * pos.horizontal_position().as_vec3())
     }
 
-    fn geocentric_to_geodetic(&self, pos: GeocentricPos) -> GeodeticPos {
+    fn geocentric_to_geodetic_position(&self, pos: GeocentricPosition) -> GeodeticPosition {
         let h = Length::from_metres(pos.as_metres().norm()) - self.radius;
-        GeodeticPos::new(NVector::new(Vec3::unit(pos.as_metres())), h)
+        GeodeticPosition::new(NVector::new(Vec3::unit(pos.as_metres())), h)
     }
 }
 
@@ -836,7 +836,8 @@ mod tests {
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
         spherical::{GreatCircle, MinorArc, Sphere},
-        Angle, GeocentricPos, GeodeticPos, LatLong, Length, NVector, Speed, Surface, Vec3, Vehicle,
+        Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, NVector, Speed, Surface,
+        Vec3, Vehicle,
     };
 
     use super::newton_raphson;
@@ -899,9 +900,9 @@ mod tests {
     // destination.
 
     #[test]
-    fn destination_pos_across_date_line() {
+    fn destination_position_across_date_line() {
         let p = NVector::from_lat_long_degrees(0.0, 154.0);
-        let actual = Sphere::EARTH.destination_pos(
+        let actual = Sphere::EARTH.destination_position(
             p,
             Angle::from_degrees(90.0),
             Length::from_kilometres(5000.0),
@@ -911,10 +912,10 @@ mod tests {
     }
 
     #[test]
-    fn destination_pos_from_north_pole() {
+    fn destination_position_from_north_pole() {
         let expected = NVector::from_lat_long_degrees(45.0, 0.0);
         let distance = Sphere::EARTH.radius() * (PI / 4.0);
-        let actual = Sphere::EARTH.destination_pos(
+        let actual = Sphere::EARTH.destination_position(
             NVector::from_lat_long_degrees(90.0, 0.0),
             Angle::from_degrees(180.0),
             distance,
@@ -923,10 +924,10 @@ mod tests {
     }
 
     #[test]
-    fn destination_pos_from_south_pole() {
+    fn destination_position_from_south_pole() {
         let expected = NVector::from_lat_long_degrees(-45.0, 0.0);
         let distance = Sphere::EARTH.radius() * (PI / 4.0);
-        let actual = Sphere::EARTH.destination_pos(
+        let actual = Sphere::EARTH.destination_position(
             NVector::from_lat_long_degrees(-90.0, 0.0),
             Angle::ZERO,
             distance,
@@ -935,19 +936,19 @@ mod tests {
     }
 
     #[test]
-    fn destination_pos_negative_distance() {
+    fn destination_position_negative_distance() {
         let p = NVector::from_lat_long_degrees(0.0, 0.0);
         // equivalent of -10 degree of longitude.
         let d = Sphere::EARTH.radius() * (-2.0 * PI / 36.0);
-        let actual = Sphere::EARTH.destination_pos(p, Angle::from_degrees(90.0), d);
+        let actual = Sphere::EARTH.destination_position(p, Angle::from_degrees(90.0), d);
         let expected = NVector::from_lat_long_degrees(0.0, -10.0);
         assert_nv_eq_d7(expected, actual);
     }
 
     #[test]
-    fn destination_pos_travelled_longitude_greater_than_90() {
+    fn destination_position_travelled_longitude_greater_than_90() {
         let p = NVector::from_lat_long_degrees(60.2, 11.1);
-        let d = Sphere::EARTH.destination_pos(
+        let d = Sphere::EARTH.destination_position(
             p,
             Angle::from_degrees(12.4),
             Length::from_nautical_miles(2000.0),
@@ -957,11 +958,11 @@ mod tests {
     }
 
     #[test]
-    fn destination_pos_zero_distance() {
+    fn destination_position_zero_distance() {
         let p = NVector::from_lat_long_degrees(55.6050, 13.0038);
         assert_eq!(
             p,
-            Sphere::EARTH.destination_pos(p, Angle::from_degrees(96.0217), Length::ZERO,)
+            Sphere::EARTH.destination_position(p, Angle::from_degrees(96.0217), Length::ZERO,)
         );
     }
 
@@ -1183,44 +1184,44 @@ mod tests {
         );
     }
 
-    // interpolated
+    // interpolated_position
 
     #[test]
-    fn interpolated_pos_antipodal() {
+    fn interpolated_position_antipodal() {
         let p = NVector::from_lat_long_degrees(90.0, 0.0);
         assert_opt_nv_eq_d7(
             NVector::from_lat_long_degrees(0.0, 90.0),
-            Sphere::interpolated_pos(p, p.antipode(), 0.5),
+            Sphere::interpolated_position(p, p.antipode(), 0.5),
         );
     }
 
     #[test]
-    fn interpolated_pos_f0() {
+    fn interpolated_position_f0() {
         let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
-        assert_eq!(Some(p1), Sphere::interpolated_pos(p1, p2, 0.0));
+        assert_eq!(Some(p1), Sphere::interpolated_position(p1, p2, 0.0));
     }
 
     #[test]
-    fn interpolated_pos_f1() {
+    fn interpolated_position_f1() {
         let p1 = NVector::from_lat_long_degrees(90.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(0.0, 0.0);
-        assert_eq!(Some(p2), Sphere::interpolated_pos(p1, p2, 1.0));
+        assert_eq!(Some(p2), Sphere::interpolated_position(p1, p2, 1.0));
     }
 
     #[test]
-    fn interpolated_pos_invalid_f() {
+    fn interpolated_position_invalid_f() {
         let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(1.0, 0.0);
-        assert!(Sphere::interpolated_pos(p1, p2, -0.1).is_none());
-        assert!(Sphere::interpolated_pos(p1, p2, 1.1).is_none());
+        assert!(Sphere::interpolated_position(p1, p2, -0.1).is_none());
+        assert!(Sphere::interpolated_position(p1, p2, 1.1).is_none());
     }
 
     #[test]
-    fn interpolated_pos_half() {
+    fn interpolated_position_half() {
         assert_opt_nv_eq_d7(
             NVector::from_lat_long_degrees(0.0, 0.0),
-            Sphere::interpolated_pos(
+            Sphere::interpolated_position(
                 NVector::from_lat_long_degrees(10.0, 0.0),
                 NVector::from_lat_long_degrees(-10.0, 0.0),
                 0.5,
@@ -1229,20 +1230,20 @@ mod tests {
     }
 
     #[test]
-    fn interpolated_pos_side() {
+    fn interpolated_position_side() {
         let p0 = NVector::from_lat_long_degrees(154.0, 54.0);
         let p1 = NVector::from_lat_long_degrees(155.0, 55.0);
-        let i = Sphere::interpolated_pos(p0, p1, 0.25).unwrap();
+        let i = Sphere::interpolated_position(p0, p1, 0.25).unwrap();
         assert_eq!(0, Sphere::side(i, p0, p1));
     }
 
     #[test]
-    fn interpolated_pos_transitivity() {
+    fn interpolated_position_transitivity() {
         let p0 = NVector::from_lat_long_degrees(10.0, 0.0);
         let p1 = NVector::from_lat_long_degrees(-10.0, 0.0);
-        let expected = Sphere::interpolated_pos(p0, p1, 0.5).unwrap();
-        let actual = Sphere::interpolated_pos(
-            Sphere::interpolated_pos(p0, p1, 0.25).unwrap(),
+        let expected = Sphere::interpolated_position(p0, p1, 0.5).unwrap();
+        let actual = Sphere::interpolated_position(
+            Sphere::interpolated_position(p0, p1, 0.25).unwrap(),
             p1,
             1.0 / 3.0,
         );
@@ -1746,16 +1747,16 @@ mod tests {
     // geodetic <-> geocentric
     #[test]
     fn geodetic_to_from_geocentric() {
-        let np = GeodeticPos::new(
+        let np = GeodeticPosition::new(
             NVector::from_lat_long_degrees(90.0, 0.0),
             Length::from_kilometres(2.0),
         );
         let s = Sphere::new(Length::from_kilometres(1.0));
-        let geoc: crate::GeocentricPos = s.geodetic_to_geocentric(np);
+        let geoc: crate::GeocentricPosition = s.geodetic_to_geocentric_position(np);
         assert_eq!(
-            GeocentricPos::new(Length::ZERO, Length::ZERO, Length::from_kilometres(3.0)),
+            GeocentricPosition::new(Length::ZERO, Length::ZERO, Length::from_kilometres(3.0)),
             geoc
         );
-        assert_eq!(np, s.geocentric_to_geodetic(geoc));
+        assert_eq!(np, s.geocentric_to_geodetic_position(geoc));
     }
 }

@@ -42,19 +42,17 @@ pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
     let triage_side = v0.dot_prod(v1.cross_prod(v2));
     // The side of v0 w.r.t. (v1, v2) is given by the triple scalar product (v0 . (v1 x v2))
     // However the cross product of v1 and v2 becomes unstable if v1 and v2 are nearly parallel (coincidental or antipodal).
-    // If the result if too close to 0 (using 10 * f64::EPSILON), then call the more expensive function `orthogonal_to`.`
-    let side = if triage_side <= TRIAGE_SIDE_EPS {
-        v0.dot_prod(v1.orthogonal_to(v2))
+    // If the result if too close to 0 (using 10 * f64::EPSILON), then call the more expensive function `orthogonal_to`.
+    if triage_side.abs() <= TRIAGE_SIDE_EPS {
+        let side = v0.dot_prod(v1.orthogonal_to(v2));
+        if eq_zero(side) {
+            return 0;
+        }
+        if side > 0.0 { 1 } else { -1 }
     } else {
-        triage_side
-    };
-    if eq_zero(side) {
-        return 0;
+        // either right or left.
+        if triage_side > 0.0 { 1 } else { -1 }
     }
-    if side < 0.0 {
-        return -1;
-    }
-    1
 }
 
 #[cfg(test)]

@@ -29,7 +29,7 @@ pub use crate::angle::Angle;
 pub mod ellipsoidal;
 
 mod local_frame;
-pub use crate::local_frame::{r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalPositionVector};
+pub use crate::local_frame::{r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalPosition};
 
 mod length;
 pub use crate::length::Length;
@@ -37,7 +37,9 @@ pub use crate::length::Length;
 mod numbers;
 
 mod positions;
-pub use crate::positions::{Cartesian3DVector, GeocentricPos, GeodeticPos, LatLong, NVector};
+pub use crate::positions::{
+    Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong, NVector,
+};
 
 mod speed;
 pub use crate::speed::Speed;

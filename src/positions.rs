@@ -52,19 +52,19 @@ pub trait Cartesian3DVector: Sized {
 /// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct GeocentricPos {
+pub struct GeocentricPosition {
     x: Length,
     y: Length,
     z: Length,
 }
 
-impl GeocentricPos {
-    /// Creates a [GeocentricPos] from the given coordinates.
+impl GeocentricPosition {
+    /// Creates a [GeocentricPosition] from the given coordinates.
     pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
 
-    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
         Self::new(
             Length::from_metres(x),
@@ -73,13 +73,13 @@ impl GeocentricPos {
         )
     }
 
-    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
         Self::from_metres(v.x(), v.y(), v.z())
     }
 }
 
-impl Cartesian3DVector for GeocentricPos {
+impl Cartesian3DVector for GeocentricPosition {
     #[inline]
     fn x(&self) -> Length {
         self.x
@@ -106,24 +106,24 @@ impl Cartesian3DVector for GeocentricPos {
 /// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct GeodeticPos {
+pub struct GeodeticPosition {
     hp: NVector,
     height: Length,
 }
 
-impl GeodeticPos {
-    /// Creates a new [GeodeticPos] from the given horizontal coordinates and height above the surface.
+impl GeodeticPosition {
+    /// Creates a new [GeodeticPosition] from the given horizontal coordinates and height above the surface.
     pub const fn new(hp: NVector, height: Length) -> Self {
         Self { hp, height }
     }
 
-    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPos].
+    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPosition].
     #[inline]
     pub fn horizontal_position(&self) -> NVector {
         self.hp
     }
 
-    /// Returns the height above the surface of this [GeodeticPos].
+    /// Returns the height above the surface of this [GeodeticPosition].
     #[inline]
     pub fn height(&self) -> Length {
         self.height
@@ -224,7 +224,7 @@ impl LatLong {
 ///
 /// Orientation:
 /// - z-axis points to the North Pole along the body's rotation axis,
-/// - x-axis points towards the point where latitude = longitude = 0
+/// - x-axis points towards the position where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct NVector(Vec3);
@@ -309,7 +309,7 @@ pub(crate) fn assert_opt_nv_eq_d7(expected: NVector, actual: Option<NVector>) {
 }
 
 #[cfg(test)]
-pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPos, actual: GeodeticPos) {
+pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticPosition) {
     assert_nv_eq_d7(expected.horizontal_position(), actual.horizontal_position());
     assert_eq!(expected.height().round_mm(), actual.height().round_mm());
 }
