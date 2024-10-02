@@ -994,6 +994,7 @@ mod tests {
         assert!(Loop::EMPTY.is_simple());
         assert!(Loop::EMPTY.is_empty());
         assert_eq!(0, Loop::EMPTY.num_vertices());
+        assert_eq!(Angle::ZERO, Loop::EMPTY.spherical_excess());
     }
 
     // new
@@ -1076,6 +1077,11 @@ mod tests {
     // is_convex
 
     #[test]
+    fn is_convex_triangle() {
+        assert_convex(true, &vec![ystad(), hoor(), helsingborg()]);
+    }
+
+    #[test]
     fn is_convex_concave() {
         assert_convex(false, &vec![ystad(), hoor(), helsingborg(), kristianstad()]);
     }
@@ -1105,6 +1111,151 @@ mod tests {
         let mut rvs = vs.to_vec();
         rvs.reverse();
         assert_eq!(e, Loop::new(&rvs).is_convex());
+    }
+
+    // is_loop_clockwise
+
+    #[test]
+    fn is_loop_clockwise_closed() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(40.0, 40.0),
+            NVector::from_lat_long_degrees(10.0, 30.0),
+            NVector::from_lat_long_degrees(20.0, 20.0),
+            NVector::from_lat_long_degrees(40.0, 40.0),
+        ];
+        assert!(is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_equal_turns_anti_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(2.0, 5.0),
+            NVector::from_lat_long_degrees(1.5, 0.0),
+            NVector::from_lat_long_degrees(2.0, -5.0),
+            NVector::from_lat_long_degrees(1.0, -1.0),
+        ];
+        assert!(!is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_equal_turns_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, -1.0),
+            NVector::from_lat_long_degrees(2.0, -5.0),
+            NVector::from_lat_long_degrees(1.5, 0.0),
+            NVector::from_lat_long_degrees(2.0, 5.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+        ];
+        assert!(is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_less_than_3_vertices() {
+        assert!(!is_loop_clockwise(&vec![]));
+        assert!(!is_loop_clockwise(&vec![NVector::from_lat_long_degrees(
+            1.0, 1.0
+        )]));
+        assert!(!is_loop_clockwise(&vec![
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(2.0, 1.0)
+        ]));
+        assert!(!is_loop_clockwise(&vec![
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(2.0, 1.0),
+            NVector::from_lat_long_degrees(1.0, 1.0)
+        ]));
+    }
+
+    #[test]
+    fn is_loop_clockwise_more_left_turns_anti_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(2.0, 5.0),
+            NVector::from_lat_long_degrees(2.0, -5.0),
+            NVector::from_lat_long_degrees(1.0, -1.0),
+        ];
+        assert!(!is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_more_right_turns_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, -1.0),
+            NVector::from_lat_long_degrees(2.0, -5.0),
+            NVector::from_lat_long_degrees(2.0, 5.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+        ];
+        assert!(is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_triangle_anti_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(20.0, 20.0),
+            NVector::from_lat_long_degrees(10.0, 30.0),
+            NVector::from_lat_long_degrees(40.0, 40.0),
+        ];
+        assert!(!is_loop_clockwise(&vs));
+    }
+
+    #[test]
+    fn is_loop_clockwise_triangle_clockwise() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(40.0, 40.0),
+            NVector::from_lat_long_degrees(10.0, 30.0),
+            NVector::from_lat_long_degrees(20.0, 20.0),
+        ];
+        assert!(is_loop_clockwise(&vs));
+    }
+
+    // is_simple
+
+    #[test]
+    fn is_simple_consectutive_coincidental_vertices() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(3.0, 0.0),
+        ]);
+        assert!(!l.is_simple());
+    }
+    #[test]
+    fn is_simple_consectutive_antipodal_vertices() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(-2.0, -2.0).antipode(),
+            NVector::from_lat_long_degrees(3.0, 0.0),
+        ]);
+        assert!(!l.is_simple());
+    }
+
+    #[test]
+    fn is_simple_self_intersecting() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(2.0, -2.0),
+            NVector::from_lat_long_degrees(3.0, 0.0),
+            NVector::from_lat_long_degrees(-2.0, 2.0),
+            NVector::from_lat_long_degrees(2.0, 2.0),
+        ]);
+        assert!(!l.is_simple());
+    }
+
+    #[test]
+    fn is_simple() {
+        let l = Loop::new(&vec![
+            NVector::from_lat_long_degrees(-2.0, -2.0),
+            NVector::from_lat_long_degrees(2.0, -2.0),
+            NVector::from_lat_long_degrees(3.0, 0.0),
+            NVector::from_lat_long_degrees(2.0, 2.0),
+            NVector::from_lat_long_degrees(-2.0, 2.0),
+        ]);
+        assert!(l.is_simple());
     }
 
     // bound

@@ -171,6 +171,10 @@ mod tests {
     #[test]
     fn from_angle_range() {
         assert_eq!(
+            ChordLength::MAX,
+            ChordLength::from_angle(Angle::HALF_CIRCLE),
+        );
+        assert_eq!(
             ChordLength::from_angle(Angle::QUARTER_CIRCLE),
             ChordLength::from_angle(Angle::HALF_CIRCLE + Angle::QUARTER_CIRCLE)
         );
