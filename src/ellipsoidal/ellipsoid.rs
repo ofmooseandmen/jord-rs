@@ -5,7 +5,7 @@ use crate::{
 
 /// An ellipsoid.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ellipsoid {
     equatorial_radius: Length,
     polar_radius: Length,

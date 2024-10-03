@@ -24,7 +24,7 @@ use crate::{Angle, NVector};
 /// assert!(d2.as_radians() < 1.8e-8); // about 0.1 metre difference (~ worst case)
 /// ```
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChordLength {
     length2: f64,
 }

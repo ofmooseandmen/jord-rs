@@ -316,7 +316,7 @@ pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticP
 
 #[cfg(test)]
 mod tests {
-    use crate::{LatLong, NVector, Vec3};
+    use crate::{Cartesian3DVector, GeocentricPosition, LatLong, NVector, Vec3};
 
     #[test]
     fn nvector_from_north_pole() {
@@ -368,5 +368,49 @@ mod tests {
             LatLong::from_degrees(54.0000001, -154.0000001),
             LatLong::from_degrees(54.00000009, -154.00000011).round_d7()
         );
+    }
+
+    #[test]
+    fn round_mm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.497, 1652208.043, 5152924.171);
+        assert_eq!(expected, actual.round_mm());
+    }
+
+    #[test]
+    fn round_cm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.5, 1652208.04, 5152924.17);
+        assert_eq!(expected, actual.round_cm());
+    }
+
+    #[test]
+    fn round_dm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.5, 1652208.0, 5152924.2);
+        assert_eq!(expected, actual.round_dm());
+    }
+
+    #[test]
+    fn round_m_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.0, 1652208.0, 5152924.0);
+        assert_eq!(expected, actual.round_m());
     }
 }
