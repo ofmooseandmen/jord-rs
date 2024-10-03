@@ -51,7 +51,7 @@ pub trait Cartesian3DVector: Sized {
 
 /// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GeocentricPosition {
     x: Length,
     y: Length,
@@ -105,7 +105,7 @@ impl Cartesian3DVector for GeocentricPosition {
 
 /// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GeodeticPosition {
     hp: NVector,
     height: Length,
@@ -132,7 +132,7 @@ impl GeodeticPosition {
 
 /// An horizontal position represented by a pair of latitude-longitude.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LatLong {
     latitude: Angle,
     longitude: Angle,
@@ -226,7 +226,7 @@ impl LatLong {
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the position where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NVector(Vec3);
 
 impl NVector {
@@ -291,7 +291,7 @@ pub(crate) fn assert_nv_eq_d7(expected: NVector, actual: NVector) {
     let lla: LatLong = LatLong::from_nvector(actual).round_d7();
     if lle != lla {
         panic!(
-            "Expected position was {:#?} but got actual position is {:#?}",
+            "Expected position was {:#?} but actual position is {:#?}",
             lle, lla
         )
     }
@@ -302,7 +302,7 @@ pub(crate) fn assert_opt_nv_eq_d7(expected: NVector, actual: Option<NVector>) {
     match actual {
         Some(a) => assert_nv_eq_d7(expected, a),
         None => panic!(
-            "Expected position was {:#?} but got actual position is None",
+            "Expected position was {:#?} but actual position is None",
             LatLong::from_nvector(expected).round_d7()
         ),
     }
@@ -351,6 +351,22 @@ mod tests {
         assert_eq!(
             LatLong::from_degrees(-90.0, 0.0),
             LatLong::from_nvector(NVector::new(Vec3::NEG_UNIT_Z))
+        );
+    }
+
+    #[test]
+    fn round() {
+        assert_eq!(
+            LatLong::from_degrees(54.00001, -154.00001),
+            LatLong::from_degrees(54.000009, -154.000011).round_d5()
+        );
+        assert_eq!(
+            LatLong::from_degrees(54.000001, -154.000001),
+            LatLong::from_degrees(54.0000009, -154.0000011).round_d6()
+        );
+        assert_eq!(
+            LatLong::from_degrees(54.0000001, -154.0000001),
+            LatLong::from_degrees(54.00000009, -154.00000011).round_d7()
         );
     }
 }

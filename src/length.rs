@@ -1,7 +1,7 @@
 use crate::{impl_measurement, Angle, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// A length.
 ///
 /// It primarely exists to unambigously represent a length as opposed to a bare
@@ -191,5 +191,57 @@ impl ::std::ops::Mul<Length> for Angle {
 
     fn mul(self, rhs: Length) -> Length {
         Length::from_metres(self.as_radians() * rhs.metres)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Angle, Length};
+
+    #[test]
+    fn units() {
+        assert_eq!(100.0, Length::from_metres(100.0).as_metres());
+        assert_eq!(3900.0, Length::from_metres(3900.0).as_metres());
+
+        assert_eq!(10.0, Length::from_metres(18520.0).as_nautical_miles());
+        assert_eq!(18520.0, Length::from_nautical_miles(10.0).as_metres());
+
+        assert_eq!(2.5, Length::from_metres(2500.0).as_kilometres());
+        assert_eq!(2500.0, Length::from_kilometres(2.5).as_metres());
+
+        assert_eq!(1000.0, Length::from_metres(304.8).as_feet());
+        assert_eq!(304.8, Length::from_feet(1000.0).as_metres());
+    }
+
+    #[test]
+    fn mul() {
+        assert_eq!(
+            Length::from_metres(100.0),
+            Length::from_metres(50.0) * Angle::from_radians(2.0)
+        );
+        assert_eq!(
+            Length::from_metres(100.0),
+            Angle::from_radians(2.0) * Length::from_metres(50.0)
+        );
+    }
+
+    #[test]
+    fn round() {
+        assert_eq!(
+            Length::from_metres(50.0),
+            Length::from_metres(50.1).round_m()
+        );
+        assert_eq!(
+            Length::from_metres(50.2),
+            Length::from_metres(50.15).round_dm()
+        );
+        assert_eq!(
+            Length::from_metres(50.16),
+            Length::from_metres(50.157).round_cm()
+        );
+        assert_eq!(
+            Length::from_metres(50.157),
+            Length::from_metres(50.1574).round_mm()
+        );
     }
 }
