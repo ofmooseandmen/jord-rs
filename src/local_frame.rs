@@ -4,7 +4,7 @@ use crate::{
 };
 
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 enum Orientation {
     // x = north (or forward), y = east (or right), z = down.
     #[default]
@@ -23,7 +23,7 @@ enum Orientation {
 /// However, the [azimuth](crate::LocalPosition::azimuth) is always relative to 'north' and the elevation is always positive if above the local
 /// tangent plane and negative if below.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LocalPosition {
     x: Length,
     y: Length,
@@ -188,7 +188,7 @@ impl Cartesian3DVector for LocalPosition {
 /// calculations are needed in a limited area, position calculations can be performed
 /// relative to this system to get approximate horizontal and vertical components
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LocalFrame<S> {
     origin: Vec3,
     dir_rm: Mat33,
@@ -465,6 +465,18 @@ mod tests {
         Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame, LocalPosition, Mat33,
         NVector, Vec3,
     };
+
+    #[test]
+    fn local_position_from_metres() {
+        assert_eq!(
+            LocalPosition::new(
+                Length::from_metres(1.0),
+                Length::from_metres(2.0),
+                Length::from_metres(3.0)
+            ),
+            LocalPosition::from_metres(1.0, 2.0, 3.0)
+        );
+    }
 
     // geodetic_to_local_pos
 

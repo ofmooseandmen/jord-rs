@@ -1,7 +1,7 @@
 use crate::{impl_measurement, Angle, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A length.
 ///
 /// It primarely exists to unambigously represent a length as opposed to a bare

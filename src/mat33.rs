@@ -2,7 +2,7 @@ use crate::Vec3;
 
 /// A 3*3 matrix.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Mat33 {
     r0: Vec3,
     r1: Vec3,
