@@ -2,7 +2,7 @@ use std::f64::consts::PI;
 
 use crate::{Angle, LatLong, Mat33, NVector, Vec3};
 
-use super::Sphere;
+use super::{ChordLength, Sphere};
 
 /// A [spherical cap](https://en.wikipedia.org/wiki/Spherical_cap): a portion of a sphere cut off by a plane.
 /// This struct and implementation is very much based on [S2Cap](https://github.com/google/s2geometry/blob/master/src/s2/s2cap.h).
@@ -10,51 +10,44 @@ use super::Sphere;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Cap {
     centre: NVector,
-    chord_radius2: f64,
+    radius: ChordLength,
 }
 
 impl Cap {
-    const MAX_CHORD_RADIUS_2: f64 = 4.0;
-
-    /// Empty spherical cap: contains no point.
+    /// Empty spherical cap: contains no position.
     pub const EMPTY: Cap = Self {
         centre: NVector::new(Vec3::UNIT_Z),
-        chord_radius2: -1.0,
+        radius: ChordLength::NEGATIVE,
     };
 
-    /// Full spherical cap: contains all points.
+    /// Full spherical cap: contains all positions.
     pub const FULL: Cap = Self {
         centre: NVector::new(Vec3::UNIT_Z),
-        chord_radius2: Self::MAX_CHORD_RADIUS_2,
+        radius: ChordLength::MAX,
     };
 
     /// Constructs a new cap from the given centre and given radius expressed as the angle between the
-    /// centre and all points on the boundary of the cap.
+    /// centre and all positions on the boundary of the cap.
     pub fn from_centre_and_radius(centre: NVector, radius: Angle) -> Self {
-        let chord_radius2 = if radius < Angle::ZERO {
-            -1.0
-        } else {
-            Self::radius_to_chord_radius2(radius)
-        };
         Self {
             centre,
-            chord_radius2,
+            radius: ChordLength::from_angle(radius),
         }
     }
 
-    /// Constructs a new cap from the given centre and a given point on the boundary of the cap.
-    pub fn from_centre_and_boundary_point(centre: NVector, boundary_point: NVector) -> Self {
+    /// Constructs a new cap from the given centre and a given position on the boundary of the cap.
+    pub fn from_centre_and_boundary_position(centre: NVector, boundary_position: NVector) -> Self {
         Self {
             centre,
-            chord_radius2: Self::chord_radius2(centre, boundary_point),
+            radius: ChordLength::new(centre, boundary_position),
         }
     }
 
-    /// Constructs a new cap whose boundary passes by the 3 given points: the returned cap is the circumcircle of the
-    /// triangle defined by the 3 given points.
+    /// Constructs a new cap whose boundary passes by the 3 given positions: the returned cap is the circumcircle of the
+    /// triangle defined by the 3 given positions.
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
-        // 3 points must be in anti-clockwise order
+        // 3 positions must be in anti-clockwise order
         let clockwise = Sphere::side(a, b, c) < 0;
         let v1 = a.as_vec3();
         let v2 = if clockwise { c.as_vec3() } else { b.as_vec3() };
@@ -62,23 +55,20 @@ impl Cap {
         let e1 = v2 - v1;
         let e2 = v3 - v1;
         let centre = NVector::new(e1.orthogonal_to(e2));
-        // all chord radius should be equal, still take maximum to account for floating point errors.
-        let chord_radius2 = Self::chord_radius2(a, centre)
-            .max(Self::chord_radius2(b, centre).max(Self::chord_radius2(c, centre)));
-        Self {
-            centre,
-            chord_radius2,
-        }
+        // all chord length should be equal, still take maximum to account for floating point errors.
+        let radius: ChordLength = ChordLength::new(a, centre)
+            .max(ChordLength::new(b, centre).max(ChordLength::new(c, centre)));
+        Self { centre, radius }
     }
 
     /// Determines whether this cap is [full](crate::spherical::Cap::FULL).
     pub fn is_full(&self) -> bool {
-        self.chord_radius2 >= Self::MAX_CHORD_RADIUS_2
+        self.radius == ChordLength::MAX
     }
 
     /// Determines whether this cap is [empty](crate::spherical::Cap::EMPTY).
     pub fn is_empty(&self) -> bool {
-        self.chord_radius2 < 0.0
+        self.radius == ChordLength::NEGATIVE
     }
 
     /// Returns the complement of this cap. Both caps have the same boundary but
@@ -91,12 +81,14 @@ impl Cap {
         } else {
             Self {
                 centre: self.centre.antipode(),
-                chord_radius2: (Self::MAX_CHORD_RADIUS_2 - self.chord_radius2),
+                radius: ChordLength::from_squared_length(
+                    ChordLength::MAX.length2() - self.radius.length2(),
+                ),
             }
         }
     }
 
-    /// Determines whether this cap contains the given point (including the boundary).
+    /// Determines whether this cap contains the given position (including the boundary).
     ///
     /// # Examples
     ///
@@ -104,19 +96,19 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// assert!(cap.contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-    /// assert!(cap.contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+    /// assert!(cap.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+    /// assert!(cap.contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     /// ```
-    pub fn contains_point(&self, p: NVector) -> bool {
-        Self::chord_radius2(self.centre, p) <= self.chord_radius2
+    pub fn contains_position(&self, p: NVector) -> bool {
+        ChordLength::new(self.centre, p) <= self.radius
     }
 
-    /// Determines whether the interior of this cap contains the given point.
+    /// Determines whether the interior of this cap contains the given position.
     ///
     /// # Examples
     ///
@@ -124,16 +116,16 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// assert!(!cap.interior_contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-    /// assert!(cap.interior_contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+    /// assert!(!cap.interior_contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+    /// assert!(cap.interior_contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     /// ```
-    pub fn interior_contains_point(&self, p: NVector) -> bool {
-        Self::chord_radius2(self.centre, p) < self.chord_radius2
+    pub fn interior_contains_position(&self, p: NVector) -> bool {
+        ChordLength::new(self.centre, p) < self.radius
     }
 
     /// Determines whether this cap contains the given cap. The full cap contains all caps
@@ -145,12 +137,12 @@ impl Cap {
     /// use jord::NVector;
     /// use jord::spherical::Cap;
     ///
-    /// let cap1 = Cap::from_centre_and_boundary_point(
+    /// let cap1 = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0)
     /// );
     ///
-    /// let cap2 = Cap::from_centre_and_boundary_point(
+    /// let cap2 = Cap::from_centre_and_boundary_position(
     ///     NVector::from_lat_long_degrees(90.0, 0.0),
     ///     NVector::from_lat_long_degrees(45.0, 0.0)
     /// );
@@ -161,14 +153,14 @@ impl Cap {
         if self.is_full() || other.is_empty() {
             true
         } else {
-            self.chord_radius2
-                >= Self::chord_radius2(self.centre, other.centre) + other.chord_radius2
+            self.radius.length2()
+                >= ChordLength::new(self.centre, other.centre).length2() + other.radius.length2()
         }
     }
 
-    ///Returns the smallest cap which encloses this cap and the other given cap.
+    /// Returns the smallest cap which encloses this cap and the other given cap.
     pub fn union(&self, other: Self) -> Self {
-        if self.chord_radius2 < other.chord_radius2 {
+        if self.radius < other.radius {
             return other.union(*self);
         }
         if self.is_full() || other.is_empty() {
@@ -186,7 +178,7 @@ impl Cap {
         let centre = Sphere::position_on_great_circle(self.centre, other.centre, ang);
         Self {
             centre,
-            chord_radius2: Self::radius_to_chord_radius2(union_radius),
+            radius: ChordLength::from_angle(union_radius),
         }
     }
 
@@ -196,9 +188,9 @@ impl Cap {
     }
 
     /// Returns the radius of this cap: central angle between the centre of this cap and
-    /// any point on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
+    /// any position on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
     /// The returned value may not exactly equal the value passed
-    /// to [from_centre_and_boundary_point](crate::spherical::Cap::from_centre_and_boundary_point).
+    /// to [from_centre_and_boundary_position](crate::spherical::Cap::from_centre_and_boundary_position).
     ///
     /// # Examples
     ///
@@ -208,7 +200,7 @@ impl Cap {
     /// use jord::{Angle, NVector};
     /// use jord::spherical::Cap;
     ///
-    /// let cap = Cap::from_centre_and_boundary_point(
+    /// let cap = Cap::from_centre_and_boundary_position(
     ///      NVector::from_lat_long_degrees(90.0, 0.0),
     ///      NVector::from_lat_long_degrees(45.0, 45.0)
     /// );
@@ -216,11 +208,7 @@ impl Cap {
     /// assert_eq!(Angle::from_radians(PI / 4.0), cap.radius().round_d7());
     /// ```
     pub fn radius(&self) -> Angle {
-        if self.is_empty() {
-            Angle::from_radians(-1.0)
-        } else {
-            Angle::from_radians(2.0 * (self.chord_radius2.sqrt() * 0.5).asin())
-        }
+        self.radius.to_angle()
     }
 
     /// Returns the list of vertices defining the boundary of this cap. If this cap is [empty](crate::spherical::Cap::EMPTY)
@@ -284,25 +272,13 @@ impl Cap {
         for a in angles {
             // arc at north pole.
             let a_np = Vec3::new(-rm * a.cos(), rm * a.sin(), z);
-            // rotate each point to arc centre.
+            // rotate each position to arc centre.
             let a_cen = (a_np * ry) * rz;
 
             let p = NVector::new(a_cen.unit());
             res.push(p);
         }
         res
-    }
-
-    fn chord_radius2(a: NVector, b: NVector) -> f64 {
-        (a.as_vec3() - b.as_vec3())
-            .squared_norm()
-            .min(Self::MAX_CHORD_RADIUS_2)
-    }
-
-    fn radius_to_chord_radius2(radius: Angle) -> f64 {
-        // max angle is PI
-        let chord_radius = 2.0 * ((radius.as_radians().min(PI)) * 0.5).sin();
-        (chord_radius * chord_radius).min(Self::MAX_CHORD_RADIUS_2)
     }
 }
 
@@ -313,16 +289,16 @@ mod tests {
 
     #[test]
     fn full() {
-        assert!(Cap::FULL.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
-        assert!(Cap::FULL.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(Cap::FULL.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(Cap::FULL.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
         assert_eq!(Angle::from_radians(PI), Cap::FULL.radius());
         assert_eq!(Cap::EMPTY, Cap::FULL.complement());
     }
 
     #[test]
     fn empty() {
-        assert!(!Cap::EMPTY.contains_point(NVector::from_lat_long_degrees(90.0, 0.0)));
-        assert!(!Cap::EMPTY.contains_point(NVector::from_lat_long_degrees(-90.0, 0.0)));
+        assert!(!Cap::EMPTY.contains_position(NVector::from_lat_long_degrees(90.0, 0.0)));
+        assert!(!Cap::EMPTY.contains_position(NVector::from_lat_long_degrees(-90.0, 0.0)));
         assert_eq!(Angle::from_radians(-1.0), Cap::EMPTY.radius());
         assert_eq!(Cap::FULL, Cap::EMPTY.complement());
     }
@@ -333,13 +309,13 @@ mod tests {
         let b = NVector::from_lat_long_degrees(20.0, 0.0);
         let c = NVector::from_lat_long_degrees(10.0, 10.0);
         let cap = Cap::from_triangle(a, b, c);
-        assert!(cap.contains_point(a));
-        assert!(cap.contains_point(b));
-        assert!(cap.contains_point(c));
+        assert!(cap.contains_position(a));
+        assert!(cap.contains_position(b));
+        assert!(cap.contains_position(c));
 
         let o = Cap::from_triangle(c, b, a);
         assert_nv_eq_d7(o.centre, cap.centre);
-        assert!((o.chord_radius2 - cap.chord_radius2).abs() < 1e-16);
+        assert!((o.radius.length2() - cap.radius.length2()).abs() < 1e-16);
     }
 
     #[test]
@@ -351,31 +327,31 @@ mod tests {
 
         let northern_complement = northern.complement();
         assert_eq!(southern.centre, northern_complement.centre);
-        assert!((southern.chord_radius2 - northern_complement.chord_radius2).abs() < 1e15);
+        assert!((southern.radius.length2() - northern_complement.radius.length2()).abs() < 1e15);
 
         let southern_complement = southern.complement();
         assert_eq!(northern.centre, southern_complement.centre);
-        assert!((northern.chord_radius2 - southern_complement.chord_radius2).abs() < 1e15);
+        assert!((northern.radius.length2() - southern_complement.radius.length2()).abs() < 1e15);
     }
 
     #[test]
-    fn contains_point() {
-        let cap = Cap::from_centre_and_boundary_point(
+    fn contains_position() {
+        let cap = Cap::from_centre_and_boundary_position(
             NVector::from_lat_long_degrees(90.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 0.0),
         );
-        assert!(cap.contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-        assert!(cap.contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+        assert!(cap.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert!(cap.contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     }
 
     #[test]
-    fn interior_contains_point() {
-        let cap = Cap::from_centre_and_boundary_point(
+    fn interior_contains_position() {
+        let cap = Cap::from_centre_and_boundary_position(
             NVector::from_lat_long_degrees(90.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 0.0),
         );
-        assert!(!cap.interior_contains_point(NVector::from_lat_long_degrees(0.0, 0.0)));
-        assert!(cap.interior_contains_point(NVector::from_lat_long_degrees(45.0, 45.0)));
+        assert!(!cap.interior_contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert!(cap.interior_contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     }
 
     #[test]
@@ -399,7 +375,7 @@ mod tests {
     fn radius() {
         assert_eq!(
             Angle::QUARTER_CIRCLE,
-            Cap::from_centre_and_boundary_point(
+            Cap::from_centre_and_boundary_position(
                 NVector::from_lat_long_degrees(90.0, 0.0),
                 NVector::from_lat_long_degrees(0.0, 0.0)
             )
@@ -408,7 +384,7 @@ mod tests {
         );
         assert_eq!(
             Angle::from_radians(PI / 4.0),
-            Cap::from_centre_and_boundary_point(
+            Cap::from_centre_and_boundary_position(
                 NVector::from_lat_long_degrees(90.0, 0.0),
                 NVector::from_lat_long_degrees(45.0, 45.0)
             )

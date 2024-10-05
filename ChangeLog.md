@@ -1,6 +1,10 @@
 ### 0.15.0
 
 - Fixed: intersection at shared vertex of both minor arcs
+- Added: serde
+- Added: spherical::ChordLength
+- Added: MinorArc::distance_to and Loop::distance_to_boundary
+- Removed: Loop::is_pos_within_distance_to_boundary (replaced by Loop::distance_to_boundary)
 
 ### 0.14.0
 

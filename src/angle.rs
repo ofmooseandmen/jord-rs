@@ -62,6 +62,21 @@ impl Angle {
         Angle { radians }
     }
 
+    /// Returns a new angle that is the absolute value of this angle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::Angle;
+    ///
+    /// assert_eq!(Angle::from_degrees(45.0), Angle::from_degrees(-45.0).abs());
+    /// ```
+    pub fn abs(&self) -> Self {
+        Angle {
+            radians: self.radians.abs(),
+        }
+    }
+
     /// Returns a new angle by normalising this angle to the range [0, 360) degrees.
     ///
     /// # Examples

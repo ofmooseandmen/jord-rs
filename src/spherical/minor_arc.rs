@@ -1,9 +1,6 @@
-use crate::{
-    numbers::{eq_zero, gte},
-    Angle, NVector, Vec3,
-};
+use crate::{numbers::eq_zero, spherical::ChordLength, Angle, NVector, Vec3};
 
-use super::base::{angle_radians_between, exact_side};
+use super::base::{angle_radians_between, side};
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
@@ -41,6 +38,70 @@ impl MinorArc {
     #[inline]
     pub fn normal(&self) -> Vec3 {
         self.normal
+    }
+
+    /// Computes the [chord length](crate::spherical::ChordLength) between the given position and the closest
+    /// position on this minor arc of great circle from that position.
+    /// Note: a chord length is returned instead of a distance as it is much faster to compute, specially when the
+    /// minimum distance to a set of edges (i.e. a loop) is to be computed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{LatLong, Length};
+    /// use jord::spherical::{ChordLength, MinorArc, Sphere};
+    ///
+    /// let ma = MinorArc::new(
+    ///     LatLong::from_degrees(0.0, 0.0).to_nvector(),
+    ///     LatLong::from_degrees(0.0, 10.0).to_nvector()
+    /// );
+    /// let p = LatLong::from_degrees(1.0, 5.0).to_nvector();
+    ///
+    /// let a = ma.distance_to(p);
+    /// let e = Sphere::angle(p, ma.projection(p).unwrap());
+    ///
+    /// assert_eq!(e.round_d7(), a.to_angle().round_d7());
+    /// ```
+    pub fn distance_to(&self, p: NVector) -> ChordLength {
+        // This method computes the minimum distance between p and any point on this edge; it can be either
+        // on the interior of the edge or to one of the endpoints.
+        //
+        // This can be achieve by first projecting p on this edge and if the result is within edge, returning the
+        // distance between p and the projection. Otherwise returning the minimum distance between (p, edge::start) and (p,
+        // edge::end).
+        //
+        // The code below effectively implements this logic, using the chord length instead (as explained
+        // in the documentation).
+
+        //
+        // Consider the triangle [X, A, B]
+        //
+        // Let XA = distance between X and A, XB = distance between X and B and AB = distance between A and B and X
+        // Let ALPHA = angle [X, A] to [A, B]
+        // Law of cosine: XA^2 = XB^2 + AB^2 - 2.XB.AB.cos(ALPHA), yielding XA^2 - XB^2 = AB^2 - 2.XB.AB.cos(ALPHA).
+        //
+        // For the closest point to be on [A, B], XAB and XBA must both be acute angles if ALPHA < 90 then
+        // 2.XB.AB.cos(ALPHA) > 0 and then XA^2 - XB^2 >= AB^2 + EPS to be on the safe side.
+        //
+        let xa = ChordLength::new(p, self.start);
+        let xb = ChordLength::new(p, self.end);
+        let ab = ChordLength::new(self.start, self.end);
+        if (xa.length2() - xb.length2()) >= ab.length2() + f64::EPSILON {
+            return xa.min(xb);
+        }
+
+        let n2 = p.as_vec3().stable_cross_prod_unit(self.normal);
+        if n2 == Vec3::ZERO {
+            // p is "perpendicular" to e, so the closest distance is to any point of the edge; pick edge::start.
+            return xa;
+        }
+
+        let proj = self.normal.orthogonal_to(n2);
+        if self.contains_vec3(proj) {
+            // p is "within" this edge, return the distance between p and the projection.
+            return ChordLength::new(p, NVector::new(proj));
+        }
+        xa.min(xb)
     }
 
     /// Computes the intersection point between this minor arc and the given minor arc, if there is an
@@ -119,7 +180,7 @@ impl MinorArc {
         }
     }
 
-    /// Determines whether this minor arc contains the given point.
+    /// Determines whether this minor arc contains the given position.
     ///
     /// ```
     /// use jord::NVector;
@@ -130,12 +191,12 @@ impl MinorArc {
     ///     NVector::from_lat_long_degrees(0.0, 10.0)
     /// );
     ///
-    /// assert!(ma.contains_point(NVector::from_lat_long_degrees(0.0, 5.0)));
-    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(1.0, 5.0)));
-    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(0.0, 11.0)));
-    /// assert!(!ma.contains_point(NVector::from_lat_long_degrees(0.0, -11.0)));
+    /// assert!(ma.contains_position(NVector::from_lat_long_degrees(0.0, 5.0)));
+    /// assert!(!ma.contains_position(NVector::from_lat_long_degrees(1.0, 5.0)));
+    /// assert!(!ma.contains_position(NVector::from_lat_long_degrees(0.0, 11.0)));
+    /// assert!(!ma.contains_position(NVector::from_lat_long_degrees(0.0, -11.0)));
     /// ```
-    pub fn contains_point(&self, p: NVector) -> bool {
+    pub fn contains_position(&self, p: NVector) -> bool {
         let v = p.as_vec3();
         eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v)
     }
@@ -245,7 +306,7 @@ impl MinorArc {
         let start = self.start.as_vec3();
         let end = self.end.as_vec3();
         let n = self.normal;
-        gte(exact_side(v, n, start), 0.0) && gte(exact_side(end, n, v), 0.0)
+        side(v, n, start) >= 0 && side(end, n, v) >= 0
     }
 }
 
@@ -254,9 +315,83 @@ mod tests {
 
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::{GreatCircle, MinorArc, Sphere},
+        spherical::{ChordLength, GreatCircle, MinorArc, Sphere},
         Angle, LatLong, Length, NVector, Vec3,
     };
+
+    // distance_to
+    #[test]
+    fn distance_to_close_interior() {
+        let e = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(-1.0 / 3600000_000.0, 0.0);
+        let actual = e.distance_to(p);
+        let projection = e.projection(p).unwrap();
+        let expected = ChordLength::new(p, projection);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn distance_to_close_start() {
+        let e = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(1.0, -1.0 / 3600000_000.0);
+        let actual: ChordLength = e.distance_to(p);
+        let expected = ChordLength::new(p, e.start());
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn distance_to_end() {
+        let e: MinorArc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(-1.0, 11.0);
+        let actual: ChordLength = e.distance_to(p);
+        let expected = ChordLength::new(p, e.end());
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn distance_to_interior() {
+        let e: MinorArc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(1.0, 5.0);
+        let actual: ChordLength = e.distance_to(p);
+        let projection = e.projection(p).unwrap();
+        let expected = ChordLength::new(p, projection);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn distance_to_perpendicular() {
+        let e: MinorArc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(90.0, 0.0);
+        let actual = e.distance_to(p);
+        assert_eq!(ChordLength::new(p, e.start()), actual);
+    }
+
+    #[test]
+    fn distance_to_start() {
+        let e: MinorArc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let p = NVector::from_lat_long_degrees(-1.0, -1.0);
+        let actual: ChordLength = e.distance_to(p);
+        let expected = ChordLength::new(p, e.start());
+        assert_eq!(expected, actual);
+    }
 
     // intersection
 
@@ -440,16 +575,19 @@ mod tests {
         let tenth_of_mm = Length::from_metres(1e-4);
         let arc1_start = NVector::from_lat_long_degrees(-32.7929069956, 135.4840669972);
         let arc1_end =
-            Sphere::EARTH.destination_pos(arc1_start, Angle::from_degrees(45.0), tenth_of_mm);
+            Sphere::EARTH.destination_position(arc1_start, Angle::from_degrees(45.0), tenth_of_mm);
 
         let arc1 = MinorArc::new(arc1_start, arc1_end);
 
-        let arc1_midpoint = Sphere::interpolated_pos(arc1_start, arc1_end, 0.5).unwrap();
+        let arc1_midpoint = Sphere::interpolated_position(arc1_start, arc1_end, 0.5).unwrap();
 
-        let arc2_start =
-            Sphere::EARTH.destination_pos(arc1_midpoint, Angle::from_degrees(315.0), tenth_of_mm);
+        let arc2_start = Sphere::EARTH.destination_position(
+            arc1_midpoint,
+            Angle::from_degrees(315.0),
+            tenth_of_mm,
+        );
         let arc2_end =
-            Sphere::EARTH.destination_pos(arc2_start, Angle::from_degrees(135.0), tenth_of_mm);
+            Sphere::EARTH.destination_position(arc2_start, Angle::from_degrees(135.0), tenth_of_mm);
         let arc2 = MinorArc::new(arc2_start, arc2_end);
 
         assert_intersection(arc1_midpoint, arc1, arc2);

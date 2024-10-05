@@ -52,19 +52,19 @@ pub trait Cartesian3DVector: Sized {
 /// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct GeocentricPos {
+pub struct GeocentricPosition {
     x: Length,
     y: Length,
     z: Length,
 }
 
-impl GeocentricPos {
-    /// Creates a [GeocentricPos] from the given coordinates.
+impl GeocentricPosition {
+    /// Creates a [GeocentricPosition] from the given coordinates.
     pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
 
-    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
         Self::new(
             Length::from_metres(x),
@@ -73,13 +73,13 @@ impl GeocentricPos {
         )
     }
 
-    /// Creates a [GeocentricPos] from the given coordinates in metres.
+    /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
         Self::from_metres(v.x(), v.y(), v.z())
     }
 }
 
-impl Cartesian3DVector for GeocentricPos {
+impl Cartesian3DVector for GeocentricPosition {
     #[inline]
     fn x(&self) -> Length {
         self.x
@@ -106,24 +106,24 @@ impl Cartesian3DVector for GeocentricPos {
 /// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct GeodeticPos {
+pub struct GeodeticPosition {
     hp: NVector,
     height: Length,
 }
 
-impl GeodeticPos {
-    /// Creates a new [GeodeticPos] from the given horizontal coordinates and height above the surface.
+impl GeodeticPosition {
+    /// Creates a new [GeodeticPosition] from the given horizontal coordinates and height above the surface.
     pub const fn new(hp: NVector, height: Length) -> Self {
         Self { hp, height }
     }
 
-    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPos].
+    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPosition].
     #[inline]
     pub fn horizontal_position(&self) -> NVector {
         self.hp
     }
 
-    /// Returns the height above the surface of this [GeodeticPos].
+    /// Returns the height above the surface of this [GeodeticPosition].
     #[inline]
     pub fn height(&self) -> Length {
         self.height
@@ -224,7 +224,7 @@ impl LatLong {
 ///
 /// Orientation:
 /// - z-axis points to the North Pole along the body's rotation axis,
-/// - x-axis points towards the point where latitude = longitude = 0
+/// - x-axis points towards the position where latitude = longitude = 0
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct NVector(Vec3);
@@ -291,7 +291,7 @@ pub(crate) fn assert_nv_eq_d7(expected: NVector, actual: NVector) {
     let lla: LatLong = LatLong::from_nvector(actual).round_d7();
     if lle != lla {
         panic!(
-            "Expected position was {:#?} but got actual position is {:#?}",
+            "Expected position was {:#?} but actual position is {:#?}",
             lle, lla
         )
     }
@@ -302,21 +302,21 @@ pub(crate) fn assert_opt_nv_eq_d7(expected: NVector, actual: Option<NVector>) {
     match actual {
         Some(a) => assert_nv_eq_d7(expected, a),
         None => panic!(
-            "Expected position was {:#?} but got actual position is None",
+            "Expected position was {:#?} but actual position is None",
             LatLong::from_nvector(expected).round_d7()
         ),
     }
 }
 
 #[cfg(test)]
-pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPos, actual: GeodeticPos) {
+pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticPosition) {
     assert_nv_eq_d7(expected.horizontal_position(), actual.horizontal_position());
     assert_eq!(expected.height().round_mm(), actual.height().round_mm());
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{LatLong, NVector, Vec3};
+    use crate::{Cartesian3DVector, GeocentricPosition, LatLong, NVector, Vec3};
 
     #[test]
     fn nvector_from_north_pole() {
@@ -352,5 +352,65 @@ mod tests {
             LatLong::from_degrees(-90.0, 0.0),
             LatLong::from_nvector(NVector::new(Vec3::NEG_UNIT_Z))
         );
+    }
+
+    #[test]
+    fn round() {
+        assert_eq!(
+            LatLong::from_degrees(54.00001, -154.00001),
+            LatLong::from_degrees(54.000009, -154.000011).round_d5()
+        );
+        assert_eq!(
+            LatLong::from_degrees(54.000001, -154.000001),
+            LatLong::from_degrees(54.0000009, -154.0000011).round_d6()
+        );
+        assert_eq!(
+            LatLong::from_degrees(54.0000001, -154.0000001),
+            LatLong::from_degrees(54.00000009, -154.00000011).round_d7()
+        );
+    }
+
+    #[test]
+    fn round_mm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.497, 1652208.043, 5152924.171);
+        assert_eq!(expected, actual.round_mm());
+    }
+
+    #[test]
+    fn round_cm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.5, 1652208.04, 5152924.17);
+        assert_eq!(expected, actual.round_cm());
+    }
+
+    #[test]
+    fn round_dm_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.5, 1652208.0, 5152924.2);
+        assert_eq!(expected, actual.round_dm());
+    }
+
+    #[test]
+    fn round_m_geocentric() {
+        let actual = GeocentricPosition::from_metres(
+            -3387528.4972551535,
+            1652208.0428068785,
+            5152924.171316559,
+        );
+        let expected = GeocentricPosition::from_metres(-3387528.0, 1652208.0, 5152924.0);
+        assert_eq!(expected, actual.round_m());
     }
 }

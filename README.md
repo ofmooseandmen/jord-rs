@@ -11,9 +11,9 @@ The `jord` crate implements various geographical position calculations, featurin
 
 - Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) models,
 - [Local frame](crate::LocalFrame)s - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
-- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of point...,
+- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of position...,
 - Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
-- [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains point, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
+- [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains position, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
 - [Spherical Cap](crate::spherical::Cap)s and [Rectangular Region](crate::spherical::Rectangle)s
 - Location-dependent radii of [ellispoid](crate::ellipsoidal::Ellipsoid)s.
 
@@ -31,21 +31,21 @@ The following references provide the theoretical basis of most of the algorithms
 Given two positions A and B. Find the exact vector from A to B in meters north, east and down, and find the direction (azimuth/bearing) to B, relative to north. Use WGS-84 ellipsoid.
 
 ```
-use jord::{Angle, Cartesian3DVector, GeodeticPos, Length, LocalFrame, NVector};
+use jord::{Angle, Cartesian3DVector, GeodeticPosition, Length, LocalFrame, NVector};
 use jord::ellipsoidal::Ellipsoid;
 
-let a = GeodeticPos::new(
+let a = GeodeticPosition::new(
     NVector::from_lat_long_degrees(1.0, 2.0),
     Length::from_metres(3.0)
 );
 
-let b = GeodeticPos::new(
+let b = GeodeticPosition::new(
     NVector::from_lat_long_degrees(4.0, 5.0),
     Length::from_metres(6.0)
 );
 
 let ned = LocalFrame::ned(a, Ellipsoid::WGS84);
-let delta = ned.geodetic_to_local_pos(b);
+let delta = ned.geodetic_to_local_position(b);
 
 assert_eq!(Length::from_metres(331730.863), delta.x().round_mm()); // north
 assert_eq!(Length::from_metres(332998.501), delta.y().round_mm()); // east
@@ -60,12 +60,12 @@ Given the position of vehicle B and a bearing and distance to an object C. Find 
 
 ```
 use jord::{
-    Angle, Cartesian3DVector, GeodeticPos, LatLong, Length, LocalFrame, LocalPositionVector,
+    Angle, Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame, LocalPosition,
     NVector, Vec3,
 };
 use jord::ellipsoidal::Ellipsoid;
 
-let b = GeodeticPos::new(
+let b = GeodeticPosition::new(
     NVector::new(Vec3::new_unit(1.0, 2.0, 3.0)),
     Length::from_metres(400.0)
 );
@@ -74,9 +74,9 @@ let yaw = Angle::from_degrees(10.0);
 let pitch = Angle::from_degrees(20.0);
 let roll = Angle::from_degrees(30.0);
 let body = LocalFrame::body(yaw, pitch, roll, b, Ellipsoid::WGS72);
-let delta = LocalPositionVector::from_metres(3000.0, 2000.0, 100.0);
+let delta = LocalPosition::from_metres(3000.0, 2000.0, 100.0);
 
-let c = body.local_to_geodetic_pos(delta);
+let c = body.local_to_geodetic_position(delta);
 let c_ll = LatLong::from_nvector(c.horizontal_position());
 
 assert_eq!(Angle::from_degrees(53.32638), c_ll.latitude().round_d5());
@@ -88,11 +88,11 @@ assert_eq!(Length::from_metres(406.007), c.height().round_mm());
 Given an ECEF-vector of a position. Find geodetic latitude, longitude and height (using WGS-84 ellipsoid).
 
 ```
-use jord::{Angle, GeocentricPos, LatLong, Length, Surface};
+use jord::{Angle, GeocentricPosition, LatLong, Length, Surface};
 use jord::ellipsoidal::Ellipsoid;
 
-let c = GeocentricPos::from_metres(0.9*6371e3, -1.0*6371e3, 1.1*6371e3);
-let p = Ellipsoid::WGS84.geocentric_to_geodetic(c);
+let c = GeocentricPosition::from_metres(0.9*6371e3, -1.0*6371e3, 1.1*6371e3);
+let p = Ellipsoid::WGS84.geocentric_to_geodetic_position(c);
 
 let p_ll = LatLong::from_nvector(p.horizontal_position());
 assert_eq!(Angle::from_degrees(39.37875), p_ll.latitude().round_d5());
@@ -104,18 +104,18 @@ assert_eq!(Length::from_metres(4702059.834), p.height().round_mm());
 Given geodetic latitude, longitude and height. Find the ECEF-vector (using WGS-84 ellipsoid).
 
 ```
-use jord::{Cartesian3DVector, GeocentricPos, GeodeticPos, Length, NVector, Surface};
+use jord::{Cartesian3DVector, GeocentricPosition, GeodeticPosition, Length, NVector, Surface};
 use jord::ellipsoidal::Ellipsoid;
 
-let p = GeodeticPos::new(
+let p = GeodeticPosition::new(
     NVector::from_lat_long_degrees(1.0, 2.0),
     Length::from_metres(3.0)
 );
 
-let c = Ellipsoid::WGS84.geodetic_to_geocentric(p);
+let c = Ellipsoid::WGS84.geodetic_to_geocentric_position(p);
 
 assert_eq!(
-    GeocentricPos::from_metres(6_373_290.277, 222_560.201, 110_568.827),
+    GeocentricPosition::from_metres(6_373_290.277, 222_560.201, 110_568.827),
     c.round_mm(),
 );
 ```
@@ -153,7 +153,7 @@ let t1 = 20.0;
 let ti = 16.0;
 
 let f = (ti - t0) / (t1 - t0);
-let pi = Sphere::interpolated_pos(a, b, f);
+let pi = Sphere::interpolated_position(a, b, f);
 
 assert!(pi.is_some());
 assert_eq!(
@@ -195,7 +195,7 @@ let p =  NVector::from_lat_long_degrees(80.0, -90.0);
 let azimuth = Angle::from_degrees(200.0);
 let distance = Length::from_metres(1000.0);
 
-let d = Sphere::EARTH.destination_pos(p, azimuth, distance);
+let d = Sphere::EARTH.destination_position(p, azimuth, distance);
 
 assert_eq!(
     LatLong::from_degrees(79.99155, -90.01770),
