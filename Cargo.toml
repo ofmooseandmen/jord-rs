@@ -14,9 +14,11 @@ categories = ["science::geo"]
 
 [features]
 serde = ["dep:serde"]
+uom = ["dep:uom"]
 
 [dependencies]
 serde = { version = "1", optional = true, features = ["derive"] }
+uom = { version = "0.36", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
