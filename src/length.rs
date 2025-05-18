@@ -1,4 +1,4 @@
-use crate::{impl_measurement, Angle, Measurement};
+9use crate::{impl_measurement, Angle, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
@@ -262,9 +262,9 @@ mod tests {
     #[cfg(feature = "uom")]
     #[test]
     fn uom() {
-        let speed = Length::from_metres(1.0);
-        let uom = uom::si::f64::Length::from(speed);
+        let length = Length::from_metres(1.0);
+        let uom = uom::si::f64::Length::from(length);
         let roundtrip = Length::from(uom);
-        assert_eq!(speed, roundtrip);
+        assert_eq!(length, roundtrip);
     }
 }
