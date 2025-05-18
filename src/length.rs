@@ -1,4 +1,4 @@
-9use crate::{impl_measurement, Angle, Measurement};
+use crate::{impl_measurement, Angle, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
