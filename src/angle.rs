@@ -1,4 +1,4 @@
-use crate::{impl_measurement, Measurement};
+p0use crate::{impl_measurement, Measurement};
 use std::f64::consts::PI;
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
@@ -276,9 +276,9 @@ mod tests {
     #[cfg(feature = "uom")]
     #[test]
     fn uom() {
-        let speed = Angle::from_radians(1.0);
-        let uom = uom::si::f64::Angle::from(speed);
+        let angle = Angle::from_radians(1.0);
+        let uom = uom::si::f64::Angle::from(angle);
         let roundtrip = Angle::from(uom);
-        assert_eq!(speed, roundtrip);
+        assert_eq!(angle, roundtrip);
     }
 }
