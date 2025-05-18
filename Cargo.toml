@@ -1,6 +1,6 @@
 [package]
 name = "jord"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 rust-version = "1.65"
 authors = ["Cedric Liegeois <omam.github@gmail.com>"]
@@ -14,9 +14,11 @@ categories = ["science::geo"]
 
 [features]
 serde = ["dep:serde"]
+uom = ["dep:uom"]
 
 [dependencies]
 serde = { version = "1", optional = true, features = ["derive"] }
+uom = { version = "0.36", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

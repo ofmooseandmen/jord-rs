@@ -192,6 +192,20 @@ impl Measurement for Angle {
 
 impl_measurement! { Angle }
 
+#[cfg(feature = "uom")]
+impl From<uom::si::f64::Angle> for Angle {
+    fn from(value: uom::si::f64::Angle) -> Self {
+        Self::from_radians(value.get::<uom::si::angle::radian>())
+    }
+}
+
+#[cfg(feature = "uom")]
+impl From<Angle> for uom::si::f64::Angle {
+    fn from(value: Angle) -> Self {
+        Self::new::<uom::si::angle::radian>(value.as_radians())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -257,5 +271,14 @@ mod tests {
             Angle::ZERO,
             Angle::from_degrees(180.0).normalised_to(Angle::HALF_CIRCLE)
         );
+    }
+
+    #[cfg(feature = "uom")]
+    #[test]
+    fn uom() {
+        let angle = Angle::from_radians(1.0);
+        let uom = uom::si::f64::Angle::from(angle);
+        let roundtrip = Angle::from(uom);
+        assert_eq!(angle, roundtrip);
     }
 }

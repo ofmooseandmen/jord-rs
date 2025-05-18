@@ -646,7 +646,7 @@ fn initial_bearing_radians(v1: NVector, v2: NVector) -> f64 {
 fn contains_antipodal(ps: &[NVector]) -> bool {
     for p in ps {
         let a = p.antipode();
-        let found = ps.iter().any(|&o| o == a);
+        let found = ps.contains(&a);
         if found {
             return true;
         }

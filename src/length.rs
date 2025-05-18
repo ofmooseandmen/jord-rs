@@ -194,6 +194,20 @@ impl ::std::ops::Mul<Length> for Angle {
     }
 }
 
+#[cfg(feature = "uom")]
+impl From<uom::si::f64::Length> for Length {
+    fn from(value: uom::si::f64::Length) -> Self {
+        Self::from_metres(value.get::<uom::si::length::meter>())
+    }
+}
+
+#[cfg(feature = "uom")]
+impl From<Length> for uom::si::f64::Length {
+    fn from(value: Length) -> Self {
+        Self::new::<uom::si::length::meter>(value.as_metres())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{Angle, Length};
@@ -243,5 +257,14 @@ mod tests {
             Length::from_metres(50.157),
             Length::from_metres(50.1574).round_mm()
         );
+    }
+
+    #[cfg(feature = "uom")]
+    #[test]
+    fn uom() {
+        let length = Length::from_metres(1.0);
+        let uom = uom::si::f64::Length::from(length);
+        let roundtrip = Length::from(uom);
+        assert_eq!(length, roundtrip);
     }
 }

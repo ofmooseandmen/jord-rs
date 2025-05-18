@@ -132,6 +132,20 @@ impl ::std::ops::Mul<Duration> for Speed {
     }
 }
 
+#[cfg(feature = "uom")]
+impl From<uom::si::f64::Velocity> for Speed {
+    fn from(value: uom::si::f64::Velocity) -> Self {
+        Self::from_metres_per_second(value.get::<uom::si::velocity::meter_per_second>())
+    }
+}
+
+#[cfg(feature = "uom")]
+impl From<Speed> for uom::si::f64::Velocity {
+    fn from(value: Speed) -> Self {
+        Self::new::<uom::si::velocity::meter_per_second>(value.as_metres_per_second())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -181,5 +195,14 @@ mod tests {
             Length::from_metres(1.0),
             Speed::from_metres_per_second(1.0) * Duration::from_secs(1)
         );
+    }
+
+    #[cfg(feature = "uom")]
+    #[test]
+    fn uom() {
+        let speed = Speed::from_metres_per_second(1.0);
+        let uom = uom::si::f64::Velocity::from(speed);
+        let roundtrip = Speed::from(uom);
+        assert_eq!(speed, roundtrip);
     }
 }
