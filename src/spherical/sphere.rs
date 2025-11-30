@@ -781,7 +781,7 @@ where
         let cosw2t = (w2 * ti_secs).cos();
         let sinw2t = (w2 * ti_secs).sin();
         let v10dv2dt = -w2 * (v10v20 * sinw2t - v10c2 * cosw2t);
-        let v10d2v2dt2 = (-1.0 * w2 * w2) * (v10v20 * cosw2t + v10c2 * sinw2t);
+        let v10d2v2dt2 = (-w2 * w2) * (v10v20 * cosw2t + v10c2 * sinw2t);
         let si = sep(ti_secs);
         // if separation = 0, intercept takes place at ti_secs.
         if si == 0.0 {

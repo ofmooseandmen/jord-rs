@@ -1,3 +1,6 @@
+### 0.16.0
+- Added: uom (behind a feature flag)
+
 ### 0.15.0
 
 - Fixed: intersection at shared vertex of both minor arcs
