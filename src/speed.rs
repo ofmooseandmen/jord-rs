@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{impl_measurement, Length, Measurement};
+use crate::{Length, Measurement};
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
