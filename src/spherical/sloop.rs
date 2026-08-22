@@ -703,7 +703,7 @@ fn reverse_edges(es: &[MinorArc]) -> Vec<MinorArc> {
     res
 }
 
-/// vertices to edges: last edge connect last vertex to first vertex + are vertices given in clockwise order?.
+/// vertices to edges: last edge connects last vertex to first vertex + are vertices given in clockwise order?.
 fn to_edges(vs: &[NVector]) -> (Vec<MinorArc>, bool) {
     let len: usize = vs.len();
     let mut edges: Vec<MinorArc> = Vec::with_capacity(len);
@@ -1072,6 +1072,29 @@ mod tests {
         assert!(e_it.clone().eq(l1.iter_vertices()));
         assert!(e_it.clone().eq(l2.iter_vertices()));
         assert!(e_it.clone().eq(l3.iter_vertices()));
+    }
+
+    // num_vertices
+
+    #[test]
+    fn num_vertices_opened() {
+        let l = Loop::new(&[
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+        ]);
+        assert_eq!(3, l.num_vertices());
+    }
+
+    #[test]
+    fn num_vertices_closed() {
+        let l = Loop::new(&[
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 0.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(0.0, 0.0),
+        ]);
+        assert_eq!(3, l.num_vertices());
     }
 
     // is_convex

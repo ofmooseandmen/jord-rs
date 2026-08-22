@@ -1,6 +1,6 @@
 [package]
 name = "jord"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 rust-version = "1.65"
 authors = ["Cedric Liegeois <omam.github@gmail.com>"]
@@ -13,12 +13,17 @@ readme = "README.md"
 categories = ["science::geo"]
 
 [features]
+default = []
 serde = ["dep:serde"]
 uom = ["dep:uom"]
+geo-types = ["dep:geo-types"]
+geo-traits = ["dep:geo-traits"]
 
 [dependencies]
 serde = { version = "1", optional = true, features = ["derive"] }
 uom = { version = "0.38", optional = true }
+geo-types = { version = "0.7.20", optional = true }
+geo-traits = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
