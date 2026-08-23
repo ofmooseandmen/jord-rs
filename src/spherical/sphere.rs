@@ -1255,7 +1255,7 @@ mod tests {
     #[test]
     fn mean_antipodal() {
         let p = NVector::from_lat_long_degrees(0.0, 0.0);
-        assert!(Sphere::mean_position(&vec!(p, p.antipode())).is_none());
+        assert!(Sphere::mean_position(&[p, p.antipode()]).is_none());
     }
 
     #[test]
@@ -1283,7 +1283,7 @@ mod tests {
     fn mean_one() {
         assert_eq!(
             Some(NVector::from_lat_long_degrees(0.0, 0.0)),
-            Sphere::mean_position(&vec!(NVector::from_lat_long_degrees(0.0, 0.0)))
+            Sphere::mean_position(&[NVector::from_lat_long_degrees(0.0, 0.0)])
         );
     }
 
@@ -1538,7 +1538,7 @@ mod tests {
         );
 
         assert_time_to_cpa(
-            Duration::from_millis(113_961_40),
+            Duration::from_millis(11_396_140),
             Sphere::EARTH.time_to_cpa(ownship, intruder),
         );
     }
