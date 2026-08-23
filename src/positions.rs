@@ -734,15 +734,23 @@ mod geo_traits_tests {
     use crate::LatLong;
     use geo_traits::{CoordTrait, Dimensions, GeometryTrait, GeometryType, PointTrait};
 
+    // tests both LatLong and &LatLong.
+    fn check_coord<C: CoordTrait<T = f64>>(coord: C, e_lat: f64, e_long: f64) {
+        assert_eq!(CoordTrait::dim(&coord), Dimensions::Xy);
+        assert_eq!(coord.x(), e_long);
+        assert_eq!(coord.y(), e_lat);
+        assert_eq!(coord.nth_or_panic(0), e_long);
+        assert_eq!(coord.nth_or_panic(1), e_lat);
+    }
+
     #[test]
     fn latlong_coord_trait() {
-        let ll = LatLong::from_degrees(54.0, 154.0);
-        assert_eq!(CoordTrait::dim(&ll), Dimensions::Xy);
+        let e_lat = 54.0;
+        let e_long = 154.0;
+        let ll = LatLong::from_degrees(e_lat, e_long);
+        check_coord(ll, e_lat, e_long);
+        check_coord(&ll, e_lat, e_long);
         assert_eq!(GeometryTrait::dim(&ll), Dimensions::Xy);
-        assert_eq!(ll.x(), ll.longitude().as_degrees());
-        assert_eq!(ll.y(), ll.latitude().as_degrees());
-        assert_eq!(ll.nth_or_panic(0), ll.longitude().as_degrees());
-        assert_eq!(ll.nth_or_panic(1), ll.latitude().as_degrees());
     }
 
     #[test]
@@ -775,6 +783,15 @@ mod geo_traits_tests {
                 assert_eq!(c.y(), 54.0);
             }
             _ => panic!("LatLong should resolve to GeometryType::Point"),
+        }
+
+        match GeometryTrait::as_type(&&pos) {
+            GeometryType::Point(pt) => {
+                let c = pt.coord().unwrap();
+                assert_eq!(c.x(), 154.0);
+                assert_eq!(c.y(), 54.0);
+            }
+            _ => panic!("&LatLong should resolve to GeometryType::Point"),
         }
     }
 
