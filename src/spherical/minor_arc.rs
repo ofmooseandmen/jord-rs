@@ -326,7 +326,7 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
         );
-        let p = NVector::from_lat_long_degrees(-1.0 / 3600000_000.0, 0.0);
+        let p = NVector::from_lat_long_degrees(-1.0 / 3_600_000_000.0, 0.0);
         let actual = e.distance_to(p);
         let projection = e.projection(p).unwrap();
         let expected = ChordLength::new(p, projection);
@@ -339,7 +339,7 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
         );
-        let p = NVector::from_lat_long_degrees(1.0, -1.0 / 3600000_000.0);
+        let p = NVector::from_lat_long_degrees(1.0, -1.0 / 3_600_000_000.0);
         let actual: ChordLength = e.distance_to(p);
         let expected = ChordLength::new(p, e.start());
         assert_eq!(expected, actual);

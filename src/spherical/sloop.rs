@@ -44,13 +44,13 @@ impl Loop {
     ///
     /// // clockwise or anti-clockwise order:
     /// assert_eq!(
-    ///     Loop::new(&vec![
+    ///     Loop::new(&[
     ///         NVector::from_lat_long_degrees(40.0, 40.0),
     ///         NVector::from_lat_long_degrees(10.0, 30.0),
     ///         NVector::from_lat_long_degrees(20.0, 20.0),
     ///         NVector::from_lat_long_degrees(50.0, 50.0),
     ///     ]),
-    ///     Loop::new(&vec![
+    ///     Loop::new(&[
     ///         NVector::from_lat_long_degrees(50.0, 50.0),
     ///         NVector::from_lat_long_degrees(20.0, 20.0),
     ///         NVector::from_lat_long_degrees(10.0, 30.0),
@@ -60,12 +60,12 @@ impl Loop {
     ///
     /// // open or closed:
     /// assert_eq!(
-    ///     Loop::new(&vec![
+    ///     Loop::new(&[
     ///         NVector::from_lat_long_degrees(40.0, 40.0),
     ///         NVector::from_lat_long_degrees(10.0, 30.0),
     ///         NVector::from_lat_long_degrees(20.0, 20.0),
     ///     ]),
-    ///     Loop::new(&vec![
+    ///     Loop::new(&[
     ///         NVector::from_lat_long_degrees(40.0, 40.0),
     ///         NVector::from_lat_long_degrees(10.0, 30.0),
     ///         NVector::from_lat_long_degrees(20.0, 20.0),
@@ -166,7 +166,7 @@ impl Loop {
     /// use jord::spherical::Loop;
     ///
     /// // consectutive coincidental vertices:
-    /// let l1 = Loop::new(&vec![
+    /// let l1 = Loop::new(&[
     ///     NVector::from_lat_long_degrees(-2.0, -2.0),
     ///     NVector::from_lat_long_degrees(-2.0, -2.0),
     ///     NVector::from_lat_long_degrees(3.0, 0.0),
@@ -174,7 +174,7 @@ impl Loop {
     /// assert!(!l1.is_simple());
     ///
     /// // consectutive antipodal vertices:
-    /// let l2 = Loop::new(&vec![
+    /// let l2 = Loop::new(&[
     ///     NVector::from_lat_long_degrees(-2.0, -2.0),
     ///     NVector::from_lat_long_degrees(-2.0, -2.0).antipode(),
     ///     NVector::from_lat_long_degrees(3.0, 0.0),
@@ -182,7 +182,7 @@ impl Loop {
     /// assert!(!l2.is_simple());
     ///
     /// // self-intersecting loop:
-    /// let l3 = Loop::new(&vec![
+    /// let l3 = Loop::new(&[
     ///     NVector::from_lat_long_degrees(-2.0, -2.0),
     ///     NVector::from_lat_long_degrees(2.0, -2.0),
     ///     NVector::from_lat_long_degrees(3.0, 0.0),
@@ -192,7 +192,7 @@ impl Loop {
     /// assert!(!l3.is_simple());
     ///
     /// // simple loop:
-    /// let l4 = Loop::new(&vec![
+    /// let l4 = Loop::new(&[
     ///     NVector::from_lat_long_degrees(-2.0, -2.0),
     ///     NVector::from_lat_long_degrees(2.0, -2.0),
     ///     NVector::from_lat_long_degrees(3.0, 0.0),
@@ -272,7 +272,7 @@ impl Loop {
     /// use jord::NVector;
     /// use jord::spherical::Loop;
     ///
-    /// let l = Loop::new(&vec![
+    /// let l = Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 10.0),
     ///     NVector::from_lat_long_degrees(10.0, 10.0),
@@ -482,7 +482,7 @@ impl Loop {
     /// use jord::{Angle, NVector};
     /// use jord::spherical::{ChordLength, Loop, MinorArc ,Sphere};
     ///
-    /// let l = Loop::new(&vec![
+    /// let l = Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 10.0),
     ///     NVector::from_lat_long_degrees(10.0, 10.0),
@@ -533,7 +533,7 @@ impl Loop {
     /// let v2 = NVector::from_lat_long_degrees(1.0, 1.0);
     /// let v3 = NVector::from_lat_long_degrees(0.0, 1.0);
     ///
-    /// let l = Loop::new(&vec![v0, v1, v2, v3]);
+    /// let l = Loop::new(&[v0, v1, v2, v3]);
     ///
     /// assert_eq!(vec![
     ///     (v3, v0, v1),
@@ -560,7 +560,7 @@ impl Loop {
     /// use jord::{Angle, NVector};
     /// use jord::spherical::{Loop, Sphere};
     ///
-    /// let l = Loop::new(&vec![
+    /// let l = Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(1.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 1.0),
@@ -1001,7 +1001,7 @@ mod tests {
 
     #[test]
     fn new_triangle() {
-        assert_loop_invariants(&vec![
+        assert_loop_invariants(&[
             NVector::from_lat_long_degrees(20.0, 20.0),
             NVector::from_lat_long_degrees(10.0, 30.0),
             NVector::from_lat_long_degrees(40.0, 40.0),
@@ -1010,7 +1010,7 @@ mod tests {
 
     #[test]
     fn new_loop() {
-        assert_loop_invariants(&vec![
+        assert_loop_invariants(&[
             NVector::from_lat_long_degrees(-85.0, 10.0),
             NVector::from_lat_long_degrees(-85.0, 170.0),
             NVector::from_lat_long_degrees(-85.0, -170.0),
@@ -1063,7 +1063,7 @@ mod tests {
         assert_eq!(opened.len(), l2.num_vertices());
         assert_eq!(opened.len(), l3.num_vertices());
 
-        let e_it = if is_loop_clockwise(&opened) {
+        let e_it = if is_loop_clockwise(opened) {
             opened.iter()
         } else {
             rvs.iter()
@@ -1101,19 +1101,19 @@ mod tests {
 
     #[test]
     fn is_convex_triangle() {
-        assert_convex(true, &vec![ystad(), hoor(), helsingborg()]);
+        assert_convex(true, &[ystad(), hoor(), helsingborg()]);
     }
 
     #[test]
     fn is_convex_concave() {
-        assert_convex(false, &vec![ystad(), hoor(), helsingborg(), kristianstad()]);
+        assert_convex(false, &[ystad(), hoor(), helsingborg(), kristianstad()]);
     }
 
     #[test]
     fn is_convex_concave_collinear_vertices() {
         assert_convex(
             false,
-            &vec![
+            &[
                 NVector::from_lat_long_degrees(10.0, 10.0),
                 NVector::from_lat_long_degrees(11.0, 10.0),
                 NVector::from_lat_long_degrees(12.0, 10.0),
@@ -1126,7 +1126,7 @@ mod tests {
 
     #[test]
     fn is_convex() {
-        assert_convex(true, &vec![ystad(), malmo(), helsingborg(), kristianstad()]);
+        assert_convex(true, &[ystad(), malmo(), helsingborg(), kristianstad()]);
     }
 
     fn assert_convex(e: bool, vs: &[NVector]) {
@@ -1177,15 +1177,15 @@ mod tests {
 
     #[test]
     fn is_loop_clockwise_less_than_3_vertices() {
-        assert!(!is_loop_clockwise(&vec![]));
-        assert!(!is_loop_clockwise(&vec![NVector::from_lat_long_degrees(
+        assert!(!is_loop_clockwise(&[]));
+        assert!(!is_loop_clockwise(&[NVector::from_lat_long_degrees(
             1.0, 1.0
         )]));
-        assert!(!is_loop_clockwise(&vec![
+        assert!(!is_loop_clockwise(&[
             NVector::from_lat_long_degrees(1.0, 1.0),
             NVector::from_lat_long_degrees(2.0, 1.0)
         ]));
-        assert!(!is_loop_clockwise(&vec![
+        assert!(!is_loop_clockwise(&[
             NVector::from_lat_long_degrees(1.0, 1.0),
             NVector::from_lat_long_degrees(2.0, 1.0),
             NVector::from_lat_long_degrees(1.0, 1.0)
@@ -1240,7 +1240,7 @@ mod tests {
 
     #[test]
     fn is_simple_consectutive_coincidental_vertices() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(3.0, 0.0),
@@ -1249,7 +1249,7 @@ mod tests {
     }
     #[test]
     fn is_simple_consectutive_antipodal_vertices() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(-2.0, -2.0).antipode(),
             NVector::from_lat_long_degrees(3.0, 0.0),
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[test]
     fn is_simple_self_intersecting() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(2.0, -2.0),
             NVector::from_lat_long_degrees(3.0, 0.0),
@@ -1271,7 +1271,7 @@ mod tests {
 
     #[test]
     fn is_simple() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(2.0, -2.0),
             NVector::from_lat_long_degrees(3.0, 0.0),
@@ -1346,7 +1346,7 @@ mod tests {
         let v1 = NVector::from_lat_long_degrees(20.0, 20.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
-        let l = Loop::new(&vec![v1, v2, v3]);
+        let l = Loop::new(&[v1, v2, v3]);
         assert!(l.contains_position(inside));
         assert!(!l.contains_position(antipode));
     }
@@ -1357,7 +1357,7 @@ mod tests {
         let v1 = NVector::from_lat_long_degrees(10.0, 179.0);
         let v2 = NVector::from_lat_long_degrees(10.0, -150.0);
         let v3 = NVector::from_lat_long_degrees(-85.0, -150.0);
-        let l = Loop::new(&vec![v1, v2, v3]);
+        let l = Loop::new(&[v1, v2, v3]);
         assert!(!l.contains_position(position));
     }
 
@@ -1447,7 +1447,7 @@ mod tests {
         // p is one arc microsecond east of v2: detected on both (v1, v2) and (v2, v3).
         let p = NVector::from_lat_long_degrees(0.0, one_mas);
 
-        let l = Loop::new(&vec![v1, v2, v3]);
+        let l = Loop::new(&[v1, v2, v3]);
 
         assert!(!l.contains_position(p));
         assert!(l.any_edge_contains_position(p));
@@ -1504,7 +1504,7 @@ mod tests {
 
     #[test]
     fn distance_to_boundary_edge() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
             NVector::from_lat_long_degrees(10.0, 10.0),
@@ -1518,20 +1518,18 @@ mod tests {
             Angle::from_degrees(90.0),
         ];
 
-        let mut i = 0;
-        for e in l.iter_edges() {
-            let m = Sphere::mean_position(&vec![e.start(), e.end()]).unwrap();
+        for (i, e) in l.iter_edges().enumerate() {
+            let m = Sphere::mean_position(&[e.start(), e.end()]).unwrap();
             let p = Sphere::EARTH.destination_position(m, bearings[i], Length::from_metres(10.0));
             let expected = ChordLength::new(m, p).to_angle().round_d7();
             assert_eq!(expected, l.distance_to_boundary(p).to_angle().round_d7());
-            i += 1;
         }
     }
 
     #[test]
     fn distance_to_boundary_vertex() {
         // define loop in clockwise order.
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(10.0, 0.0),
             NVector::from_lat_long_degrees(10.0, 10.0),
@@ -1545,12 +1543,10 @@ mod tests {
             Angle::from_degrees(135.0),
         ];
 
-        let mut i = 0;
-        for v in l.iter_vertices() {
+        for (i, v) in l.iter_vertices().enumerate() {
             let p = Sphere::EARTH.destination_position(*v, bearings[i], Length::from_metres(10.0));
             let expected = ChordLength::new(*v, p);
             assert_eq!(expected, l.distance_to_boundary(p));
-            i += 1;
         }
     }
 
@@ -1565,7 +1561,7 @@ mod tests {
         let v4 = NVector::from_lat_long_degrees(20.0, 20.0);
 
         let expected = vec![(v0, v1, v2), (v4, v0, v2), (v2, v3, v4)];
-        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4]);
+        assert_loop_triangulation(&expected, &[v0, v1, v2, v3, v4]);
     }
 
     #[test]
@@ -1585,12 +1581,12 @@ mod tests {
             (v6, v0, v4),
             (v4, v5, v6),
         ];
-        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6]);
+        assert_loop_triangulation(&expected, &[v0, v1, v2, v3, v4, v5, v6]);
     }
 
     #[test]
     fn triangulate_convex_6() {
-        let vs = &vec![
+        let vs = vec![
             bangui(),
             juba(),
             narobi(),
@@ -1654,7 +1650,7 @@ mod tests {
             (v1, v7, v8),
             (v1, v8, v9),
         ];
-        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
+        assert_loop_triangulation(&expected, &[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
     }
 
     #[test]
@@ -1680,12 +1676,12 @@ mod tests {
             (v9, v5, v7),
             (v7, v8, v9),
         ];
-        assert_loop_triangulation(&expected, &vec![v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
+        assert_loop_triangulation(&expected, &[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9]);
     }
 
     #[test]
     fn triangulate_self_intersecting() {
-        let l = Loop::new(&vec![
+        let l = Loop::new(&[
             NVector::from_lat_long_degrees(-2.0, -2.0),
             NVector::from_lat_long_degrees(2.0, -2.0),
             NVector::from_lat_long_degrees(3.0, 0.0),
@@ -1715,7 +1711,7 @@ mod tests {
     }
 
     fn assert_loop_triangulation(e: &[(NVector, NVector, NVector)], vs: &[NVector]) {
-        assert_triangulation(e, &Loop::new(&vs));
+        assert_triangulation(e, &Loop::new(vs));
         let mut rvs = vs.to_vec();
         rvs.reverse();
         assert_triangulation(e, &Loop::new(&rvs));

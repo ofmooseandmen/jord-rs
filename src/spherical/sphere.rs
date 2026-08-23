@@ -449,7 +449,7 @@ impl Sphere {
     /// assert!(opt_time_at_cpa.is_some());
     /// let time_at_cpa = opt_time_at_cpa.unwrap();
     ///
-    /// assert_eq!(113_961_40, time_at_cpa.as_millis());
+    /// assert_eq!(11_396_140, time_at_cpa.as_millis());
     ///
     /// // Position of ownship at CPA:
     /// let p_cpa_own = Sphere::EARTH.position_after(ownship, time_at_cpa);
