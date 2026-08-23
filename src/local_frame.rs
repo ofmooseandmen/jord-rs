@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{
     surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong,
     Length, Mat33, Vec3,
@@ -22,6 +24,9 @@ enum Orientation {
 ///
 /// However, the [azimuth](crate::LocalPosition::azimuth) is always relative to 'north' and the elevation is always positive if above the local
 /// tangent plane and negative if below.
+///
+/// [LocalPosition] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
+/// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LocalPosition {
@@ -182,6 +187,87 @@ impl Cartesian3DVector for LocalPosition {
     }
 }
 
+impl ::std::ops::Add for LocalPosition {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        let r = self.as_metres() + rhs.with_orientation(self.o).as_metres();
+        LocalPosition::from_metres_with_o(r, self.o)
+    }
+}
+
+impl ::std::ops::Sub for LocalPosition {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self {
+        let r = self.as_metres() - rhs.with_orientation(self.o).as_metres();
+        LocalPosition::from_metres_with_o(r, self.o)
+    }
+}
+
+impl ::std::ops::Mul<f64> for LocalPosition {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self {
+        let r = self.as_metres() * rhs;
+        LocalPosition::from_metres_with_o(r, self.o)
+    }
+}
+
+impl ::std::ops::Mul<LocalPosition> for f64 {
+    type Output = LocalPosition;
+
+    fn mul(self, rhs: LocalPosition) -> Self::Output {
+        let r = rhs.as_metres() * self;
+        LocalPosition::from_metres_with_o(r, rhs.o)
+    }
+}
+
+impl ::std::ops::Div<f64> for LocalPosition {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self {
+        let r = self.as_metres() / rhs;
+        LocalPosition::from_metres_with_o(r, self.o)
+    }
+}
+
+/// The origin of a [LocalFrame]. This trait exists to allow the creation
+/// of local frames using either [GeodeticPosition] or [GeocentricPosition].
+pub trait LocalFrameOrigin<S>: Clone + Copy + Debug + Sized {
+    /// Returns the [GeodeticPosition] corresponding to the frame origin.
+    fn geodetic(&self, surface: S) -> GeodeticPosition;
+
+    /// Returns the [GeocentricPosition] corresponding to the frame origin.
+    fn geocentric(&self, surface: S) -> GeocentricPosition;
+}
+
+impl<S> LocalFrameOrigin<S> for GeodeticPosition
+where
+    S: Surface,
+{
+    fn geodetic(&self, _surface: S) -> GeodeticPosition {
+        *self
+    }
+
+    fn geocentric(&self, surface: S) -> GeocentricPosition {
+        surface.geodetic_to_geocentric_position(*self)
+    }
+}
+
+impl<S> LocalFrameOrigin<S> for GeocentricPosition
+where
+    S: Surface,
+{
+    fn geodetic(&self, surface: S) -> GeodeticPosition {
+        surface.geocentric_to_geodetic_position(*self)
+    }
+
+    fn geocentric(&self, _surface: S) -> GeocentricPosition {
+        *self
+    }
+}
+
 /// Defines a local Cartesian coordinate frame with two axes forming a horizontal
 /// tangent plane to the reference surface ([ellipsoid](crate::ellipsoidal::Ellipsoid) or
 /// [sphere](crate::spherical::Sphere)) at a specified tangent point. Assuming several
@@ -207,8 +293,8 @@ where
     ///   horizontal), and the z-axis is pointing up.
     ///
     /// See also [NED](crate::LocalFrame::ned)
-    pub fn enu(origin: GeodeticPosition, surface: S) -> Self {
-        let vo = origin.horizontal_position().as_vec3();
+    pub fn enu<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
+        let vo = origin.geodetic(surface).horizontal_position().as_vec3();
         // up - just the n-vector.
         let ru = vo;
         // east - pointing perpendicular to the plane.
@@ -219,7 +305,7 @@ where
         let inv_rm = Mat33::new(re, rn, ru);
 
         Self {
-            origin: surface.geodetic_to_geocentric_position(origin).as_metres(),
+            origin: origin.geocentric(surface).as_metres(),
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
@@ -241,8 +327,8 @@ where
     /// general calculations.
     ///
     /// See also: [ENU](crate::LocalFrame::enu)
-    pub fn ned(origin: GeodeticPosition, surface: S) -> Self {
-        let vo = origin.horizontal_position().as_vec3();
+    pub fn ned<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
+        let vo = origin.geodetic(surface).horizontal_position().as_vec3();
         // down (pointing opposite to n-vector).
         let rd = -1.0 * vo;
         // east (pointing perpendicular to the plane)
@@ -253,7 +339,7 @@ where
         let inv_rm = Mat33::new(rn, re, rd);
 
         Self {
-            origin: surface.geodetic_to_geocentric_position(origin).as_metres(),
+            origin: origin.geocentric(surface).as_metres(),
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
@@ -265,11 +351,11 @@ where
     ///
     /// -The origin is in the vehicle’s reference point.
     /// - Orientation: The x-axis points forward, the y-axis to the right (starboard) and the z-axis in the vehicle’s down direction.
-    pub fn body(
+    pub fn body<O: LocalFrameOrigin<S>>(
         yaw: Angle,
         pitch: Angle,
         roll: Angle,
-        origin: GeodeticPosition,
+        origin: O,
         surface: S,
     ) -> Self {
         let r_nb = zyx2r(yaw, pitch, roll);
@@ -277,7 +363,7 @@ where
         // closest frames cancel: N.
         let dir_rm = r_en * r_nb;
         Self {
-            origin: surface.geodetic_to_geocentric_position(origin).as_metres(),
+            origin: origin.geocentric(surface).as_metres(),
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
@@ -299,13 +385,17 @@ where
     /// difference between the frames is an angle between the x-axis of L and the north direction;
     /// this angle is called the wander azimuth angle. The L-frame is well suited for general
     /// calculations, as it is non-singular.
-    pub fn local_level(wander_azimuth: Angle, origin: GeodeticPosition, surface: S) -> Self {
-        let ll = LatLong::from_nvector(origin.horizontal_position());
+    pub fn local_level<O: LocalFrameOrigin<S>>(
+        wander_azimuth: Angle,
+        origin: O,
+        surface: S,
+    ) -> Self {
+        let ll = LatLong::from_nvector(origin.geodetic(surface).horizontal_position());
         let r = xyz2r(ll.longitude(), -ll.latitude(), wander_azimuth);
         let r_ee = Mat33::new(Vec3::NEG_UNIT_Z, Vec3::UNIT_Y, Vec3::UNIT_X);
         let dir_rm = r_ee * r;
         Self {
-            origin: surface.geodetic_to_geocentric_position(origin).as_metres(),
+            origin: origin.geocentric(surface).as_metres(),
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
@@ -313,25 +403,38 @@ where
         }
     }
 
+    /// Converts the given [GeocentricPosition] into a [LocalPosition]: the exact vector between this frame
+    /// origin and the given position. The resulting [LocalPosition] orientation is the one of this frame.
+    pub fn geocentric_to_local_position(&self, p: GeocentricPosition) -> LocalPosition {
+        let p_vec3 = p.as_metres();
+        // delta in 'Earth' frame.
+        let de = p_vec3 - self.origin;
+        let d = de * self.inv_rm;
+        LocalPosition::from_metres_with_o(d, self.o)
+    }
+
     /// Converts the given [GeodeticPosition] into a [LocalPosition]: the exact vector between this frame
     /// origin and the given position. The resulting [LocalPosition] orientation is the one of this frame.
     pub fn geodetic_to_local_position(&self, p: GeodeticPosition) -> LocalPosition {
-        let p_geocentric = self.surface.geodetic_to_geocentric_position(p).as_metres();
-        // delta in 'Earth' frame.
-        let de = p_geocentric - self.origin;
-        let d = de * self.inv_rm;
-        LocalPosition::from_metres_with_o(d, self.o)
+        self.geocentric_to_local_position(self.surface.geodetic_to_geocentric_position(p))
+    }
+
+    /// Converts the given [LocalPosition] into a [GeocentricPosition]: the geocentric position of an object
+    /// which is located at a bearing and distance from this frame origin. The given [LocalPosition]
+    /// is re-oriented to match the orientation of this frame if required.
+    pub fn local_to_geocentric_position(&self, p: LocalPosition) -> GeocentricPosition {
+        let op = p.with_orientation(self.o);
+        let c = op.as_metres() * self.dir_rm;
+        let v = self.origin + c;
+        GeocentricPosition::from_vec3_metres(v)
     }
 
     /// Converts the given [LocalPosition] into a [GeodeticPosition]: the geodetic position of an object
     /// which is located at a bearing and distance from this frame origin. The given [LocalPosition]
     /// is re-oriented to match the orientation of this frame if required.
     pub fn local_to_geodetic_position(&self, p: LocalPosition) -> GeodeticPosition {
-        let op = p.with_orientation(self.o);
-        let c = op.as_metres() * self.dir_rm;
-        let v = self.origin + c;
-        let p_geocentric = GeocentricPosition::from_vec3_metres(v);
-        self.surface.geocentric_to_geodetic_position(p_geocentric)
+        self.surface
+            .geocentric_to_geodetic_position(self.local_to_geocentric_position(p))
     }
 }
 
@@ -461,9 +564,9 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 mod tests {
 
     use crate::{
-        ellipsoidal::Ellipsoid, positions::assert_geod_eq_d7_mm, r2xyz, r2zyx, Angle,
-        Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame, LocalPosition, Mat33,
-        NVector, Vec3,
+        ellipsoidal::Ellipsoid, local_frame::Orientation, positions::assert_geod_eq_d7_mm, r2xyz,
+        r2zyx, Angle, Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame,
+        LocalPosition, Mat33, NVector, Surface, Vec3,
     };
 
     #[test]
@@ -476,6 +579,65 @@ mod tests {
             ),
             LocalPosition::from_metres(1.0, 2.0, 3.0)
         );
+    }
+
+    #[test]
+    fn add_local_positions() {
+        let l1 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
+        let l2 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Enu);
+        let l3 = LocalPosition::from_metres_with_o(Vec3::new(2.0, 1.0, -3.0), Orientation::Ned);
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(3.0, 3.0, 0.0), Orientation::Ned),
+            l1 + l2
+        );
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(3.0, 3.0, 0.0), Orientation::Ned),
+            l1 + l3
+        )
+    }
+
+    #[test]
+    fn sub_local_positions() {
+        let l1 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
+        let l2 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Enu);
+        let l3 = LocalPosition::from_metres_with_o(Vec3::new(2.0, 1.0, -3.0), Orientation::Ned);
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(-1.0, 1.0, 6.0), Orientation::Ned),
+            l1 - l2
+        );
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(-1.0, 1.0, 6.0), Orientation::Ned),
+            l1 - l3
+        )
+    }
+
+    #[test]
+    fn mul_local_position() {
+        let l = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned),
+            l * 2.0
+        );
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned),
+            2.0 * l
+        )
+    }
+
+    #[test]
+    fn div_local_position() {
+        let l = LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned);
+
+        assert_eq!(
+            LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned),
+            l / 2.0
+        )
     }
 
     // geodetic_to_local_pos
@@ -667,6 +829,15 @@ mod tests {
         assert_geod_eq_d7_mm(
             point_b,
             enu.local_to_geodetic_position(enu.geodetic_to_local_position(point_b)),
+        );
+
+        let enu2 = LocalFrame::enu(
+            Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
+            Ellipsoid::WGS84,
+        );
+        assert_geod_eq_d7_mm(
+            point_b,
+            enu2.local_to_geodetic_position(enu2.geodetic_to_local_position(point_b)),
         )
     }
 
@@ -681,10 +852,19 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let ned = LocalFrame::ned(point_a, Ellipsoid::WGS84);
+        let ned: LocalFrame<Ellipsoid> = LocalFrame::ned(point_a, Ellipsoid::WGS84);
         assert_geod_eq_d7_mm(
             point_b,
             ned.local_to_geodetic_position(ned.geodetic_to_local_position(point_b)),
+        );
+
+        let ned2: LocalFrame<Ellipsoid> = LocalFrame::ned(
+            Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
+            Ellipsoid::WGS84,
+        );
+        assert_geod_eq_d7_mm(
+            point_b,
+            ned2.local_to_geodetic_position(ned2.geodetic_to_local_position(point_b)),
         )
     }
 
@@ -709,6 +889,18 @@ mod tests {
         assert_geod_eq_d7_mm(
             point_b,
             body.local_to_geodetic_position(body.geodetic_to_local_position(point_b)),
+        );
+
+        let body2 = LocalFrame::body(
+            Angle::from_degrees(45.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(5.0),
+            Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
+            Ellipsoid::WGS84,
+        );
+        assert_geod_eq_d7_mm(
+            point_b,
+            body2.local_to_geodetic_position(body2.geodetic_to_local_position(point_b)),
         )
     }
 
@@ -723,11 +915,22 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let local_level =
-            LocalFrame::local_level(Angle::from_degrees(45.0), point_a, Ellipsoid::WGS84);
+        let local_level = LocalFrame::local_level(
+            Angle::from_degrees(45.0),
+            Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
+            Ellipsoid::WGS84,
+        );
         assert_geod_eq_d7_mm(
             point_b,
             local_level.local_to_geodetic_position(local_level.geodetic_to_local_position(point_b)),
+        );
+
+        let local_level2 =
+            LocalFrame::local_level(Angle::from_degrees(45.0), point_a, Ellipsoid::WGS84);
+        assert_geod_eq_d7_mm(
+            point_b,
+            local_level2
+                .local_to_geodetic_position(local_level2.geodetic_to_local_position(point_b)),
         )
     }
 

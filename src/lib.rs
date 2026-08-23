@@ -29,7 +29,9 @@ pub use crate::angle::Angle;
 pub mod ellipsoidal;
 
 mod local_frame;
-pub use crate::local_frame::{r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalPosition};
+pub use crate::local_frame::{
+    r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalFrameOrigin, LocalPosition,
+};
 
 mod length;
 pub use crate::length::Length;
