@@ -290,35 +290,6 @@ impl CoordTrait for LatLong {
 }
 
 #[cfg(feature = "geo-traits")]
-impl CoordTrait for &LatLong {
-    type T = f64;
-
-    #[inline]
-    fn dim(&self) -> Dimensions {
-        Dimensions::Xy
-    }
-
-    #[inline]
-    fn x(&self) -> Self::T {
-        self.longitude().as_degrees()
-    }
-
-    #[inline]
-    fn y(&self) -> Self::T {
-        self.latitude().as_degrees()
-    }
-
-    #[inline]
-    fn nth_or_panic(&self, n: usize) -> Self::T {
-        match n {
-            0 => self.x(),
-            1 => self.y(),
-            _ => panic!("Index {n} out of bounds for LatLong"),
-        }
-    }
-}
-
-#[cfg(feature = "geo-traits")]
 impl GeometryTrait for LatLong {
     type T = f64;
     type PointType<'a>
@@ -388,97 +359,15 @@ impl GeometryTrait for LatLong {
 }
 
 #[cfg(feature = "geo-traits")]
-impl GeometryTrait for &LatLong {
-    type T = f64;
-    type PointType<'a>
-        = &'a LatLong
-    where
-        Self: 'a;
-    type LineStringType<'a>
-        = UnimplementedLineString<f64>
-    where
-        Self: 'a;
-    type PolygonType<'a>
-        = UnimplementedPolygon<f64>
-    where
-        Self: 'a;
-    type MultiPointType<'a>
-        = UnimplementedMultiPoint<f64>
-    where
-        Self: 'a;
-    type MultiLineStringType<'a>
-        = UnimplementedMultiLineString<f64>
-    where
-        Self: 'a;
-    type MultiPolygonType<'a>
-        = UnimplementedMultiPolygon<f64>
-    where
-        Self: 'a;
-    type GeometryCollectionType<'a>
-        = UnimplementedGeometryCollection<f64>
-    where
-        Self: 'a;
-    type RectType<'a>
-        = UnimplementedRect<f64>
-    where
-        Self: 'a;
-    type TriangleType<'a>
-        = UnimplementedTriangle<f64>
-    where
-        Self: 'a;
-    type LineType<'a>
-        = UnimplementedLine<f64>
-    where
-        Self: 'a;
-
-    #[inline]
-    fn dim(&self) -> Dimensions {
-        Dimensions::Xy
-    }
-
-    #[inline]
-    fn as_type(
-        &self,
-    ) -> GeometryType<
-        '_,
-        Self::PointType<'_>,
-        Self::LineStringType<'_>,
-        Self::PolygonType<'_>,
-        Self::MultiPointType<'_>,
-        Self::MultiLineStringType<'_>,
-        Self::MultiPolygonType<'_>,
-        Self::GeometryCollectionType<'_>,
-        Self::RectType<'_>,
-        Self::TriangleType<'_>,
-        Self::LineType<'_>,
-    > {
-        GeometryType::Point(self)
-    }
-}
-
-#[cfg(feature = "geo-traits")]
 impl PointTrait for LatLong {
     type CoordType<'a>
-        = &'a LatLong
+        = LatLong
     where
         Self: 'a;
 
     #[inline]
     fn coord(&self) -> Option<Self::CoordType<'_>> {
-        Some(self)
-    }
-}
-
-#[cfg(feature = "geo-traits")]
-impl PointTrait for &LatLong {
-    type CoordType<'a>
-        = &'a LatLong
-    where
-        Self: 'a;
-
-    #[inline]
-    fn coord(&self) -> Option<Self::CoordType<'_>> {
-        Some(self)
+        Some(*self)
     }
 }
 
@@ -734,22 +623,16 @@ mod geo_traits_tests {
     use crate::LatLong;
     use geo_traits::{CoordTrait, Dimensions, GeometryTrait, GeometryType, PointTrait};
 
-    // tests both LatLong and &LatLong.
-    fn check_coord<C: CoordTrait<T = f64>>(coord: C, e_lat: f64, e_long: f64) {
-        assert_eq!(CoordTrait::dim(&coord), Dimensions::Xy);
-        assert_eq!(coord.x(), e_long);
-        assert_eq!(coord.y(), e_lat);
-        assert_eq!(coord.nth_or_panic(0), e_long);
-        assert_eq!(coord.nth_or_panic(1), e_lat);
-    }
-
     #[test]
     fn latlong_coord_trait() {
         let e_lat = 54.0;
         let e_long = 154.0;
         let ll = LatLong::from_degrees(e_lat, e_long);
-        check_coord(ll, e_lat, e_long);
-        check_coord(&ll, e_lat, e_long);
+        assert_eq!(ll.x(), e_long);
+        assert_eq!(ll.y(), e_lat);
+        assert_eq!(ll.nth_or_panic(0), e_long);
+        assert_eq!(ll.nth_or_panic(1), e_lat);
+        assert_eq!(CoordTrait::dim(&ll), Dimensions::Xy);
         assert_eq!(GeometryTrait::dim(&ll), Dimensions::Xy);
     }
 
@@ -783,15 +666,6 @@ mod geo_traits_tests {
                 assert_eq!(c.y(), 54.0);
             }
             _ => panic!("LatLong should resolve to GeometryType::Point"),
-        }
-
-        match GeometryTrait::as_type(&&pos) {
-            GeometryType::Point(pt) => {
-                let c = pt.coord().unwrap();
-                assert_eq!(c.x(), 154.0);
-                assert_eq!(c.y(), 54.0);
-            }
-            _ => panic!("&LatLong should resolve to GeometryType::Point"),
         }
     }
 
