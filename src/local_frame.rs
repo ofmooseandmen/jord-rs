@@ -1,169 +1,202 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use crate::{
     surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong,
     Length, Mat33, Vec3,
 };
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-enum Orientation {
-    // x = north (or forward), y = east (or right), z = down.
-    #[default]
-    Ned,
-    // x = east, y = north, z = up.
-    Enu,
+/// The orientation of a local frame.
+pub trait FrameOrientation: Copy + Clone + Debug + PartialEq + Eq + Default {
+    /// Maps North, East, and Up components to frame (x, y, z) coordinates.
+    fn nez_to_xyz(north: Length, east: Length, z_up: Length) -> (Length, Length, Length);
+}
+
+/// East-North-Up (ENU) orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Enu;
+impl FrameOrientation for Enu {
+    #[inline]
+    fn nez_to_xyz(north: Length, east: Length, z_up: Length) -> (Length, Length, Length) {
+        (east, north, z_up)
+    }
+}
+
+/// North-East-Down (NED) orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Ned;
+impl FrameOrientation for Ned {
+    #[inline]
+    fn nez_to_xyz(north: Length, east: Length, z_up: Length) -> (Length, Length, Length) {
+        (north, east, -z_up)
+    }
+}
+
+/// Body (Vehicle) orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Body;
+impl FrameOrientation for Body {
+    #[inline]
+    fn nez_to_xyz(north: Length, east: Length, z_up: Length) -> (Length, Length, Length) {
+        (north, east, -z_up)
+    }
+}
+
+/// Wander azimuth orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct WanderAzimuth;
+impl FrameOrientation for WanderAzimuth {
+    #[inline]
+    fn nez_to_xyz(north: Length, east: Length, z_up: Length) -> (Length, Length, Length) {
+        (north, east, -z_up)
+    }
 }
 
 /// A vector whose length and direction is such that it goes from the origin
 /// of frame A to the origin of frame B, i.e. the position of B relative to A.
 ///
-/// The orientation of the x, y and z axis depends on the [local Cartesian coordinate frame](crate::LocalFrame):
-/// - x = north (or forward), y = east (or right), z = down: [NED](crate::LocalFrame::ned), [Body](crate::LocalFrame::body) and [Local Level](crate::LocalFrame::local_level),
-/// - x = east, y = north, z = up: [ENU](crate::LocalFrame::enu).
-///
-/// However, the [azimuth](crate::LocalPosition::azimuth) is always relative to 'north' and the elevation is always positive if above the local
-/// tangent plane and negative if below.
-///
-/// [LocalPosition] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
+/// [LocalPosition] implements [Add](::std::ops::Add), [Sub](::std::ops::Sub),
 /// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct LocalPosition {
+pub struct LocalPosition<O: FrameOrientation> {
     x: Length,
     y: Length,
     z: Length,
-    o: Orientation,
+    _o: PhantomData<O>,
 }
 
-impl LocalPosition {
+/// [LocalPosition] for [Enu] frame.
+pub type EnuPosition = LocalPosition<Enu>;
+
+/// [LocalPosition] for [Ned] frame.
+pub type NedPosition = LocalPosition<Ned>;
+
+/// [LocalPosition] for [Body] frame.
+pub type BodyPosition = LocalPosition<Body>;
+
+/// [LocalPosition] for [WanderAzimuth] frame.
+pub type WanderAzimuthPosition = LocalPosition<WanderAzimuth>;
+
+impl<O: FrameOrientation> LocalPosition<O> {
     /// Creates a [LocalPosition] from the given coordinates.
-    /// Orientation: x = north (or forward), y = east (or right), z = down
     pub const fn new(x: Length, y: Length, z: Length) -> Self {
-        Self::new_with_o(x, y, z, Orientation::Ned)
-    }
-
-    /// Creates a [LocalPosition] from the given coordinates in metres.
-    /// Orientation: x = north (or forward), y = east (or right), z = down
-    pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
-        Self::new_with_o(
-            Length::from_metres(x),
-            Length::from_metres(y),
-            Length::from_metres(z),
-            Orientation::Ned,
-        )
-    }
-
-    const fn new_with_o(x: Length, y: Length, z: Length, o: Orientation) -> Self {
-        Self { x, y, z, o }
-    }
-
-    fn from_metres_with_o(v: Vec3, o: Orientation) -> Self {
-        Self::new_with_o(
-            Length::from_metres(v.x()),
-            Length::from_metres(v.y()),
-            Length::from_metres(v.z()),
-            o,
-        )
-    }
-
-    /// Converts this [LocalPosition] using the given orientation.
-    fn with_orientation(&self, o: Orientation) -> Self {
-        if self.o == o {
-            *self
-        } else {
-            // ENU(x, y, z) = NED(y, x, -z)
-            // NED(x, y, z) = ENU(y, x, -z)
-            LocalPosition {
-                x: self.y,
-                y: self.x,
-                z: -self.z,
-                o,
-            }
+        Self {
+            x,
+            y,
+            z,
+            _o: PhantomData,
         }
     }
 
-    /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
-    /// local north-east-down (NED) Cartesian coordinates.
-    ///
+    /// Creates a [LocalPosition] from the given coordinates in metres.
+    pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
+        Self::new(
+            Length::from_metres(x),
+            Length::from_metres(y),
+            Length::from_metres(z),
+        )
+    }
+
+    /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates
+    /// to local Cartesian coordinates.
     /// # Examples
     ///
     /// ```
-    /// use jord::{Angle, Cartesian3DVector, Length, LocalPosition};
+    /// use jord::{Angle, BodyPosition, Cartesian3DVector, Length};
     ///
     /// let az: Angle = Angle::from_degrees(155.427);
     /// let el = Angle::from_degrees(-23.161); // elevation is negative, so resulting z (down) will be positive
     /// let sr = Length::from_metres(10.885);
     ///
-    /// let local = LocalPosition::aer_to_ned(az, el, sr);
+    /// let local = BodyPosition::from_aer(az, el, sr);
     /// assert_eq!(Length::from_metres(-9.101), local.x().round_mm());
     /// assert_eq!(Length::from_metres(4.162), local.y().round_mm());
     /// assert_eq!(Length::from_metres(4.281), local.z().round_mm());
     /// ```
-    pub fn aer_to_ned(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
-        let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPosition::new_with_o(north, east, -z, Orientation::Ned)
+    pub fn from_aer(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
+        let (north, east, z_up) = aer_to_nez(azimuth, elevation, slant_range);
+        let (x, y, z) = O::nez_to_xyz(north, east, z_up);
+        Self::new(x, y, z)
     }
 
-    /// Transforms the given local azimuth-elevation-range (AER) spherical coordinates to the
-    /// local east-north-up (ENU) Cartesian coordinates.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jord::{Angle, Cartesian3DVector, Length, LocalPosition};
-    ///
-    /// let az: Angle = Angle::from_degrees(34.1160);
-    /// let el = Angle::from_degrees(4.1931); // elevation is positive, so resulting z (down) will be positive
-    /// let sr = Length::from_metres(15.1070);
-    ///
-    /// let local = LocalPosition::aer_to_enu(az, el, sr);
-    /// assert_eq!(Length::from_metres(8.45), local.x().round_mm());
-    /// assert_eq!(Length::from_metres(12.474), local.y().round_mm());
-    /// assert_eq!(Length::from_metres(1.105), local.z().round_mm());
-    /// ```
-    pub fn aer_to_enu(azimuth: Angle, elevation: Angle, slant_range: Length) -> Self {
-        let (north, east, z) = Self::aer_to_enz(azimuth, elevation, slant_range);
-        LocalPosition::new_with_o(east, north, z, Orientation::Enu)
-    }
-
-    fn aer_to_enz(
-        azimuth: Angle,
-        elevation: Angle,
-        slant_range: Length,
-    ) -> (Length, Length, Length) {
-        let cose = elevation.as_radians().cos();
-        let east = azimuth.as_radians().sin() * cose * slant_range;
-        let north = azimuth.as_radians().cos() * cose * slant_range;
-        let z = elevation.as_radians().sin() * slant_range;
-        (north, east, z)
-    }
-
-    /// Returns the azimuth in compass angle from the 'north'.
-    pub fn azimuth(&self) -> Angle {
-        let (e, n) = match self.o {
-            Orientation::Ned => (self.y(), self.x()),
-            Orientation::Enu => (self.x(), self.y()),
-        };
-        Angle::from_radians(e.as_metres().atan2(n.as_metres())).normalised()
-    }
-
-    /// Returns the elevation from horizontal (ie tangent to surface).
-    pub fn elevation(&self) -> Angle {
-        let ev = Angle::from_radians((self.z() / self.slant_range()).asin());
-        match self.o {
-            Orientation::Ned => -ev,
-            Orientation::Enu => ev,
-        }
+    fn from_vec3_metres(v: Vec3) -> Self {
+        Self::from_metres(v.x(), v.y(), v.z())
     }
 
     /// Returns the slant range - distance from origin in the local system.
     pub fn slant_range(&self) -> Length {
         Length::from_metres(self.as_metres().norm())
     }
+
+    /// Absolute elevation with respect to the z-axis.
+    fn z_elevation(&self) -> Angle {
+        Angle::from_radians((self.z() / self.slant_range()).asin())
+    }
+
+    /// Bearing calculated from origin vector components 'north' and 'east'.
+    fn bearing(n: Length, e: Length) -> Angle {
+        Angle::from_radians(e.as_metres().atan2(n.as_metres())).normalised()
+    }
 }
 
-impl Cartesian3DVector for LocalPosition {
+impl NedPosition {
+    /// Returns the true compass angle from North (0°..360°).
+    pub fn azimuth(&self) -> Angle {
+        Self::bearing(self.x(), self.y())
+    }
+
+    /// Returns the angle above the Earth's local horizontal plane.
+    pub fn elevation(&self) -> Angle {
+        -self.z_elevation()
+    }
+}
+
+impl EnuPosition {
+    /// Returns the true compass angle from North (0°..360°).
+    pub fn azimuth(&self) -> Angle {
+        Self::bearing(self.y(), self.x())
+    }
+
+    /// Returns the angle above the Earth's local horizontal plane.
+    pub fn elevation(&self) -> Angle {
+        self.z_elevation()
+    }
+}
+
+impl BodyPosition {
+    /// Returns the angle off the vehicle nose in the body plane (-180°..+180°).
+    pub fn relative_bearing(&self) -> Angle {
+        Self::bearing(self.x(), self.y())
+    }
+
+    /// Vertical angle above (+) or below (-) the vehicle's structural plane.
+    pub fn relative_elevation(&self) -> Angle {
+        -self.z_elevation()
+    }
+}
+
+impl WanderAzimuthPosition {
+    /// Returns the angle relative to the Wander x-axis (requires adding wander angle for True North).
+    pub fn wander_bearing(&self) -> Angle {
+        Self::bearing(self.x(), self.y())
+    }
+
+    /// Returns the angle above the Earth's local horizontal plane (z is still local Down).
+    pub fn elevation(&self) -> Angle {
+        -self.z_elevation()
+    }
+}
+
+fn aer_to_nez(azimuth: Angle, elevation: Angle, slant_range: Length) -> (Length, Length, Length) {
+    let cose = elevation.as_radians().cos();
+    let east = azimuth.as_radians().sin() * cose * slant_range;
+    let north = azimuth.as_radians().cos() * cose * slant_range;
+    let z = elevation.as_radians().sin() * slant_range;
+    (north, east, z)
+}
+
+impl<O: FrameOrientation> Cartesian3DVector for LocalPosition<O> {
     #[inline]
     fn x(&self) -> Length {
         self.x
@@ -183,52 +216,55 @@ impl Cartesian3DVector for LocalPosition {
     where
         F: Fn(Length) -> Length,
     {
-        Self::new_with_o(round(self.x()), round(self.y()), round(self.z()), self.o)
+        Self::new(round(self.x()), round(self.y()), round(self.z()))
     }
 }
 
-impl ::std::ops::Add for LocalPosition {
+impl<O: FrameOrientation> ::std::ops::Add for LocalPosition<O> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self {
-        let r = self.as_metres() + rhs.with_orientation(self.o).as_metres();
-        LocalPosition::from_metres_with_o(r, self.o)
+        LocalPosition::from_vec3_metres(self.as_metres() + rhs.as_metres())
     }
 }
 
-impl ::std::ops::Sub for LocalPosition {
+impl<O: FrameOrientation> ::std::ops::Sub for LocalPosition<O> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self {
-        let r = self.as_metres() - rhs.with_orientation(self.o).as_metres();
-        LocalPosition::from_metres_with_o(r, self.o)
+        LocalPosition::from_vec3_metres(self.as_metres() - rhs.as_metres())
     }
 }
 
-impl ::std::ops::Mul<f64> for LocalPosition {
+impl<O: FrameOrientation> ::std::ops::Mul<f64> for LocalPosition<O> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self {
-        let r = self.as_metres() * rhs;
-        LocalPosition::from_metres_with_o(r, self.o)
+        LocalPosition::from_vec3_metres(self.as_metres() * rhs)
     }
 }
 
-impl ::std::ops::Mul<LocalPosition> for f64 {
-    type Output = LocalPosition;
+impl<O: FrameOrientation> ::std::ops::Mul<LocalPosition<O>> for f64 {
+    type Output = LocalPosition<O>;
 
-    fn mul(self, rhs: LocalPosition) -> Self::Output {
-        let r = rhs.as_metres() * self;
-        LocalPosition::from_metres_with_o(r, rhs.o)
+    fn mul(self, rhs: LocalPosition<O>) -> Self::Output {
+        LocalPosition::from_vec3_metres(rhs.as_metres() * self)
     }
 }
 
-impl ::std::ops::Div<f64> for LocalPosition {
+impl<O: FrameOrientation> ::std::ops::Div<f64> for LocalPosition<O> {
     type Output = Self;
 
     fn div(self, rhs: f64) -> Self {
-        let r = self.as_metres() / rhs;
-        LocalPosition::from_metres_with_o(r, self.o)
+        LocalPosition::from_vec3_metres(self.as_metres() / rhs)
+    }
+}
+
+impl<O: FrameOrientation> ::std::ops::Neg for LocalPosition<O> {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        LocalPosition::from_vec3_metres(-self.as_metres())
     }
 }
 
@@ -272,36 +308,35 @@ where
 /// tangent plane to the reference surface ([ellipsoid](crate::ellipsoidal::Ellipsoid) or
 /// [sphere](crate::spherical::Sphere)) at a specified tangent point. Assuming several
 /// calculations are needed in a limited area, position calculations can be performed
-/// relative to this system to get approximate horizontal and vertical components
+/// relative to this system to get approximate horizontal and vertical components.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
-pub struct LocalFrame<S> {
+pub struct LocalFrame<S: Surface, O: FrameOrientation> {
     origin: Vec3,
     dir_rm: Mat33,
     inv_rm: Mat33,
     surface: S,
-    o: Orientation,
+    _o: PhantomData<O>,
 }
 
-impl<S> LocalFrame<S>
-where
-    S: Surface,
-{
-    /// East-North-Up (local level) frame. This frame is useful for many targeting and tracking applications.
-    ///
-    /// - Orientation: The x-axis points towards east, the y-axis points towards north (both are
-    ///   horizontal), and the z-axis is pointing up.
-    ///
-    /// See also [NED](crate::LocalFrame::ned)
-    pub fn enu<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
-        let vo = origin.geodetic(surface).horizontal_position().as_vec3();
-        // up - just the n-vector.
-        let ru = vo;
-        // east - pointing perpendicular to the plane.
-        let re = Vec3::UNIT_Z.orthogonal_to(vo);
-        // north - by right hand rule.
-        let rn = ru.cross_prod(re);
+/// East-North-Up Frame: placed locally on a vehicle or platform and moves around with the system.
+/// This frame is typically used in targeting and tracking applications.
+///
+/// Orientation:
+/// - the y-axis points to True North
+/// - the z-axis points away from the interior of the earth
+/// - the x-axis completes the right-handed system pointing east
+///
+/// See note in [Ned] for suitability.
+pub type EnuFrame<S> = LocalFrame<S, Enu>;
 
+impl<S: Surface> EnuFrame<S> {
+    /// [East-North-Up (local level)](Enu) frame fixed to the given origin.
+    pub fn new<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
+        let vo = origin.geodetic(surface).horizontal_position().as_vec3();
+        let ru = vo;
+        let re = Vec3::UNIT_Z.orthogonal_to(vo);
+        let rn = ru.cross_prod(re);
         let inv_rm = Mat33::new(re, rn, ru);
 
         Self {
@@ -309,33 +344,33 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
-            o: Orientation::Enu,
+            _o: PhantomData,
         }
     }
+}
 
-    /// North-East-Down (local level) frame. In an airplane, most objects of interest are below the aircraft,
-    /// so it is sensible to define down as a positive number.
-    ///
-    /// - The origin is directly beneath or above the vehicle (B), at Earth’s surface.
-    /// - Orientation: The x-axis points towards north, the y-axis points towards east (both are
-    ///   horizontal), and the z-axis is pointing down.
-    ///
-    /// Note: When moving relative to the Earth, the frame rotates about its z-axis to allow the
-    /// x-axis to always point towards north. When getting close to the poles this rotation rate
-    /// will increase, being infinite at the poles. The poles are thus singularities and the direction of
-    /// the x- and y-axes are not defined here. Hence, this coordinate frame is not suitable for
-    /// general calculations.
-    ///
-    /// See also: [ENU](crate::LocalFrame::enu)
-    pub fn ned<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
+/// North-East-Down (NED) frame: fixed to the vehicle or platform and moves with the body frame.
+/// This frame is typically used in aviation, marine navigation, and standard compass-based vehicle tracking.
+///
+/// Orientation:
+/// - the x-axis points to True North
+/// - the z-axis points towards the interior of the earth
+/// - the y-axis completes the right-handed system pointing east
+///
+/// Note: When moving relative to the Earth, the frame rotates about its z-axis to allow the
+/// x-axis to always point towards north. When getting close to the poles this rotation rate
+/// will increase, being infinite at the poles. The poles are thus singularities and the direction of
+/// the x- and y-axes are not defined here. Hence, this coordinate frame is not suitable for
+/// general calculations.
+pub type NedFrame<S> = LocalFrame<S, Ned>;
+
+impl<S: Surface> NedFrame<S> {
+    /// [North-East-Down (local level)](Ned) frame fixed to the given origin.
+    pub fn new<O: LocalFrameOrigin<S>>(origin: O, surface: S) -> Self {
         let vo = origin.geodetic(surface).horizontal_position().as_vec3();
-        // down (pointing opposite to n-vector).
         let rd = -1.0 * vo;
-        // east (pointing perpendicular to the plane)
         let re = Vec3::UNIT_Z.orthogonal_to(vo);
-        // north (by right hand rule)
         let rn = re.cross_prod(rd);
-
         let inv_rm = Mat33::new(rn, re, rd);
 
         Self {
@@ -343,15 +378,26 @@ where
             dir_rm: inv_rm.transpose(),
             inv_rm,
             surface,
-            o: Orientation::Ned,
+            _o: PhantomData,
         }
     }
+}
 
-    /// Body frame (typically of a vehicle). This frame is fixed to the vehicle.
-    ///
-    /// -The origin is in the vehicle’s reference point.
-    /// - Orientation: The x-axis points forward, the y-axis to the right (starboard) and the z-axis in the vehicle’s down direction.
-    pub fn body<O: LocalFrameOrigin<S>>(
+/// Body frame: in most applications, the position, velocity, and orientation of a system are found
+/// using sensors mounted to a vehicle or platform. The platform can have its own reference frame
+/// known as the body frame, or sometimes called the vehicle frame. This type of reference frame
+/// consists of an origin that is typically placed at the platform's center of gravity and three orthogonal
+/// axes that comprise a right-handed system.
+///
+/// Orientation:
+/// - the x-axis is pointing forward
+/// - the y-axis is pointing to the right
+/// - the z-axis is pointing down
+pub type BodyFrame<S> = LocalFrame<S, Body>;
+
+impl<S: Surface> BodyFrame<S> {
+    /// [Body](Body) frame fixed to a vehicle at the given reference location (origin) and yaw/pitch/roll.
+    pub fn new<O: LocalFrameOrigin<S>>(
         yaw: Angle,
         pitch: Angle,
         roll: Angle,
@@ -359,72 +405,105 @@ where
         surface: S,
     ) -> Self {
         let r_nb = zyx2r(yaw, pitch, roll);
-        let r_en = Self::ned(origin, surface).dir_rm;
-        // closest frames cancel: N.
+        let r_en = NedFrame::new(origin, surface).dir_rm;
         let dir_rm = r_en * r_nb;
+
         Self {
             origin: origin.geocentric(surface).as_metres(),
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
-            o: Orientation::Ned,
+            _o: PhantomData,
         }
     }
 
-    /// Local level, Wander azimuth frame.
-    ///
-    /// - The origin is directly beneath or above the vehicle (B), at Earth’s surface.
-    /// - Orientation: The z-axis is pointing down. Initially, the x-axis points towards north, and the
-    ///   y-axis points towards east, but as the vehicle moves they are not rotating about the z-axis
-    ///   (their angular velocity relative to the Earth has zero component along the z-axis).
-    ///   (Note: Any initial horizontal direction of the x- and y-axes is valid for L, but if the
-    ///   initial position is outside the poles, north and east are usually chosen for convenience.)
-    ///
-    /// Notes: The L-frame is equal to the N-frame except for the rotation about the z-axis,
-    /// which is always zero for this frame (relative to Earth). Hence, at a given time, the only
-    /// difference between the frames is an angle between the x-axis of L and the north direction;
-    /// this angle is called the wander azimuth angle. The L-frame is well suited for general
-    /// calculations, as it is non-singular.
-    pub fn local_level<O: LocalFrameOrigin<S>>(
-        wander_azimuth: Angle,
-        origin: O,
-        surface: S,
-    ) -> Self {
+    /// Translates the body frame origin by a displacement vector defined in body coordinates.
+    pub fn translate(&self, offset: BodyPosition) -> Self {
+        let translation_ecef = offset.as_metres() * self.dir_rm;
+        Self {
+            origin: self.origin + translation_ecef,
+            dir_rm: self.dir_rm,
+            inv_rm: self.inv_rm,
+            surface: self.surface,
+            _o: PhantomData,
+        }
+    }
+
+    /// Rotates the body frame intrinsically by relative yaw, pitch, and roll adjustments.
+    pub fn rotate(&self, delta_yaw: Angle, delta_pitch: Angle, delta_roll: Angle) -> Self {
+        let r_delta = zyx2r(delta_yaw, delta_pitch, delta_roll);
+        let dir_rm = self.dir_rm * r_delta;
+        Self {
+            origin: self.origin,
+            dir_rm,
+            inv_rm: dir_rm.transpose(),
+            surface: self.surface,
+            _o: PhantomData,
+        }
+    }
+}
+
+/// Local level, Wander azimuth frame: advanced inertial navigation systems (INS) use this frame
+/// to avoid mathematical singularities when navigating near the Earth's geographic poles, where
+/// meridians converge and traditional North-tracking fails.
+///
+/// Orientation: The z-axis is pointing down. Initially, the x-axis points towards north, and the
+///   y-axis points towards east, but as the vehicle moves they are not rotating about the z-axis
+///   (their angular velocity relative to the Earth has zero component along the z-axis).
+///   (Note: Any initial horizontal direction of the x- and y-axes is valid for L, but if the
+///   initial position is outside the poles, north and east are usually chosen for convenience.)
+///
+/// Notes: This frame is equal to the [NED frame](Ned) except for the rotation about the z-axis,
+/// which is always zero for this frame (relative to Earth). Hence, at a given time, the only
+/// difference between the frames is an angle between the x-axis of L and the north direction;
+/// this angle is called the wander azimuth angle. This frame is well suited for general
+/// calculations, as it is non-singular.
+pub type WanderAzimuthFrame<S> = LocalFrame<S, WanderAzimuth>;
+
+impl<S: Surface> WanderAzimuthFrame<S> {
+    /// [Local Level, Wander Azimuth](WanderAzimuth) fixed to the given origin and rotated by the given wander azimuth.
+    pub fn new<O: LocalFrameOrigin<S>>(wander_azimuth: Angle, origin: O, surface: S) -> Self {
         let ll = LatLong::from_nvector(origin.geodetic(surface).horizontal_position());
         let r = xyz2r(ll.longitude(), -ll.latitude(), wander_azimuth);
         let r_ee = Mat33::new(Vec3::NEG_UNIT_Z, Vec3::UNIT_Y, Vec3::UNIT_X);
         let dir_rm = r_ee * r;
+
         Self {
             origin: origin.geocentric(surface).as_metres(),
             dir_rm,
             inv_rm: dir_rm.transpose(),
             surface,
-            o: Orientation::Ned,
+            _o: PhantomData,
         }
     }
+}
 
+impl<S, O> LocalFrame<S, O>
+where
+    S: Surface,
+    O: FrameOrientation,
+{
     /// Converts the given [GeocentricPosition] into a [LocalPosition]: the exact vector between this frame
     /// origin and the given position. The resulting [LocalPosition] orientation is the one of this frame.
-    pub fn geocentric_to_local_position(&self, p: GeocentricPosition) -> LocalPosition {
+    pub fn geocentric_to_local_position(&self, p: GeocentricPosition) -> LocalPosition<O> {
         let p_vec3 = p.as_metres();
         // delta in 'Earth' frame.
         let de = p_vec3 - self.origin;
         let d = de * self.inv_rm;
-        LocalPosition::from_metres_with_o(d, self.o)
+        LocalPosition::from_vec3_metres(d)
     }
 
     /// Converts the given [GeodeticPosition] into a [LocalPosition]: the exact vector between this frame
     /// origin and the given position. The resulting [LocalPosition] orientation is the one of this frame.
-    pub fn geodetic_to_local_position(&self, p: GeodeticPosition) -> LocalPosition {
+    pub fn geodetic_to_local_position(&self, p: GeodeticPosition) -> LocalPosition<O> {
         self.geocentric_to_local_position(self.surface.geodetic_to_geocentric_position(p))
     }
 
     /// Converts the given [LocalPosition] into a [GeocentricPosition]: the geocentric position of an object
     /// which is located at a bearing and distance from this frame origin. The given [LocalPosition]
     /// is re-oriented to match the orientation of this frame if required.
-    pub fn local_to_geocentric_position(&self, p: LocalPosition) -> GeocentricPosition {
-        let op = p.with_orientation(self.o);
-        let c = op.as_metres() * self.dir_rm;
+    pub fn local_to_geocentric_position(&self, p: LocalPosition<O>) -> GeocentricPosition {
+        let c = p.as_metres() * self.dir_rm;
         let v = self.origin + c;
         GeocentricPosition::from_vec3_metres(v)
     }
@@ -432,7 +511,7 @@ where
     /// Converts the given [LocalPosition] into a [GeodeticPosition]: the geodetic position of an object
     /// which is located at a bearing and distance from this frame origin. The given [LocalPosition]
     /// is re-oriented to match the orientation of this frame if required.
-    pub fn local_to_geodetic_position(&self, p: LocalPosition) -> GeodeticPosition {
+    pub fn local_to_geodetic_position(&self, p: LocalPosition<O>) -> GeodeticPosition {
         self.surface
             .geocentric_to_geodetic_position(self.local_to_geocentric_position(p))
     }
@@ -564,79 +643,66 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 mod tests {
 
     use crate::{
-        ellipsoidal::Ellipsoid, local_frame::Orientation, positions::assert_geod_eq_d7_mm, r2xyz,
-        r2zyx, Angle, Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame,
-        LocalPosition, Mat33, NVector, Surface, Vec3,
+        ellipsoidal::Ellipsoid, positions::assert_geod_eq_d7_mm, r2xyz, r2zyx, Angle, BodyFrame,
+        BodyPosition, Cartesian3DVector, EnuFrame, EnuPosition, GeodeticPosition, LatLong, Length,
+        LocalPosition, Mat33, NVector, NedFrame, NedPosition, Surface, Vec3, WanderAzimuthFrame,
+        WanderAzimuthPosition,
     };
 
     #[test]
-    fn local_position_from_metres() {
-        assert_eq!(
-            LocalPosition::new(
-                Length::from_metres(1.0),
-                Length::from_metres(2.0),
-                Length::from_metres(3.0)
-            ),
-            LocalPosition::from_metres(1.0, 2.0, 3.0)
-        );
-    }
-
-    #[test]
     fn add_local_positions() {
-        let l1 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
-        let l2 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Enu);
-        let l3 = LocalPosition::from_metres_with_o(Vec3::new(2.0, 1.0, -3.0), Orientation::Ned);
+        let l1 = NedPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0));
+        let l2 = NedPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0));
 
         assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(3.0, 3.0, 0.0), Orientation::Ned),
+            NedPosition::from_vec3_metres(Vec3::new(2.0, 4.0, 6.0)),
             l1 + l2
         );
-
-        assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(3.0, 3.0, 0.0), Orientation::Ned),
-            l1 + l3
-        )
     }
 
     #[test]
     fn sub_local_positions() {
-        let l1 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
-        let l2 = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Enu);
-        let l3 = LocalPosition::from_metres_with_o(Vec3::new(2.0, 1.0, -3.0), Orientation::Ned);
+        let l1 = EnuPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0));
+        let l2: LocalPosition<_> = EnuPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0));
 
         assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(-1.0, 1.0, 6.0), Orientation::Ned),
+            EnuPosition::from_vec3_metres(Vec3::new(0.0, 0.0, 0.0)),
             l1 - l2
         );
-
-        assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(-1.0, 1.0, 6.0), Orientation::Ned),
-            l1 - l3
-        )
     }
 
     #[test]
     fn mul_local_position() {
-        let l = LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned);
+        let l = BodyPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0));
 
         assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned),
+            BodyPosition::from_vec3_metres(Vec3::new(2.0, 4.0, 6.0)),
             l * 2.0
         );
 
         assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned),
+            BodyPosition::from_vec3_metres(Vec3::new(2.0, 4.0, 6.0)),
             2.0 * l
         )
     }
 
     #[test]
     fn div_local_position() {
-        let l = LocalPosition::from_metres_with_o(Vec3::new(2.0, 4.0, 6.0), Orientation::Ned);
+        let l = WanderAzimuthPosition::from_vec3_metres(Vec3::new(2.0, 4.0, 6.0));
 
         assert_eq!(
-            LocalPosition::from_metres_with_o(Vec3::new(1.0, 2.0, 3.0), Orientation::Ned),
+            WanderAzimuthPosition::from_vec3_metres(Vec3::new(1.0, 2.0, 3.0)),
             l / 2.0
+        )
+    }
+
+    #[test]
+    fn neg_local_position() {
+        let l = NedPosition::from_vec3_metres(Vec3::new(2.0, 4.0, 6.0));
+
+        assert_eq!(
+            NedPosition::from_vec3_metres(Vec3::new(-2.0, -4.0, -6.0)),
+            -l
         )
     }
 
@@ -655,24 +721,24 @@ mod tests {
             Length::ZERO,
         );
 
-        let f0: LocalFrame<Ellipsoid> =
-            LocalFrame::local_level(Angle::from_degrees(90.0), ship_position_0, Ellipsoid::WGS84);
+        let f0 =
+            WanderAzimuthFrame::new(Angle::from_degrees(90.0), ship_position_0, Ellipsoid::WGS84);
         let local_0 = f0.geodetic_to_local_position(sensor_position).round_mm();
 
         assert_eq!(Length::from_metres(278.257), local_0.x());
         assert_eq!(Length::from_metres(-10.0), local_0.y());
         assert_eq!(Length::ZERO, local_0.z().round_m());
-        assert_eq!(358.0, local_0.azimuth().as_degrees().round());
+        assert_eq!(358.0, local_0.wander_bearing().as_degrees().round());
 
-        let f1: LocalFrame<Ellipsoid> =
-            LocalFrame::local_level(Angle::from_degrees(90.0), ship_position_1, Ellipsoid::WGS84);
+        let f1 =
+            WanderAzimuthFrame::new(Angle::from_degrees(90.0), ship_position_1, Ellipsoid::WGS84);
 
         let local_1 = f1.geodetic_to_local_position(sensor_position).round_mm();
 
         assert_eq!(Length::from_metres(-278.257), local_1.x());
         assert_eq!(Length::from_metres(-10.0), local_1.y());
         assert_eq!(Length::ZERO, local_1.z().round_m());
-        assert_eq!(182.0, local_1.azimuth().as_degrees().round());
+        assert_eq!(182.0, local_1.wander_bearing().as_degrees().round());
     }
 
     #[test]
@@ -686,7 +752,7 @@ mod tests {
             Length::ZERO,
         );
 
-        let f0: LocalFrame<Ellipsoid> = LocalFrame::ned(ship_position_0, Ellipsoid::WGS84);
+        let f0 = NedFrame::new(ship_position_0, Ellipsoid::WGS84);
         let local_0 = f0.geodetic_to_local_position(sensor_position).round_mm();
 
         assert_eq!(Length::ZERO, local_0.x());
@@ -694,7 +760,7 @@ mod tests {
         assert_eq!(Length::ZERO, local_0.z().round_m());
         assert_eq!(90.0, local_0.azimuth().as_degrees());
 
-        let f1: LocalFrame<Ellipsoid> = LocalFrame::ned(ship_position_1, Ellipsoid::WGS84);
+        let f1 = NedFrame::new(ship_position_1, Ellipsoid::WGS84);
         let local_1 = f1.geodetic_to_local_position(sensor_position).round_mm();
 
         assert_eq!(Length::ZERO, local_1.x());
@@ -715,7 +781,7 @@ mod tests {
             Length::from_metres(1340.0),
         );
 
-        let ned = LocalFrame::ned(origin, Ellipsoid::WGS84);
+        let ned: crate::LocalFrame<Ellipsoid, crate::Ned> = NedFrame::new(origin, Ellipsoid::WGS84);
 
         let local = ned.geodetic_to_local_position(point);
 
@@ -745,7 +811,7 @@ mod tests {
             Length::from_metres(4531.0),
         );
 
-        let enu: LocalFrame<Ellipsoid> = LocalFrame::enu(origin, Ellipsoid::WGS84);
+        let enu = EnuFrame::new(origin, Ellipsoid::WGS84);
 
         let local = enu.geodetic_to_local_position(point);
 
@@ -766,7 +832,7 @@ mod tests {
         let el = Angle::from_degrees(-23.161);
         let sr = Length::from_metres(10.885);
 
-        let local = LocalPosition::aer_to_ned(az, el, sr);
+        let local = NedPosition::from_aer(az, el, sr);
 
         assert_eq!(Length::from_metres(-9.101), local.x().round_mm());
         assert_eq!(Length::from_metres(4.162), local.y().round_mm());
@@ -783,7 +849,7 @@ mod tests {
         let el = Angle::from_degrees(4.1931);
         let sr = Length::from_metres(15.1070);
 
-        let local = LocalPosition::aer_to_enu(az, el, sr);
+        let local = EnuPosition::from_aer(az, el, sr);
 
         assert_eq!(Length::from_metres(8.45), local.x().round_mm());
         assert_eq!(Length::from_metres(12.474), local.y().round_mm());
@@ -804,14 +870,11 @@ mod tests {
             Length::from_metres(4531.0),
         );
 
-        let enu: LocalFrame<Ellipsoid> = LocalFrame::enu(origin, Ellipsoid::WGS84);
+        let enu = EnuFrame::new(origin, Ellipsoid::WGS84);
 
-        let local_enu: LocalPosition = enu.geodetic_to_local_position(point);
+        let local_enu = enu.geodetic_to_local_position(point);
 
-        // LocalPosition::new is NED
-        let local_ned = LocalPosition::new(local_enu.y(), local_enu.x(), -local_enu.z());
-
-        assert_geod_eq_d7_mm(point, enu.local_to_geodetic_position(local_ned));
+        assert_geod_eq_d7_mm(point, enu.local_to_geodetic_position(local_enu));
     }
 
     #[test]
@@ -825,13 +888,13 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let enu = LocalFrame::enu(point_a, Ellipsoid::WGS84);
+        let enu = EnuFrame::new(point_a, Ellipsoid::WGS84);
         assert_geod_eq_d7_mm(
             point_b,
             enu.local_to_geodetic_position(enu.geodetic_to_local_position(point_b)),
         );
 
-        let enu2 = LocalFrame::enu(
+        let enu2 = EnuFrame::new(
             Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
             Ellipsoid::WGS84,
         );
@@ -852,13 +915,13 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let ned: LocalFrame<Ellipsoid> = LocalFrame::ned(point_a, Ellipsoid::WGS84);
+        let ned = NedFrame::new(point_a, Ellipsoid::WGS84);
         assert_geod_eq_d7_mm(
             point_b,
             ned.local_to_geodetic_position(ned.geodetic_to_local_position(point_b)),
         );
 
-        let ned2: LocalFrame<Ellipsoid> = LocalFrame::ned(
+        let ned2 = NedFrame::new(
             Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
             Ellipsoid::WGS84,
         );
@@ -879,7 +942,7 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let body = LocalFrame::body(
+        let body = BodyFrame::new(
             Angle::from_degrees(45.0),
             Angle::from_degrees(10.0),
             Angle::from_degrees(5.0),
@@ -891,7 +954,7 @@ mod tests {
             body.local_to_geodetic_position(body.geodetic_to_local_position(point_b)),
         );
 
-        let body2 = LocalFrame::body(
+        let body2 = BodyFrame::new(
             Angle::from_degrees(45.0),
             Angle::from_degrees(10.0),
             Angle::from_degrees(5.0),
@@ -915,22 +978,20 @@ mod tests {
             Length::from_metres(-6.0),
         );
 
-        let local_level = LocalFrame::local_level(
+        let wa = WanderAzimuthFrame::new(
             Angle::from_degrees(45.0),
             Ellipsoid::WGS84.geodetic_to_geocentric_position(point_a),
             Ellipsoid::WGS84,
         );
         assert_geod_eq_d7_mm(
             point_b,
-            local_level.local_to_geodetic_position(local_level.geodetic_to_local_position(point_b)),
+            wa.local_to_geodetic_position(wa.geodetic_to_local_position(point_b)),
         );
 
-        let local_level2 =
-            LocalFrame::local_level(Angle::from_degrees(45.0), point_a, Ellipsoid::WGS84);
+        let wa2 = WanderAzimuthFrame::new(Angle::from_degrees(45.0), point_a, Ellipsoid::WGS84);
         assert_geod_eq_d7_mm(
             point_b,
-            local_level2
-                .local_to_geodetic_position(local_level2.geodetic_to_local_position(point_b)),
+            wa2.local_to_geodetic_position(wa2.geodetic_to_local_position(point_b)),
         )
     }
 
@@ -971,5 +1032,63 @@ mod tests {
         assert_eq!(Angle::from_degrees(10.0), z.round_d7());
         assert_eq!(Angle::from_degrees(20.0), y.round_d7());
         assert_eq!(Angle::from_degrees(30.0), x.round_d7());
+    }
+
+    #[test]
+    fn body_relative_angles() {
+        // Target forward (+x), right (+y), above (-z)
+        let target = BodyPosition::from_metres(10.0, 10.0, -10.0);
+
+        assert_eq!(Angle::from_degrees(45.0), target.relative_bearing());
+        assert_eq!(
+            Angle::from_degrees(35.2643897),
+            target.relative_elevation().round_d7()
+        );
+    }
+
+    #[test]
+    fn body_relative_elevation_below_plane() {
+        // Target directly below vehicle (+z in Body frame)
+        let target = BodyPosition::from_metres(0.0, 0.0, 10.0);
+        assert_eq!(
+            Angle::from_degrees(-90.0),
+            target.relative_elevation().round_d7()
+        );
+    }
+
+    #[test]
+    fn sensor_observation_to_geodetic_position() {
+        let ac_pos = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            Length::from_feet(35000.0),
+        );
+        let yaw = Angle::from_degrees(45.0);
+        let pitch = Angle::from_degrees(2.0);
+        let roll = Angle::from_degrees(-1.0);
+        let ac_frame = BodyFrame::new(yaw, pitch, roll, ac_pos, Ellipsoid::WGS84);
+
+        // Sensor fixed offset relative to aircraft CG (x: +2.5m forward, y: 0.0m, z: +0.8m down)
+        let sensor_offset_body = BodyPosition::new(
+            Length::from_metres(2.5),
+            Length::from_metres(0.0),
+            Length::from_metres(0.8),
+        );
+        let sensor_frame = ac_frame.translate(sensor_offset_body);
+
+        // Sensor observes a target at relative azimuth 30°, elevation -15° (downward), range 5000m
+        let rel_azimuth = Angle::from_degrees(30.0);
+        let rel_elevation = Angle::from_degrees(-15.0);
+        let slant_range = Length::from_metres(5000.0);
+
+        let target_rel_sensor = BodyPosition::from_aer(rel_azimuth, rel_elevation, slant_range);
+
+        // Conversion of observation to geodetic position
+        assert_geod_eq_d7_mm(
+            GeodeticPosition::new(
+                NVector::from_lat_long_degrees(54.01132811615137, 154.07176275677563),
+                Length::from_feet(31378.3653906617),
+            ),
+            sensor_frame.local_to_geodetic_position(target_rel_sensor),
+        )
     }
 }

@@ -30,7 +30,9 @@ pub mod ellipsoidal;
 
 mod local_frame;
 pub use crate::local_frame::{
-    r2xyz, r2zyx, xyz2r, zyx2r, LocalFrame, LocalFrameOrigin, LocalPosition,
+    r2xyz, r2zyx, xyz2r, zyx2r, Body, BodyFrame, BodyPosition, Enu, EnuFrame, EnuPosition,
+    FrameOrientation, LocalFrame, LocalFrameOrigin, LocalPosition, Ned, NedFrame, NedPosition,
+    WanderAzimuth, WanderAzimuthFrame, WanderAzimuthPosition,
 };
 
 mod length;

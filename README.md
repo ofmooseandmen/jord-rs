@@ -31,7 +31,7 @@ The following references provide the theoretical basis of most of the algorithms
 Given two positions A and B. Find the exact vector from A to B in meters north, east and down, and find the direction (azimuth/bearing) to B, relative to north. Use WGS-84 ellipsoid.
 
 ```
-use jord::{Angle, Cartesian3DVector, GeodeticPosition, Length, LocalFrame, NVector};
+use jord::{Angle, Cartesian3DVector, GeodeticPosition, Length, NedFrame, NVector};
 use jord::ellipsoidal::Ellipsoid;
 
 let a = GeodeticPosition::new(
@@ -44,7 +44,7 @@ let b = GeodeticPosition::new(
     Length::from_metres(6.0)
 );
 
-let ned = LocalFrame::ned(a, Ellipsoid::WGS84);
+let ned = NedFrame::new(a, Ellipsoid::WGS84);
 let delta = ned.geodetic_to_local_position(b);
 
 assert_eq!(Length::from_metres(331730.863), delta.x().round_mm()); // north
@@ -60,7 +60,7 @@ Given the position of vehicle B and a bearing and distance to an object C. Find 
 
 ```
 use jord::{
-    Angle, Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame, LocalPosition,
+    Angle, BodyFrame, BodyPosition, Cartesian3DVector, GeodeticPosition, LatLong, Length,
     NVector, Vec3,
 };
 use jord::ellipsoidal::Ellipsoid;
@@ -73,8 +73,8 @@ let b = GeodeticPosition::new(
 let yaw = Angle::from_degrees(10.0);
 let pitch = Angle::from_degrees(20.0);
 let roll = Angle::from_degrees(30.0);
-let body = LocalFrame::body(yaw, pitch, roll, b, Ellipsoid::WGS72);
-let delta = LocalPosition::from_metres(3000.0, 2000.0, 100.0);
+let body = BodyFrame::new(yaw, pitch, roll, b, Ellipsoid::WGS72);
+let delta = BodyPosition::from_metres(3000.0, 2000.0, 100.0);
 
 let c = body.local_to_geodetic_position(delta);
 let c_ll = LatLong::from_nvector(c.horizontal_position());
