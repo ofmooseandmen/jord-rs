@@ -1,6 +1,6 @@
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, Length,
-    NVector, Vec3,
+    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, Length, NVector, PositionVector,
+    Vec3,
 };
 
 /// An ellipsoid.

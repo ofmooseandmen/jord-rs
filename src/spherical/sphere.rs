@@ -1,8 +1,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong,
-    Length, Mat33, NVector, Speed, Vec3, Vehicle,
+    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, Mat33, NVector,
+    PositionVector, Speed, Vec3, Vehicle,
 };
 
 use super::{

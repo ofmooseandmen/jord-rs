@@ -10,7 +10,7 @@
 The `jord` crate implements various geographical position calculations, featuring:
 
 - Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) models,
-- [Local frame](crate::LocalFrame)s - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
+- [Local frame](crate::local::LocalFrame)s - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
 - [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of position...,
 - Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
 - [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains position, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
@@ -31,7 +31,8 @@ The following references provide the theoretical basis of most of the algorithms
 Given two positions A and B. Find the exact vector from A to B in meters north, east and down, and find the direction (azimuth/bearing) to B, relative to north. Use WGS-84 ellipsoid.
 
 ```
-use jord::{Angle, Cartesian3DVector, GeodeticPosition, Length, NedFrame, NVector};
+use jord::{Angle, GeodeticPosition, Length, NVector, PositionVector, Surface};
+use jord::local::NedFrame;
 use jord::ellipsoidal::Ellipsoid;
 
 let a = GeodeticPosition::new(
@@ -44,14 +45,15 @@ let b = GeodeticPosition::new(
     Length::from_metres(6.0)
 );
 
-let ned = NedFrame::new(a, Ellipsoid::WGS84);
-let delta = ned.geodetic_to_local_position(b);
+let e = Ellipsoid::WGS84;
+let ned = NedFrame::from_geodetic(a, e);
+let delta = ned.local_vector_to(e.geodetic_to_geocentric_position(b));
 
 assert_eq!(Length::from_metres(331730.863), delta.x().round_mm()); // north
 assert_eq!(Length::from_metres(332998.501), delta.y().round_mm()); // east
 assert_eq!(Length::from_metres(17398.304), delta.z().round_mm()); // down
 assert_eq!(Length::from_metres(470357.384), delta.slant_range().round_mm());
-assert_eq!(Angle::from_degrees(45.10926), delta.azimuth().round_d5());
+assert_eq!(Angle::from_degrees(45.10926), delta.bearing().round_d5());
 assert_eq!(Angle::from_degrees(-2.11983), delta.elevation().round_d5());
 ```
 
@@ -59,10 +61,8 @@ assert_eq!(Angle::from_degrees(-2.11983), delta.elevation().round_d5());
 Given the position of vehicle B and a bearing and distance to an object C. Find the exact position of C. Use WGS-72 ellipsoid.
 
 ```
-use jord::{
-    Angle, BodyFrame, BodyPosition, Cartesian3DVector, GeodeticPosition, LatLong, Length,
-    NVector, Vec3,
-};
+use jord::{Angle, GeodeticPosition, LatLong, Length, NVector,PositionVector, Surface, Vec3};
+use jord::local::{BodyFrame, BodyVector};
 use jord::ellipsoidal::Ellipsoid;
 
 let b = GeodeticPosition::new(
@@ -70,13 +70,15 @@ let b = GeodeticPosition::new(
     Length::from_metres(400.0)
 );
 
+let e = Ellipsoid::WGS72;
+
 let yaw = Angle::from_degrees(10.0);
 let pitch = Angle::from_degrees(20.0);
 let roll = Angle::from_degrees(30.0);
-let body = BodyFrame::new(yaw, pitch, roll, b, Ellipsoid::WGS72);
-let delta = BodyPosition::from_metres(3000.0, 2000.0, 100.0);
+let body = BodyFrame::from_geodetic(yaw, pitch, roll, b, e);
+let delta = BodyVector::from_metres(3000.0, 2000.0, 100.0);
 
-let c = body.local_to_geodetic_position(delta);
+let c = e.geocentric_to_geodetic_position(body.destination_position(delta));
 let c_ll = LatLong::from_nvector(c.horizontal_position());
 
 assert_eq!(Angle::from_degrees(53.32638), c_ll.latitude().round_d5());
@@ -104,7 +106,7 @@ assert_eq!(Length::from_metres(4702059.834), p.height().round_mm());
 Given geodetic latitude, longitude and height. Find the ECEF-vector (using WGS-84 ellipsoid).
 
 ```
-use jord::{Cartesian3DVector, GeocentricPosition, GeodeticPosition, Length, NVector, Surface};
+use jord::{GeocentricPosition, GeodeticPosition, Length, NVector, PositionVector, Surface};
 use jord::ellipsoidal::Ellipsoid;
 
 let p = GeodeticPosition::new(

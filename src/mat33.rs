@@ -10,6 +10,13 @@ pub struct Mat33 {
 }
 
 impl Mat33 {
+    /// Identify matrix.
+    pub const IDENTITY: Mat33 = Mat33 {
+        r0: Vec3::UNIT_X,
+        r1: Vec3::UNIT_Y,
+        r2: Vec3::UNIT_Z,
+    };
+
     /// Creates a 3*3 matrix from the given rows components.
     pub fn new(r0: Vec3, r1: Vec3, r2: Vec3) -> Self {
         Self { r0, r1, r2 }

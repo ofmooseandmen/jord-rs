@@ -10,9 +10,9 @@ use geo_traits::{
     UnimplementedPolygon, UnimplementedRect, UnimplementedTriangle,
 };
 
-/// Cartesian 3D position vector: allows to represent the position of a general coordinate frame B
+/// Position vector: allows to represent the position of a general coordinate frame B
 /// relative to a reference coordinate frame A as the position vector from A to B.
-pub trait Cartesian3DVector: Sized {
+pub trait PositionVector: Sized {
     /// Returns the x component of this vector.
     fn x(&self) -> Length;
 
@@ -80,14 +80,13 @@ impl GeocentricPosition {
             Length::from_metres(z),
         )
     }
-
     /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
         Self::from_metres(v.x(), v.y(), v.z())
     }
 }
 
-impl Cartesian3DVector for GeocentricPosition {
+impl PositionVector for GeocentricPosition {
     #[inline]
     fn x(&self) -> Length {
         self.x
@@ -484,7 +483,7 @@ pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticP
 
 #[cfg(test)]
 mod tests {
-    use crate::{Cartesian3DVector, GeocentricPosition, LatLong, NVector, Vec3};
+    use crate::{GeocentricPosition, LatLong, NVector, PositionVector, Vec3};
 
     #[test]
     fn nv_ll_roundtrip() {
