@@ -33,7 +33,7 @@ do overlap.
 
 ## Installation
 
-```
+```sh
 cargo add jord
 ```
 
@@ -46,7 +46,7 @@ jord = "0.17.0"
 
 To enable an [optional feature](#cargo-features), e.g. `geo-types`:
 
-```
+```sh
 cargo add jord --features geo-types
 ```
 
