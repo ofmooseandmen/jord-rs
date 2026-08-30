@@ -1,21 +1,78 @@
 # Jord - Geographical Position Calculations
 
 [![crates.io](https://img.shields.io/crates/v/jord.svg?color=brightgreen)](https://crates.io/crates/jord)
+[![docs.rs](https://img.shields.io/docsrs/jord)](https://docs.rs/jord)
+[![downloads](https://img.shields.io/crates/d/jord.svg)](https://crates.io/crates/jord)
 [![build](https://github.com/ofmooseandmen/jord-rs/workflows/CI/badge.svg)](https://github.com/ofmooseandmen/jord-rs/actions)
 [![coverage](https://codecov.io/gh/ofmooseandmen/jord-rs/graph/badge.svg?token=MEKNYZRK3V)](https://codecov.io/gh/ofmooseandmen/jord-rs)
-[![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://opensource.org/license/mit)
+[![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://github.com/ofmooseandmen/jord-rs/LICENSE)
 
 > __Jord__ (_Swedish_) is __Earth__ (_English_)
 
-The `jord` crate implements various geographical position calculations, featuring:
+`jord` is a Rust crate for exact geodetic, geocentric and great-circle position
+calculations on both spherical and ellipsoidal Earth models — ECEF/n-vector
+conversions, local reference frames (NED, ENU, body, wander-azimuth), great
+circle navigation, kinematics, and spherical polygon ("Loop") geometry.
 
-- Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) models,
-- [Local frame](crate::local::LocalFrame)s - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
-- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of position...,
-- Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
-- [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains position, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
-- [Spherical Cap](crate::spherical::Cap)s and [Rectangular Region](crate::spherical::Rectangle)s
-- Location-dependent radii of [ellispoid](crate::ellipsoidal::Ellipsoid)s.
+If you're looking for planar/projected geometry and boolean operations on
+generic 2D shapes, see the [`geo`](https://crates.io/crates/geo) crate instead
+— `jord` focuses specifically on accurate positions and geometry *on the
+Earth* (geodesic/great-circle math, not straight-edge planar math), and
+provides optional interop with `geo-types`/`geo-traits` for the pieces that
+do overlap.
+
+## Table of contents
+
+- [Installation](#installation)
+- [Capabilities](#capabilities)
+- [Cargo features](#cargo-features)
+- [Literature](#literature)
+- [Examples](#solutions-to-the-10-examples-from-navlab)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Installation
+
+```
+cargo add jord
+```
+
+or add it to `Cargo.toml` directly:
+
+```toml
+[dependencies]
+jord = "0.17.0"
+```
+
+To enable an [optional feature](#cargo-features), e.g. `geo-types`:
+
+```
+cargo add jord --features geo-types
+```
+
+## Capabilities
+
+- Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude
+  and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
+  positions, for both [spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)
+  and [ellipsoidal](https://docs.rs/jord/latest/jord/ellipsoidal/struct.Ellipsoid.html) models.
+- [Local reference frame](https://docs.rs/jord/latest/jord/local/struct.LocalFrame.html)s:
+  - Body, local-level/wander-azimuth, NED (north, east, down) and ENU (east, north, up).
+  - Delta between two positions, destination position from a reference position and a delta.
+  - Frame transformation (translation and/or rotation).
+- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)) navigation:
+  surface distance, initial & final bearing, interpolated position,
+  [minor arc](https://docs.rs/jord/latest/jord/spherical/struct.MinorArc.html) intersection,
+  cross track distance, angle turned, side of position, ...
+- Kinematics ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)):
+  closest point of approach between tracks, minimum speed for intercept, time to intercept.
+- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygons"):
+  convex/concave, clockwise/anti-clockwise, contains position,
+  [minimum bounding rectangle](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html),
+  triangulation, spherical excess, ...
+- [Spherical Cap](https://docs.rs/jord/latest/jord/spherical/struct.Cap.html)s and
+  [Rectangular Region](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html)s.
+- Location-dependent radii of [ellipsoid](https://docs.rs/jord/latest/jord/ellipsoidal/struct.Ellipsoid.html)s.
 
 ## Literature
 
@@ -24,6 +81,17 @@ The following references provide the theoretical basis of most of the algorithms
 - [Non-singular Horizontal Position Representation; Gade, K.; 2010](https://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
 - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
+
+## Cargo features
+
+All of the following are disabled by default:
+
+- **`serde`**: serialization/deserialization support via serde.
+- **`uom`**: interoperability between jord [measurement types](https://docs.rs/jord/latest/jord/trait.Measurement.html)
+  and [uom](https://docs.rs/uom/latest/uom/) types.
+- **`geo-types`** and **`geo-traits`**: interoperability between jord
+  [`LatLong`](https://docs.rs/jord/latest/jord/struct.LatLong.html) and
+  [geo-types](https://docs.rs/geo-types/latest/geo_types/)/[geo-traits](https://docs.rs/geo-traits/latest/geo_traits/).
 
 ## Solutions to the 10 examples from [NavLab](https://www.navlab.net/nvector)
 
@@ -249,3 +317,11 @@ let d = Sphere::EARTH.cross_track_distance(b, a);
 
 assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ```
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/ofmooseandmen/jord-rs).
+
+## License
+
+`jord` is licensed under the [MIT license](https://github.com/ofmooseandmen/jord-rs/LICENSE).
