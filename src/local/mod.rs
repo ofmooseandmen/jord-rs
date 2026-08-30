@@ -45,7 +45,9 @@ pub use frame::{
 };
 
 mod orientation;
-pub use orientation::{Body, Enu, FrameOrientation, LocalNavigationFrame, Ned, WanderAzimuth};
+pub use orientation::{
+    align_to_z_down_matrix, Body, Enu, FrameOrientation, LocalNavigationFrame, Ned, WanderAzimuth,
+};
 
 mod vector;
 pub use vector::{BodyVector, EnuVector, LocalVector, NedVector, WanderAzimuthVector};

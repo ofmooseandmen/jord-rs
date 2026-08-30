@@ -7,25 +7,18 @@ pub trait FrameOrientation: Copy + Clone + Debug + PartialEq + Eq + Default {
     /// Returns true if the z-axis points UP (away from the Earth's center).
     /// Returns false if the z-axis points DOWN (towards the Earth's center).
     fn is_z_up() -> bool;
-
-    /// Returns the matrix to align this frame's axes to a standard aerospace Z-down
-    /// orientation (x-forward/north, y-right/east, z-down) prior to attitude rotations.
-    #[inline]
-    fn align_to_z_down_matrix() -> Mat33 {
-        if Self::is_z_up() {
-            // Maps Z-up (ENU: East, North, Up) to Z-down (NED: North, East, Down).
-            // X_down = Y_up, Y_down = X_up, Z_down = -Z_up
-            Mat33::new(
-                Vec3::new(0.0, 1.0, 0.0),
-                Vec3::new(1.0, 0.0, 0.0),
-                Vec3::new(0.0, 0.0, -1.0),
-            )
-        } else {
-            // Already Z-down (NED, WanderAzimuth, Body), return Identity.
-            Mat33::IDENTITY
-        }
-    }
 }
+
+/// Maps Z-up (ENU: East, North, Up) to Z-down (NED: North, East, Down).
+/// X_down = Y_up, Y_down = X_up, Z_down = -Z_up
+pub fn align_to_z_down_matrix() -> Mat33 {
+    Mat33::new(
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, -1.0),
+    )
+}
+
 /// East-North-Up (ENU) orientation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Enu;

@@ -2,7 +2,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::{
-    local::{Body, Enu, FrameOrientation, LocalNavigationFrame, LocalVector, Ned, WanderAzimuth},
+    local::{
+        orientation::align_to_z_down_matrix, Body, Enu, FrameOrientation, LocalNavigationFrame,
+        LocalVector, Ned, WanderAzimuth,
+    },
     surface::Surface,
     Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
 };
@@ -265,9 +268,8 @@ impl<O: LocalNavigationFrame> LocalFrame<O> {
     /// let wa = enu.rotate_around_z(Angle::from_degrees(45.0));
     /// ```
     pub fn rotate_around_z(&self, angle: Angle) -> WanderAzimuthFrame {
-        let alignment_rot = O::align_to_z_down_matrix();
         let rot_z = zyx2r(angle, Angle::ZERO, Angle::ZERO);
-        let dir_rm = self.dir_rm * rot_z * alignment_rot;
+        let dir_rm = self.rotate(self.dir_rm, rot_z);
         LocalFrame {
             origin: self.origin,
             dir_rm,
@@ -315,9 +317,8 @@ where
     ) -> BodyFrame {
         let global_translation = offset.as_metres() * self.dir_rm;
         let new_origin = self.origin + global_translation;
-        let alignment_rot = O::align_to_z_down_matrix();
         let r_delta = zyx2r(yaw, pitch, roll);
-        let dir_rm = self.dir_rm * r_delta * alignment_rot;
+        let dir_rm = self.rotate(self.dir_rm, r_delta);
         LocalFrame {
             origin: new_origin,
             dir_rm,
@@ -342,6 +343,15 @@ where
         let c = vector.as_metres() * self.dir_rm;
         let v = self.origin + c;
         GeocentricPosition::from_vec3_metres(v)
+    }
+
+    /// m1 * m2 aligning to z-down if required.
+    fn rotate(&self, m1: Mat33, m2: Mat33) -> Mat33 {
+        if O::is_z_up() {
+            m1 * m2 * align_to_z_down_matrix()
+        } else {
+            m1 * m2
+        }
     }
 }
 
