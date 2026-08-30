@@ -1014,7 +1014,7 @@ mod tests {
 
     #[test]
     fn pan_tilt_gimbal() {
-        let s= Ellipsoid::WGS84;
+        let s = Ellipsoid::WGS84;
 
         let ac_pos: GeodeticPosition = GeodeticPosition::new(
             NVector::from_lat_long_degrees(54.0, 154.0),
