@@ -1,8 +1,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, Cartesian3DVector, GeocentricPosition, GeodeticPosition, LatLong,
-    Length, Mat33, NVector, Speed, Vec3, Vehicle,
+    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, Mat33, NVector,
+    PositionVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
@@ -449,7 +449,7 @@ impl Sphere {
     /// assert!(opt_time_at_cpa.is_some());
     /// let time_at_cpa = opt_time_at_cpa.unwrap();
     ///
-    /// assert_eq!(113_961_40, time_at_cpa.as_millis());
+    /// assert_eq!(11_396_140, time_at_cpa.as_millis());
     ///
     /// // Position of ownship at CPA:
     /// let p_cpa_own = Sphere::EARTH.position_after(ownship, time_at_cpa);
@@ -1255,7 +1255,7 @@ mod tests {
     #[test]
     fn mean_antipodal() {
         let p = NVector::from_lat_long_degrees(0.0, 0.0);
-        assert!(Sphere::mean_position(&vec!(p, p.antipode())).is_none());
+        assert!(Sphere::mean_position(&[p, p.antipode()]).is_none());
     }
 
     #[test]
@@ -1283,7 +1283,7 @@ mod tests {
     fn mean_one() {
         assert_eq!(
             Some(NVector::from_lat_long_degrees(0.0, 0.0)),
-            Sphere::mean_position(&vec!(NVector::from_lat_long_degrees(0.0, 0.0)))
+            Sphere::mean_position(&[NVector::from_lat_long_degrees(0.0, 0.0)])
         );
     }
 
@@ -1538,7 +1538,7 @@ mod tests {
         );
 
         assert_time_to_cpa(
-            Duration::from_millis(113_961_40),
+            Duration::from_millis(11_396_140),
             Sphere::EARTH.time_to_cpa(ownship, intruder),
         );
     }

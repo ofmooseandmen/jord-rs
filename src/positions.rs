@@ -2,9 +2,17 @@ use crate::Length;
 
 use {crate::Angle, crate::Vec3};
 
-/// Cartesian 3D position vector: allows to represent the position of a general coordinate frame B
+#[cfg(feature = "geo-traits")]
+use geo_traits::{
+    CoordTrait, Dimensions, GeometryTrait, GeometryType, PointTrait,
+    UnimplementedGeometryCollection, UnimplementedLine, UnimplementedLineString,
+    UnimplementedMultiLineString, UnimplementedMultiPoint, UnimplementedMultiPolygon,
+    UnimplementedPolygon, UnimplementedRect, UnimplementedTriangle,
+};
+
+/// Position vector: allows to represent the position of a general coordinate frame B
 /// relative to a reference coordinate frame A as the position vector from A to B.
-pub trait Cartesian3DVector: Sized {
+pub trait PositionVector: Sized {
     /// Returns the x component of this vector.
     fn x(&self) -> Length;
 
@@ -72,14 +80,13 @@ impl GeocentricPosition {
             Length::from_metres(z),
         )
     }
-
     /// Creates a [GeocentricPosition] from the given coordinates in metres.
     pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
         Self::from_metres(v.x(), v.y(), v.z())
     }
 }
 
-impl Cartesian3DVector for GeocentricPosition {
+impl PositionVector for GeocentricPosition {
     #[inline]
     fn x(&self) -> Length {
         self.x
@@ -220,6 +227,149 @@ impl LatLong {
     }
 }
 
+#[cfg(feature = "geo-types")]
+impl From<geo_types::geometry::Coord> for LatLong {
+    fn from(value: geo_types::geometry::Coord) -> Self {
+        Self::from_degrees(value.y, value.x)
+    }
+}
+
+#[cfg(feature = "geo-types")]
+impl From<geo_types::geometry::Point> for LatLong {
+    fn from(value: geo_types::geometry::Point) -> Self {
+        Self::from_degrees(value.y(), value.x())
+    }
+}
+
+#[cfg(feature = "geo-types")]
+impl From<LatLong> for geo_types::geometry::Coord {
+    fn from(value: LatLong) -> Self {
+        geo_types::geometry::Coord {
+            x: value.longitude().as_degrees(),
+            y: value.latitude().as_degrees(),
+        }
+    }
+}
+
+#[cfg(feature = "geo-types")]
+impl From<LatLong> for geo_types::geometry::Point {
+    fn from(value: LatLong) -> Self {
+        let c: geo_types::geometry::Coord = value.into();
+        c.into()
+    }
+}
+
+#[cfg(feature = "geo-traits")]
+impl CoordTrait for LatLong {
+    type T = f64;
+
+    #[inline]
+    fn dim(&self) -> Dimensions {
+        Dimensions::Xy
+    }
+
+    #[inline]
+    fn x(&self) -> Self::T {
+        self.longitude().as_degrees()
+    }
+
+    #[inline]
+    fn y(&self) -> Self::T {
+        self.latitude().as_degrees()
+    }
+
+    #[inline]
+    fn nth_or_panic(&self, n: usize) -> Self::T {
+        match n {
+            0 => self.longitude().as_degrees(),
+            1 => self.latitude().as_degrees(),
+            _ => panic!("Index {n} out of bounds for LatLong"),
+        }
+    }
+}
+
+#[cfg(feature = "geo-traits")]
+impl GeometryTrait for LatLong {
+    type T = f64;
+    type PointType<'a>
+        = LatLong
+    where
+        Self: 'a;
+    type LineStringType<'a>
+        = UnimplementedLineString<f64>
+    where
+        Self: 'a;
+    type PolygonType<'a>
+        = UnimplementedPolygon<f64>
+    where
+        Self: 'a;
+    type MultiPointType<'a>
+        = UnimplementedMultiPoint<f64>
+    where
+        Self: 'a;
+    type MultiLineStringType<'a>
+        = UnimplementedMultiLineString<f64>
+    where
+        Self: 'a;
+    type MultiPolygonType<'a>
+        = UnimplementedMultiPolygon<f64>
+    where
+        Self: 'a;
+    type GeometryCollectionType<'a>
+        = UnimplementedGeometryCollection<f64>
+    where
+        Self: 'a;
+    type RectType<'a>
+        = UnimplementedRect<f64>
+    where
+        Self: 'a;
+    type TriangleType<'a>
+        = UnimplementedTriangle<f64>
+    where
+        Self: 'a;
+    type LineType<'a>
+        = UnimplementedLine<f64>
+    where
+        Self: 'a;
+
+    #[inline]
+    fn dim(&self) -> Dimensions {
+        Dimensions::Xy
+    }
+
+    #[inline]
+    fn as_type(
+        &self,
+    ) -> GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        GeometryType::Point(self)
+    }
+}
+
+#[cfg(feature = "geo-traits")]
+impl PointTrait for LatLong {
+    type CoordType<'a>
+        = LatLong
+    where
+        Self: 'a;
+
+    #[inline]
+    fn coord(&self) -> Option<Self::CoordType<'_>> {
+        Some(*self)
+    }
+}
+
 /// An horizontal position represented by a n-vector: the unit and normal vector to the surface.
 ///
 /// Orientation:
@@ -235,12 +385,17 @@ impl NVector {
         Self(v)
     }
 
+    /// Creates a new [NVector] from the given latitude and longitude.
+    pub fn from_lat_long(latitude: Angle, longitude: Angle) -> Self {
+        Self::new(latlong_to_nvector(latitude, longitude))
+    }
+
     /// Creates a new [NVector] from the given latitude and longitude in degrees.
     pub fn from_lat_long_degrees(latitude_degrees: f64, longitude_degrees: f64) -> Self {
-        Self::new(latlong_to_nvector(
+        Self::from_lat_long(
             Angle::from_degrees(latitude_degrees),
             Angle::from_degrees(longitude_degrees),
-        ))
+        )
     }
 
     /// Returns the [NVector] which is the antipode of this [NVector].
@@ -257,6 +412,18 @@ impl NVector {
     #[inline]
     pub fn as_vec3(&self) -> Vec3 {
         self.0
+    }
+}
+
+impl From<LatLong> for NVector {
+    fn from(value: LatLong) -> Self {
+        value.to_nvector()
+    }
+}
+
+impl From<NVector> for LatLong {
+    fn from(value: NVector) -> Self {
+        LatLong::from_nvector(value)
     }
 }
 
@@ -316,7 +483,15 @@ pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticP
 
 #[cfg(test)]
 mod tests {
-    use crate::{Cartesian3DVector, GeocentricPosition, LatLong, NVector, Vec3};
+    use crate::{GeocentricPosition, LatLong, NVector, PositionVector, Vec3};
+
+    #[test]
+    fn nv_ll_roundtrip() {
+        let ll = LatLong::from_degrees(54.0, 154.0);
+        let nv: NVector = ll.into();
+        let roundtrip = nv.into();
+        assert_eq!(ll, roundtrip)
+    }
 
     #[test]
     fn nvector_from_north_pole() {
@@ -412,5 +587,98 @@ mod tests {
         );
         let expected = GeocentricPosition::from_metres(-3387528.0, 1652208.0, 5152924.0);
         assert_eq!(expected, actual.round_m());
+    }
+}
+
+#[cfg(all(test, feature = "geo-types"))]
+mod geo_types_tests {
+
+    use crate::LatLong;
+
+    #[test]
+    fn geo_types_coord() {
+        let ll = LatLong::from_degrees(54.0, 154.0);
+        let gt = geo_types::geometry::Coord::from(ll);
+        assert_eq!(ll.latitude().as_degrees(), gt.y);
+        assert_eq!(ll.longitude().as_degrees(), gt.x);
+        let roundtrip = LatLong::from(gt);
+        assert_eq!(ll, roundtrip);
+    }
+
+    #[test]
+    fn geo_types_point() {
+        let ll = LatLong::from_degrees(54.0, 154.0);
+        let gt = geo_types::geometry::Point::from(ll);
+        assert_eq!(ll.latitude().as_degrees(), gt.y());
+        assert_eq!(ll.longitude().as_degrees(), gt.x());
+        let roundtrip = LatLong::from(gt);
+        assert_eq!(ll, roundtrip);
+    }
+}
+
+#[cfg(all(test, feature = "geo-traits"))]
+mod geo_traits_tests {
+
+    use crate::LatLong;
+    use geo_traits::{CoordTrait, Dimensions, GeometryTrait, GeometryType, PointTrait};
+
+    #[test]
+    fn latlong_coord_trait() {
+        let e_lat = 54.0;
+        let e_long = 154.0;
+        let ll = LatLong::from_degrees(e_lat, e_long);
+        assert_eq!(ll.x(), e_long);
+        assert_eq!(ll.y(), e_lat);
+        assert_eq!(ll.nth_or_panic(0), e_long);
+        assert_eq!(ll.nth_or_panic(1), e_lat);
+        assert_eq!(CoordTrait::dim(&ll), Dimensions::Xy);
+        assert_eq!(GeometryTrait::dim(&ll), Dimensions::Xy);
+    }
+
+    #[test]
+    #[should_panic]
+    fn nth_panic() {
+        let ll = LatLong::from_degrees(54.0, 154.0);
+        ll.nth_or_panic(2);
+    }
+
+    #[test]
+    fn latlong_point_trait() {
+        let pos = LatLong::from_degrees(54.0, 154.0);
+        let coord_opt = pos.coord();
+        assert!(coord_opt.is_some());
+        let coord = coord_opt.unwrap();
+        assert_eq!(coord.x(), 154.0);
+        assert_eq!(coord.y(), 54.0);
+        assert_eq!(CoordTrait::dim(&coord), Dimensions::Xy);
+        assert_eq!(GeometryTrait::dim(&coord), Dimensions::Xy);
+    }
+
+    #[test]
+    fn geometry_trait_variant_matching() {
+        let pos = LatLong::from_degrees(54.0, 154.0);
+
+        match pos.as_type() {
+            GeometryType::Point(pt) => {
+                let c = pt.coord().unwrap();
+                assert_eq!(c.x(), 154.0);
+                assert_eq!(c.y(), 54.0);
+            }
+            _ => panic!("LatLong should resolve to GeometryType::Point"),
+        }
+    }
+
+    #[test]
+    fn generic_function_accepting_point_trait() {
+        fn extract_x_y<P: PointTrait<T = f64>>(p: &P) -> (f64, f64) {
+            let coord = p.coord().unwrap();
+            (coord.x(), coord.y())
+        }
+
+        let pos = LatLong::from_degrees(54.0, 154.0);
+
+        let (x, y) = extract_x_y(&pos);
+        assert_eq!(x, 154.0);
+        assert_eq!(y, 54.0);
     }
 }

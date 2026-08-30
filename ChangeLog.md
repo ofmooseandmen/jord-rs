@@ -1,3 +1,7 @@
+### 0.17.0
+- Added: geo-types and geo-traits (behind a feature flag)
+- Improved: Local frames API
+
 ### 0.16.0
 - Added: uom (behind a feature flag)
 

@@ -1219,7 +1219,7 @@ mod tests {
         for lat in -900..900 {
             let lat_f = lat as f64;
             let p = LatLong::from_degrees(lat_f / 10.0, 0.0);
-            if lat >= 0 && lat <= 100 {
+            if (0..=100).contains(&lat) {
                 assert!(actual.contains_position(p));
             } else {
                 assert!(!actual.contains_position(p));

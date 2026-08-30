@@ -1,21 +1,80 @@
 # Jord - Geographical Position Calculations
 
 [![crates.io](https://img.shields.io/crates/v/jord.svg?color=brightgreen)](https://crates.io/crates/jord)
+[![docs.rs](https://img.shields.io/docsrs/jord)](https://docs.rs/jord)
+[![downloads](https://img.shields.io/crates/d/jord.svg)](https://crates.io/crates/jord)
 [![build](https://github.com/ofmooseandmen/jord-rs/workflows/CI/badge.svg)](https://github.com/ofmooseandmen/jord-rs/actions)
 [![coverage](https://codecov.io/gh/ofmooseandmen/jord-rs/graph/badge.svg?token=MEKNYZRK3V)](https://codecov.io/gh/ofmooseandmen/jord-rs)
-[![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://opensource.org/license/mit)
+[![license](https://img.shields.io/badge/license-MIT-lightgray.svg)](https://github.com/ofmooseandmen/jord-rs/LICENSE)
 
 > __Jord__ (_Swedish_) is __Earth__ (_English_)
 
-The `jord` crate implements various geographical position calculations, featuring:
+`jord` is a Rust crate for exact geodetic, geocentric and great-circle position
+calculations on both spherical and ellipsoidal Earth models — ECEF/n-vector
+conversions, local reference frames (NED, ENU, body, wander-azimuth), great
+circle navigation, kinematics, and spherical polygon ("Loop") geometry.
 
-- Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf) positions for [spherical](crate::spherical::Sphere) and [ellipsoidal](crate::ellipsoidal::Ellipsoid) models,
-- [Local frame](crate::LocalFrame)s - body; local level, wander azimuth; north, east, down; east, north, up: delta between positions, target position from reference position and delta,
-- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](crate::spherical::Sphere)) navigation: surface distance, initial & final bearing, interpolated position, [minor arc](crate::spherical::MinorArc) intersection, cross track distance, angle turned, side of position...,
-- Kinematics ([spherical](crate::spherical::Sphere)): closest point of approach between tracks, minimum speed for intercept and time to intercept,
-- [Spherical Loop](crate::spherical::Loop)s ('simple polygons'): convex/concave, clockwise/anti-clockwise, contains position, [minimum bounding rectangle](crate::spherical::Rectangle), triangulation, spherical excess...,
-- [Spherical Cap](crate::spherical::Cap)s and [Rectangular Region](crate::spherical::Rectangle)s
-- Location-dependent radii of [ellispoid](crate::ellipsoidal::Ellipsoid)s.
+If you're looking for planar/projected geometry and boolean operations on
+generic 2D shapes, see the [`geo`](https://crates.io/crates/geo) crate instead
+— `jord` focuses specifically on accurate positions and geometry *on the
+Earth* (geodesic/great-circle math, not straight-edge planar math), and
+provides optional interop with `geo-types`/`geo-traits` for the pieces that
+do overlap.
+
+For ellipsoidal geodesic distance/bearing (Vincenty/Karney), see [geographiclib-rs](https://github.com/georust/geographiclib-rs) (pure Rust) or [geographiclib](https://github.com/savage13/geographiclib) (C++ bindings, faster) - jord's GeodeticPosition converts to their plain lat/lon/metres inputs via `.latitude().as_degrees()` etc...
+
+## Table of contents
+
+- [Installation](#installation)
+- [Capabilities](#capabilities)
+- [Cargo features](#cargo-features)
+- [Literature](#literature)
+- [Examples](#solutions-to-the-10-examples-from-navlab)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Installation
+
+```sh
+cargo add jord
+```
+
+or add it to `Cargo.toml` directly:
+
+```toml
+[dependencies]
+jord = "0.17.0"
+```
+
+To enable an [optional feature](#cargo-features), e.g. `geo-types`:
+
+```sh
+cargo add jord --features geo-types
+```
+
+## Capabilities
+
+- Conversions between ECEF (earth-centred, earth-fixed), latitude/longitude
+  and [n-vector](http://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
+  positions, for both [spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)
+  and [ellipsoidal](https://docs.rs/jord/latest/jord/ellipsoidal/struct.Ellipsoid.html) models.
+- [Local reference frame](https://docs.rs/jord/latest/jord/local/struct.LocalFrame.html)s:
+  - Body, local-level/wander-azimuth, NED (north, east, down) and ENU (east, north, up).
+  - Delta between two positions, destination position from a reference position and a delta.
+  - Frame transformation (translation and/or rotation).
+- [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)) navigation:
+  surface distance, initial & final bearing, interpolated position,
+  [minor arc](https://docs.rs/jord/latest/jord/spherical/struct.MinorArc.html) intersection,
+  cross track distance, angle turned, side of position, ...
+- Kinematics ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)):
+  closest point of approach between tracks, minimum speed for intercept, time to intercept.
+- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygons"):
+  convex/concave, clockwise/anti-clockwise, contains position,
+  [minimum bounding rectangle](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html),
+  triangulation, spherical excess, ...
+- [Spherical Cap](https://docs.rs/jord/latest/jord/spherical/struct.Cap.html)s and
+  [Rectangular Region](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html)s.
+- Location-dependent radii of [ellipsoid](https://docs.rs/jord/latest/jord/ellipsoidal/struct.Ellipsoid.html)s.
 
 ## Literature
 
@@ -25,13 +84,25 @@ The following references provide the theoretical basis of most of the algorithms
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
 - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
 
+## Cargo features
+
+All of the following are disabled by default:
+
+- **`serde`**: serialization/deserialization support via serde.
+- **`uom`**: interoperability between jord [measurement types](https://docs.rs/jord/latest/jord/trait.Measurement.html)
+  and [uom](https://docs.rs/uom/latest/uom/) types.
+- **`geo-types`** and **`geo-traits`**: interoperability between jord
+  [`LatLong`](https://docs.rs/jord/latest/jord/struct.LatLong.html) and
+  [geo-types](https://docs.rs/geo-types/latest/geo_types/)/[geo-traits](https://docs.rs/geo-traits/latest/geo_traits/).
+
 ## Solutions to the 10 examples from [NavLab](https://www.navlab.net/nvector)
 
 ### Example 1: A and B to delta
 Given two positions A and B. Find the exact vector from A to B in meters north, east and down, and find the direction (azimuth/bearing) to B, relative to north. Use WGS-84 ellipsoid.
 
 ```
-use jord::{Angle, Cartesian3DVector, GeodeticPosition, Length, LocalFrame, NVector};
+use jord::{Angle, GeodeticPosition, Length, NVector, PositionVector, Surface};
+use jord::local::NedFrame;
 use jord::ellipsoidal::Ellipsoid;
 
 let a = GeodeticPosition::new(
@@ -44,14 +115,15 @@ let b = GeodeticPosition::new(
     Length::from_metres(6.0)
 );
 
-let ned = LocalFrame::ned(a, Ellipsoid::WGS84);
-let delta = ned.geodetic_to_local_position(b);
+let e = Ellipsoid::WGS84;
+let ned = NedFrame::from_geodetic(a, e);
+let delta = ned.local_vector_to(e.geodetic_to_geocentric_position(b));
 
 assert_eq!(Length::from_metres(331730.863), delta.x().round_mm()); // north
 assert_eq!(Length::from_metres(332998.501), delta.y().round_mm()); // east
 assert_eq!(Length::from_metres(17398.304), delta.z().round_mm()); // down
 assert_eq!(Length::from_metres(470357.384), delta.slant_range().round_mm());
-assert_eq!(Angle::from_degrees(45.10926), delta.azimuth().round_d5());
+assert_eq!(Angle::from_degrees(45.10926), delta.bearing().round_d5());
 assert_eq!(Angle::from_degrees(-2.11983), delta.elevation().round_d5());
 ```
 
@@ -59,10 +131,8 @@ assert_eq!(Angle::from_degrees(-2.11983), delta.elevation().round_d5());
 Given the position of vehicle B and a bearing and distance to an object C. Find the exact position of C. Use WGS-72 ellipsoid.
 
 ```
-use jord::{
-    Angle, Cartesian3DVector, GeodeticPosition, LatLong, Length, LocalFrame, LocalPosition,
-    NVector, Vec3,
-};
+use jord::{Angle, GeodeticPosition, LatLong, Length, NVector,PositionVector, Surface, Vec3};
+use jord::local::{BodyFrame, BodyVector};
 use jord::ellipsoidal::Ellipsoid;
 
 let b = GeodeticPosition::new(
@@ -70,13 +140,15 @@ let b = GeodeticPosition::new(
     Length::from_metres(400.0)
 );
 
+let e = Ellipsoid::WGS72;
+
 let yaw = Angle::from_degrees(10.0);
 let pitch = Angle::from_degrees(20.0);
 let roll = Angle::from_degrees(30.0);
-let body = LocalFrame::body(yaw, pitch, roll, b, Ellipsoid::WGS72);
-let delta = LocalPosition::from_metres(3000.0, 2000.0, 100.0);
+let body = BodyFrame::from_geodetic(yaw, pitch, roll, b, e);
+let delta = BodyVector::from_metres(3000.0, 2000.0, 100.0);
 
-let c = body.local_to_geodetic_position(delta);
+let c = e.geocentric_to_geodetic_position(body.destination_position(delta));
 let c_ll = LatLong::from_nvector(c.horizontal_position());
 
 assert_eq!(Angle::from_degrees(53.32638), c_ll.latitude().round_d5());
@@ -104,7 +176,7 @@ assert_eq!(Length::from_metres(4702059.834), p.height().round_mm());
 Given geodetic latitude, longitude and height. Find the ECEF-vector (using WGS-84 ellipsoid).
 
 ```
-use jord::{Cartesian3DVector, GeocentricPosition, GeodeticPosition, Length, NVector, Surface};
+use jord::{GeocentricPosition, GeodeticPosition, Length, NVector, PositionVector, Surface};
 use jord::ellipsoidal::Ellipsoid;
 
 let p = GeodeticPosition::new(
@@ -247,3 +319,11 @@ let d = Sphere::EARTH.cross_track_distance(b, a);
 
 assert_eq!(Length::from_metres(11117.8), d.round_dm());
 ```
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/ofmooseandmen/jord-rs).
+
+## License
+
+`jord` is licensed under the [MIT license](https://github.com/ofmooseandmen/jord-rs/LICENSE).

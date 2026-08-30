@@ -80,7 +80,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let v1 = NVector::from_lat_long_degrees(20.0, 20.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
-        let l = Loop::new(&vec![v1, v2, v3]);
+        let l = Loop::new(&[v1, v2, v3]);
         assert!(l.contains_position(inside));
         b.iter(|| black_box(l.contains_position(inside)));
     });
@@ -90,7 +90,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let v1 = NVector::from_lat_long_degrees(20.0, 20.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 30.0);
         let v3 = NVector::from_lat_long_degrees(40.0, 40.0);
-        let l = Loop::new(&vec![v1, v2, v3]);
+        let l = Loop::new(&[v1, v2, v3]);
         assert!(!l.contains_position(outside));
         b.iter(|| black_box(l.contains_position(outside)));
     });
