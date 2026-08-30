@@ -164,6 +164,43 @@ impl BodyFrame {
         )
     }
 
+    /// Builds a [Body] frame at the given reference [geodetic position](GeodeticPosition),
+    /// with yaw and pitch automatically computed so that the frame's x-axis points directly at
+    /// `target`, and the given `roll` about that pointing axis.
+    ///
+    /// This is a convenience over [`BodyFrame::from_geodetic`] for "look-at"/targeting use cases
+    /// (e.g. orienting a sensor or a gimbal frame towards a known target position), where the
+    /// desired orientation is naturally defined by a target position rather than known yaw/pitch
+    /// angles.
+    ///
+    /// If `target` coincides with `origin`, the direction to look in is undefined; this returns
+    /// a frame facing due north and level (yaw = 0°, pitch = 0°) in that case.
+    pub fn looking_at_geodetic(
+        origin: GeodeticPosition,
+        target: GeodeticPosition,
+        roll: Angle,
+        surface: impl Surface,
+    ) -> Self {
+        let o_geoc = surface.geodetic_to_geocentric_position(origin);
+        let t_geoc = surface.geodetic_to_geocentric_position(target);
+        Self::looking_at(origin, o_geoc, t_geoc, roll)
+    }
+
+    /// Builds a [Body] frame at the given reference [geocentric position](GeocentricPosition),
+    /// with yaw and pitch automatically computed so that the frame's x-axis points directly at
+    /// `target`, and the given `roll` about that pointing axis.
+    ///
+    /// See [`BodyFrame::looking_at_geodetic`] for details.
+    pub fn looking_at_geocentric(
+        origin: GeocentricPosition,
+        target: GeocentricPosition,
+        roll: Angle,
+        surface: impl Surface,
+    ) -> Self {
+        let o_geod = surface.geocentric_to_geodetic_position(origin);
+        Self::looking_at(o_geod, origin, target, roll)
+    }
+
     fn new(
         yaw: Angle,
         pitch: Angle,
@@ -181,6 +218,17 @@ impl BodyFrame {
             inv_rm: dir_rm.transpose(),
             _o: PhantomData,
         }
+    }
+
+    fn looking_at(
+        o_geod: GeodeticPosition,
+        o_geoc: GeocentricPosition,
+        target: GeocentricPosition,
+        roll: Angle,
+    ) -> Self {
+        let ned = NedFrame::new(o_geod, o_geoc);
+        let delta = ned.local_vector_to(target);
+        Self::new(delta.bearing(), delta.elevation(), roll, o_geod, o_geoc)
     }
 }
 
@@ -481,10 +529,10 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 mod tests {
 
     use crate::{
-        ellipsoidal::Ellipsoid, local::r2xyz, local::r2zyx, local::BodyFrame, local::BodyVector,
-        local::EnuFrame, local::NedFrame, local::WanderAzimuthFrame,
-        positions::assert_geod_eq_d7_mm, Angle, GeodeticPosition, LatLong, Length, Mat33, NVector,
-        PositionVector, Surface, Vec3,
+        ellipsoidal::Ellipsoid,
+        local::{r2xyz, r2zyx, BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame},
+        positions::assert_geod_eq_d7_mm,
+        Angle, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector, Surface, Vec3,
     };
 
     #[test]
@@ -527,6 +575,30 @@ mod tests {
         assert_eq!(
             WanderAzimuthFrame::from_geocentric(Angle::from_degrees(10.0), o_geoc, s),
             WanderAzimuthFrame::from_geodetic(Angle::from_degrees(10.0), o_geod, s)
+        )
+    }
+
+    #[test]
+    fn looking_at_geodetic_and_geocentric() {
+        let s: Ellipsoid = Ellipsoid::WGS84;
+
+        let o_geod = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            Length::from_metres(10_000.0),
+        );
+        let o_geoc = s.geodetic_to_geocentric_position(o_geod);
+
+        let t_geod = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(55.0, 155.0),
+            Length::from_metres(11_000.0),
+        );
+        let t_geoc = s.geodetic_to_geocentric_position(t_geod);
+
+        let roll = Angle::from_degrees(1.0);
+
+        assert_eq!(
+            BodyFrame::looking_at_geodetic(o_geod, t_geod, roll, s),
+            BodyFrame::looking_at_geocentric(o_geoc, t_geoc, roll, s)
         )
     }
 
@@ -942,7 +1014,7 @@ mod tests {
 
     #[test]
     fn pan_tilt_gimbal() {
-        let s = Ellipsoid::WGS84;
+        let s= Ellipsoid::WGS84;
 
         let ac_pos: GeodeticPosition = GeodeticPosition::new(
             NVector::from_lat_long_degrees(54.0, 154.0),
@@ -982,5 +1054,30 @@ mod tests {
                 .destination_position(raw_observation)
                 .round_mm()
         )
+    }
+
+    #[test]
+    fn looking_at() {
+        let s: Ellipsoid = Ellipsoid::WGS84;
+
+        let ac_pos: GeodeticPosition = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            Length::from_feet(35000.0),
+        );
+        let target_pos = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(54.1, 154.1),
+            Length::from_feet(36000.0),
+        );
+
+        let roll = Angle::from_degrees(2.0);
+        let body = BodyFrame::looking_at_geodetic(ac_pos, target_pos, roll, s);
+
+        let ned = NedFrame::from_geodetic(ac_pos, s);
+        let d = ned.local_vector_to(s.geodetic_to_geocentric_position(target_pos));
+
+        let yaw = d.bearing();
+        let pitch = d.elevation();
+        let expected = BodyFrame::from_geodetic(yaw, pitch, roll, ac_pos, s);
+        assert_eq!(expected, body);
     }
 }

@@ -21,6 +21,8 @@ Earth* (geodesic/great-circle math, not straight-edge planar math), and
 provides optional interop with `geo-types`/`geo-traits` for the pieces that
 do overlap.
 
+For ellipsoidal geodesic distance/bearing (Vincenty/Karney), see [geographiclib-rs](https://github.com/georust/geographiclib-rs) (pure Rust) or [geographiclib](https://github.com/savage13/geographiclib) (C++ bindings, faster) - jord's GeodeticPosition converts to their plain lat/lon/metres inputs via `.latitude().as_degrees()` etc...
+
 ## Table of contents
 
 - [Installation](#installation)

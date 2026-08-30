@@ -26,9 +26,13 @@ pub struct LocalVector<O: FrameOrientation> {
 }
 
 /// [LocalVector] for [ENU frame](crate::local::EnuFrame).
+///
+/// Can be converted to an [NedVector] using [From].
 pub type EnuVector = LocalVector<Enu>;
 
 /// [LocalVector] for [NED frame](crate::local::NedFrame).
+///
+/// Can be converted to an [EnuVector] using [From].
 pub type NedVector = LocalVector<Ned>;
 
 /// [LocalVector] for [body frame](crate::local::BodyFrame).
@@ -243,6 +247,18 @@ impl<O: FrameOrientation> ::std::ops::Neg for LocalVector<O> {
     }
 }
 
+impl From<EnuVector> for NedVector {
+    fn from(value: EnuVector) -> Self {
+        Self::new(value.y(), value.x(), -value.z())
+    }
+}
+
+impl From<NedVector> for EnuVector {
+    fn from(value: NedVector) -> Self {
+        Self::new(value.y(), value.x(), -value.z())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -361,5 +377,19 @@ mod tests {
         // Target directly below vehicle (+z in Body frame)
         let target = BodyVector::from_metres(0.0, 0.0, 10.0);
         assert_eq!(Angle::from_degrees(-90.0), target.elevation().round_d7());
+    }
+
+    #[test]
+    fn enu_to_ned() {
+        let enu = EnuVector::from_metres(1.0, 2.0, 3.0);
+        let ned: NedVector = enu.into();
+        assert_eq!(NedVector::from_metres(2.0, 1.0, -3.0), ned)
+    }
+
+    #[test]
+    fn ned_to_enu() {
+        let ned = NedVector::from_metres(1.0, 2.0, 3.0);
+        let enu: EnuVector = ned.into();
+        assert_eq!(EnuVector::from_metres(2.0, 1.0, -3.0), enu)
     }
 }
