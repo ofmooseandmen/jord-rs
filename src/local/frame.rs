@@ -7,7 +7,8 @@ use crate::{
         LocalVector, Ned, WanderAzimuth,
     },
     surface::Surface,
-    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
+    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Speed, Vec3,
+    Velocity,
 };
 
 /// A 3D local Cartesian coordinate frame anchored at a reference origin on or relative
@@ -96,6 +97,31 @@ impl NedFrame {
     /// [North-East-Down (local level)](Ned) frame fixed to the given [geodetic origin](GeodeticPosition).
     pub fn from_geodetic(origin: GeodeticPosition, surface: impl Surface) -> Self {
         Self::new(origin, surface.geodetic_to_geocentric_position(origin))
+    }
+
+    /// Converts a horizontal bearing and speed, plus a vertical rate of climb (positive) or
+    /// descent (negative), into a velocity vector decomposed in the Earth-centred frame
+    /// (ECEF axes).
+    ///
+    /// `bearing` and `speed` describe horizontal motion relative to this frame's origin;
+    /// `rocd` is the rate of climb/descent (metres/second, positive up). These combine into a
+    /// velocity decomposed in this NED frame -- `(speed*cos(bearing), speed*sin(bearing),
+    /// -rocd)`, since NED's z-axis points down -- which is then rotated into the Earth frame.
+    ///
+    /// The result is suitable as the `velocity_e` input to [`dead_reckoned_position`](crate::Surface::dead_reckoned_position).
+    pub fn velocity_e_from_bearing_speed_rocd(
+        &self,
+        bearing: Angle,
+        speed: Speed,
+        rocd: Speed,
+    ) -> Velocity {
+        let v_ned = Vec3::new(
+            speed.as_metres_per_second() * bearing.as_radians().cos(),
+            speed.as_metres_per_second() * bearing.as_radians().sin(),
+            -rocd.as_metres_per_second(),
+        );
+        let v_e = v_ned * self.local_to_earth_matrix();
+        Velocity::from_vec3_mps(v_e)
     }
 
     fn new(o_geod: GeodeticPosition, o_geoc: GeocentricPosition) -> Self {
@@ -325,6 +351,31 @@ impl<O: LocalNavigationFrame> LocalFrame<O> {
             _o: PhantomData,
         }
     }
+
+    /// Returns the 3x3 direction matrix describing the orientation of this frame relative
+    /// to the Earth-centred frame.
+    ///
+    /// This allows to resolve a free vector decomposed in this frame's axes into the
+    /// Earth-centred frame: `v_earth = v_local * frame.local_to_earth_matrix()`.
+    pub fn local_to_earth_matrix(&self) -> Mat33 {
+        self.dir_rm
+    }
+
+    /// Returns the 3x3 direction matrix describing the orientation of the Earth-centred
+    /// frame relative to this frame.
+    ///
+    /// This allows to resolve a free vector decomposed in the Earth-centred frame
+    /// (e.g. a velocity, force, or angular rate — any quantity with a direction
+    /// and magnitude but no associated origin, unlike a position) into this frame's
+    /// axes: `v_local = v_earth * frame.earth_to_local_matrix()`.
+    pub fn earth_to_local_matrix(&self) -> Mat33 {
+        self.inv_rm
+    }
+
+    /// Returns the origin of this frame.
+    pub fn origin(&self) -> GeocentricPosition {
+        GeocentricPosition::from_vec3_metres(self.origin)
+    }
 }
 
 impl<O> LocalFrame<O>
@@ -532,7 +583,8 @@ mod tests {
         ellipsoidal::Ellipsoid,
         local::{r2xyz, r2zyx, BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame},
         positions::assert_geod_eq_d7_mm,
-        Angle, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector, Surface, Vec3,
+        Angle, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector, Speed, Surface,
+        Vec3,
     };
 
     #[test]
@@ -1079,5 +1131,25 @@ mod tests {
         let pitch = d.elevation();
         let expected = BodyFrame::from_geodetic(yaw, pitch, roll, ac_pos, s);
         assert_eq!(expected, body);
+    }
+
+    #[test]
+    fn velocity_e_round_trips_through_earth_to_local_matrix() {
+        let p0 = GeodeticPosition::new(NVector::from_lat_long_degrees(30.0, -40.0), Length::ZERO);
+        let ned = NedFrame::from_geodetic(p0, Ellipsoid::WGS84);
+        let bearing = Angle::from_degrees(200.0);
+        let speed = Speed::from_metres_per_second(15.0);
+        let rocd = Speed::from_metres_per_second(3.0);
+
+        let v_e = ned.velocity_e_from_bearing_speed_rocd(bearing, speed, rocd);
+        let back = v_e.as_metres_per_second() * ned.earth_to_local_matrix();
+
+        assert!(
+            (back.x() - speed.as_metres_per_second() * bearing.as_radians().cos()).abs() < 1e-9
+        );
+        assert!(
+            (back.y() - speed.as_metres_per_second() * bearing.as_radians().sin()).abs() < 1e-9
+        );
+        assert!((back.z() - (-rocd.as_metres_per_second())).abs() < 1e-9);
     }
 }

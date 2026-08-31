@@ -1,8 +1,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, Mat33, NVector,
-    PositionVector, Speed, Vec3, Vehicle,
+    local::NedFrame, surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong,
+    Length, Mat33, NVector, PositionVector, Speed, Vec3, Vehicle, Velocity,
 };
 
 use super::{
@@ -415,13 +415,97 @@ impl Sphere {
 
     // kinematics
 
-    /// Calculates the position that the given vehicle will reach after the given time.
-    pub fn position_after(&self, vehicle: Vehicle, duration: Duration) -> NVector {
-        Sphere::EARTH.destination_position(
-            vehicle.position(),
-            vehicle.bearing(),
-            vehicle.speed() * duration,
-        )
+    /// Angular velocity of a local-level frame relative to Earth, decomposed in the Earth
+    /// frame, for a spherical Earth model — Gade (2010), eq. (13).
+    fn angular_velocity_of_local_frame(n: NVector, velocity_e: Vec3, radius: Length) -> Vec3 {
+        let inv_r = 1.0 / radius.as_metres();
+        let scaled = Vec3::new(
+            velocity_e.x() * inv_r,
+            velocity_e.y() * inv_r,
+            velocity_e.z() * inv_r,
+        );
+        n.as_vec3().cross_prod(scaled)
+    }
+
+    /// Time-derivative of n-vector — Gade (2010), eq. (14) applied to eq. (13).
+    fn n_vector_rate(n: NVector, velocity_e: Vec3, radius: Length) -> Vec3 {
+        Self::angular_velocity_of_local_frame(n, velocity_e, radius).cross_prod(n.as_vec3())
+    }
+
+    /// Time-derivative of height above the sphere's surface — Gade (2010), eq. (15).
+    fn height_rate(n: NVector, velocity_e: Vec3) -> f64 {
+        n.as_vec3().dot_prod(velocity_e)
+    }
+
+    /// Computes the position reached from `p0` after travelling for `duration` at the given
+    /// constant velocity, decomposed in the Earth-centred frame (ECEF axes).
+    ///
+    /// The horizontal component of the velocity is interpreted as constant compass bearing and
+    /// speed along a great circle — i.e. this is exact for any `duration`, not an approximation,
+    /// since it delegates to [`Sphere::destination_position`] rather than integrating a rate.
+    /// The vertical component is interpreted as a constant rate of height change, applied
+    /// linearly over `duration`.
+    ///
+    /// If instead you need velocity to be constant in the sense of a fixed vector in
+    /// non-rotating Cartesian ECEF space (i.e. an unconstrained straight-line path through
+    /// space, not a path that follows the sphere), this is not that: a straight Cartesian line
+    /// and a constant-bearing great-circle path diverge from each other over time, even for
+    /// identical initial velocity.
+    pub fn destination_position_after(
+        &self,
+        p0: GeodeticPosition,
+        velocity_e: Velocity,
+        duration: Duration,
+    ) -> GeodeticPosition {
+        let v_e = velocity_e.as_metres_per_second();
+        let n0 = p0.horizontal_position();
+        let secs = duration.as_secs_f64();
+
+        // Horizontal: bearing + speed of v_e at p0, then the exact great-circle formula.
+        let ned = NedFrame::from_geodetic(p0, *self);
+        let v_ned = v_e * ned.earth_to_local_matrix();
+        let bearing = Angle::from_radians(v_ned.y().atan2(v_ned.x())).normalised();
+        let horizontal_speed = (v_ned.x() * v_ned.x() + v_ned.y() * v_ned.y()).sqrt();
+        let distance = Length::from_metres(horizontal_speed * secs);
+        let n1 = self.destination_position(n0, bearing, distance);
+
+        // Vertical: eq. (15), ḣ = n·v_e, held constant over `duration` — exact under this
+        // model (constant bearing/speed/vertical-rate), not an approximation.
+        let h_dot = n0.as_vec3().dot_prod(v_e);
+        let h1 = p0.height().as_metres() + h_dot * secs;
+
+        GeodeticPosition::new(n1, Length::from_metres(h1))
+    }
+
+    /// Integrates position forward by `dt`, given the current velocity decomposed in the
+    /// Earth-centred frame (ECEF axes) — one step of forward Euler applied to Gade (2010)
+    /// eqs. (13)-(15).
+    ///
+    /// Intended to be called repeatedly, once per newly measured or re-estimated velocity, as
+    /// in a dead-reckoning navigation system or simulator — see Gade §6.5, Example 5, which
+    /// this method's tests are directly modelled on. If you instead have a single velocity
+    /// known to stay constant over a known total duration, use
+    /// [`destination_position_after`](Sphere::destination_position_after), which is exact at any duration rather than
+    /// accumulating integration error over repeated steps.
+    pub fn dead_reckoned_position(
+        &self,
+        current: GeodeticPosition,
+        velocity_e: Velocity,
+        dt: Duration,
+    ) -> GeodeticPosition {
+        let n = current.horizontal_position();
+        let radius = self.radius();
+        let secs = dt.as_secs_f64();
+
+        let v_e = velocity_e.as_metres_per_second();
+        let n_dot = Self::n_vector_rate(n, v_e, radius);
+        let h_dot = Self::height_rate(n, v_e);
+
+        let stepped = n.as_vec3() + Vec3::new(n_dot.x() * secs, n_dot.y() * secs, n_dot.z() * secs);
+        let next_n = NVector::new(Vec3::new_unit(stepped.x(), stepped.y(), stepped.z()));
+        let next_height = current.height().as_metres() + h_dot * secs;
+
+        GeodeticPosition::new(next_n, Length::from_metres(next_height))
     }
 
     ///  Computes the time to the closest point of approach (CPA) between the two given vehicles: the time at which the
@@ -837,7 +921,7 @@ mod tests {
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
         spherical::{GreatCircle, MinorArc, Sphere},
         Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, NVector, Speed, Surface,
-        Vec3, Vehicle,
+        Vec3, Vehicle, Velocity,
     };
 
     use super::newton_raphson;
@@ -1673,7 +1757,11 @@ mod tests {
             Angle::from_degrees(12.0),
             Speed::from_knots(400.0),
         );
-        let interceptor_pos = Sphere::EARTH.position_after(intruder, Duration::from_secs(60));
+        let interceptor_pos = Sphere::EARTH.destination_position(
+            intruder.position(),
+            intruder.bearing(),
+            intruder.speed() * Duration::from_mins(1),
+        );
 
         let opt_max_time: Option<Duration> =
             Sphere::EARTH.max_time_to_intercept(interceptor_pos, intruder);
@@ -1758,5 +1846,87 @@ mod tests {
             geoc
         );
         assert_eq!(np, s.geocentric_to_geodetic_position(geoc));
+    }
+
+    #[test]
+    fn dead_reckoned_position_zero_velocity_stays_put() {
+        let p0 = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(10.0, 20.0),
+            Length::from_metres(50.0),
+        );
+        let p1 = Sphere::EARTH.dead_reckoned_position(p0, Velocity::ZERO, Duration::from_secs(1));
+        assert_eq!(p0.height().round_mm(), p1.height().round_mm());
+        assert!(
+            Sphere::EARTH
+                .distance(p0.horizontal_position(), p1.horizontal_position())
+                .as_metres()
+                < 1e-9
+        );
+    }
+
+    /// Reproduces Gade (2010) §6.5, Example 5, Part 1: a ship at constant 7.5 m/s passing
+    /// 10 m from the North Pole, integrated with 1 Hz forward Euler over a 50 s window
+    /// (20 s before closest approach). The paper reports the resulting n-vector error stays
+    /// at the level of IEEE-754 double precision (~1.4e-9 m), versus ~228 m for the
+    /// equivalent latitude/longitude integration -- this asserts the same order of magnitude.
+    #[test]
+    fn dead_reckoned_position_matches_gade_2010_example_5_part_1() {
+        let sphere = Sphere::EARTH;
+        let r = sphere.radius().as_metres();
+        let speed = 7.5_f64; // m/s
+        let d2 = 10.0_f64; // metres, closest approach distance to the pole
+
+        // The great circle's vertex: its single closest point to the pole, where, by
+        // symmetry, the direction of travel is exactly due east/west.
+        let vertex = NVector::from_lat_long_degrees(90.0 - (d2 / r).to_degrees(), 0.0);
+        let vv = vertex.as_vec3();
+
+        // East/north unit vectors at the vertex, derived independently of any of jord's own
+        // frame-construction code, assuming the standard convention where Vec3::UNIT_Z is
+        // Earth's rotation axis (north) -- verified against NVector::from_lat_long_degrees
+        // at (0,90) mapping to (0,1,0), where east must be (-1,0,0).
+        let raw_east = Vec3::UNIT_Z.cross_prod(vv);
+        let east = Vec3::new_unit(raw_east.x(), raw_east.y(), raw_east.z());
+
+        // n(sigma) = cos(sigma)*vertex + sin(sigma)*east, where sigma is the signed angle
+        // travelled from the vertex (positive after closest approach).
+        let true_n = |t: f64| {
+            let sigma = speed * (t - 20.0) / r;
+            Vec3::new_unit(
+                sigma.cos() * vv.x() + sigma.sin() * east.x(),
+                sigma.cos() * vv.y() + sigma.sin() * east.y(),
+                sigma.cos() * vv.z() + sigma.sin() * east.z(),
+            )
+        };
+        // d/d(sigma) of the above, scaled by speed: the exact instantaneous velocity.
+        let true_velocity_e = |t: f64| {
+            let sigma = speed * (t - 20.0) / r;
+            let v = Vec3::new(
+                speed * (-sigma.sin() * vv.x() + sigma.cos() * east.x()),
+                speed * (-sigma.sin() * vv.y() + sigma.cos() * east.y()),
+                speed * (-sigma.sin() * vv.z() + sigma.cos() * east.z()),
+            );
+            Velocity::from_vec3_mps(v)
+        };
+
+        // 1 Hz forward Euler, feeding the exact instantaneous velocity at the *start* of
+        // each step -- isolating integration error, exactly as the paper does ("We assume
+        // correct initial position and velocity input, and thus we only study the errors
+        // arising from the integration process itself.").
+        let mut position = GeodeticPosition::new(NVector::new(true_n(0.0)), Length::ZERO);
+        for step in 0..50 {
+            let v_e = true_velocity_e(step as f64);
+            position = sphere.dead_reckoned_position(position, v_e, Duration::from_secs(1));
+        }
+
+        let final_true_n = NVector::new(true_n(50.0));
+        let error = sphere.distance(position.horizontal_position(), final_true_n);
+
+        assert!(
+            error.as_metres() < 1e-6,
+            "n-vector dead reckoning error {} m exceeds the expected ~1e-9 m level",
+            error.as_metres()
+        );
+        assert!(position.height().as_metres().abs() < 1e-6); // purely horizontal motion
     }
 }

@@ -53,3 +53,6 @@ pub use crate::vec3::Vec3;
 
 mod vehicle;
 pub use crate::vehicle::Vehicle;
+
+mod velocity;
+pub use crate::velocity::Velocity;
