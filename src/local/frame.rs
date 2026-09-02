@@ -317,7 +317,7 @@ impl<O: LocalNavigationFrame> LocalFrame<O> {
     /// ```
     pub fn rotate_around_z(&self, angle: Angle) -> WanderAzimuthFrame {
         let rot_z = zyx2r(angle, Angle::ZERO, Angle::ZERO);
-        let dir_rm = self.rotate(self.dir_rm, rot_z);
+        let dir_rm = Self::rotate(self.dir_rm, rot_z);
         LocalFrame {
             origin: self.origin,
             dir_rm,
@@ -391,7 +391,7 @@ where
         let global_translation = offset.as_metres() * self.dir_rm;
         let new_origin = self.origin + global_translation;
         let r_delta = zyx2r(yaw, pitch, roll);
-        let dir_rm = self.rotate(self.dir_rm, r_delta);
+        let dir_rm = Self::rotate(self.dir_rm, r_delta);
         LocalFrame {
             origin: new_origin,
             dir_rm,
@@ -419,7 +419,7 @@ where
     }
 
     /// m1 * m2 aligning to z-down if required.
-    fn rotate(&self, m1: Mat33, m2: Mat33) -> Mat33 {
+    fn rotate(m1: Mat33, m2: Mat33) -> Mat33 {
         if O::is_z_up() {
             m1 * m2 * align_to_z_down_matrix()
         } else {

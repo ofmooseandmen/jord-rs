@@ -28,6 +28,9 @@ impl Loop {
         edges: Vec::new(),
     };
 
+    const NP: NVector = NVector::new(Vec3::UNIT_Z);
+    const SP: NVector = NVector::new(Vec3::NEG_UNIT_Z);
+
     /// Creates a new loop from the given vertices.
     ///
     /// The vertices can:
@@ -348,17 +351,14 @@ impl Loop {
         // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
         mbr = mbr.polar_closure();
 
-        static NP: NVector = NVector::new(Vec3::UNIT_Z);
-        static SP: NVector = NVector::new(Vec3::NEG_UNIT_Z);
-
-        if self.contains_position(NP) {
+        if self.contains_position(Self::NP) {
             mbr = mbr.expand_to_north_pole();
         }
 
         // If a loop contains the south pole, then either it wraps entirely around the sphere (full longitude
         // range), or it also contains the north pole in which case bound#is_longitude_full() is true due to the
         // test above. Either way, we only need to do the south pole containment test if bound#is_longitude_full().
-        if mbr.is_longitude_full() && self.contains_position(SP) {
+        if mbr.is_longitude_full() && self.contains_position(Self::SP) {
             mbr = mbr.expand_to_south_pole();
         }
         mbr
@@ -579,7 +579,7 @@ impl Loop {
             Angle::ZERO
         } else {
             // normal to each edge.
-            let ns = self.edges.iter().map(|e| e.normal()).collect::<Vec<_>>();
+            let ns = self.edges.iter().map(MinorArc::normal).collect::<Vec<_>>();
 
             // sum interior angles; depending on whether polygon is cw or ccw, angle between edges is PI - a or PI
             // + a, where a is angle between great-circle vectors; so sum a, then take n * PI - abs(sum(a)) (cannot

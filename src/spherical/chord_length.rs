@@ -44,7 +44,7 @@ impl ChordLength {
     };
 
     #[inline]
-    pub(crate) fn length2(&self) -> f64 {
+    pub(crate) fn length2(self) -> f64 {
         self.length2
     }
 

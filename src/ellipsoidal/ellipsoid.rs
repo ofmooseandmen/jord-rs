@@ -17,33 +17,33 @@ impl Ellipsoid {
     /// [World Geodetic](https://en.wikipedia.org/wiki/World_Geodetic_System) 84 Ellipsoid.
     pub const WGS84: Ellipsoid = Ellipsoid {
         equatorial_radius: Length::from_metres(6_378_137.0f64),
-        polar_radius: Length::from_metres(6_356_752.314245179f64),
-        eccentricity: 0.08181919084262157f64,
-        flattening: 0.0033528106647474805f64,
+        polar_radius: Length::from_metres(6_356_752.314_245_179_f64),
+        eccentricity: 0.081_819_190_842_621_57_f64,
+        flattening: 0.003_352_810_664_747_480_5_f64,
     };
 
     /// Geodetic Reference System 1980 Ellipsoid.
     pub const GRS80: Ellipsoid = Ellipsoid {
         equatorial_radius: Length::from_metres(6_378_137.0f64),
-        polar_radius: Length::from_metres(6_356_752.314140356f64),
-        eccentricity: 0.08181919104281514f64,
-        flattening: 0.003352810681182319f64,
+        polar_radius: Length::from_metres(6_356_752.314_140_356_f64),
+        eccentricity: 0.081_819_191_042_815_14_f64,
+        flattening: 0.003_352_810_681_182_319_f64,
     };
 
     /// [World Geodetic](https://en.wikipedia.org/wiki/World_Geodetic_System) 72 Ellipsoid.
     pub const WGS72: Ellipsoid = Ellipsoid {
         equatorial_radius: Length::from_metres(6_378_135.0f64),
-        polar_radius: Length::from_metres(6_356_750.520016094f64),
-        eccentricity: 0.08181881066274845f64,
-        flattening: 0.003352779454167505,
+        polar_radius: Length::from_metres(6_356_750.520_016_094_f64),
+        eccentricity: 0.081_818_810_662_748_45_f64,
+        flattening: 0.003_352_779_454_167_505_f64,
     };
 
     /// [Mars Orbiter Laser Altimeter Ellipsoid](https://tharsis.gsfc.nasa.gov/geodesy.html).
     pub const MOLA: Ellipsoid = Ellipsoid {
         equatorial_radius: Length::from_metres(3_396_200f64),
-        polar_radius: Length::from_metres(3_376_198.822143698f64),
-        eccentricity: 0.10836918094475001f64,
-        flattening: 0.005889281507656065f64,
+        polar_radius: Length::from_metres(3_376_198.822_143_698_f64),
+        eccentricity: 0.108_369_180_944_750_01_f64,
+        flattening: 0.005_889_281_507_656_065_f64,
     };
 
     /// Creates a new ellipsoid from the given equatorial radius (semi-major axis A) and

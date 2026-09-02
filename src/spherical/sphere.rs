@@ -244,10 +244,10 @@ impl Sphere {
     /// );
     /// ```
     pub fn final_bearing(p1: NVector, p2: NVector) -> Angle {
-        if !Self::is_great_circle(p1, p2) {
-            Angle::ZERO
-        } else {
+        if Self::is_great_circle(p1, p2) {
             Angle::from_radians(final_bearing_radians(p1, p2)).normalised()
+        } else {
+            Angle::ZERO
         }
     }
 
@@ -267,10 +267,10 @@ impl Sphere {
     /// );
     /// ```
     pub fn initial_bearing(p1: NVector, p2: NVector) -> Angle {
-        if !Self::is_great_circle(p1, p2) {
-            Angle::ZERO
-        } else {
+        if Self::is_great_circle(p1, p2) {
             Angle::from_radians(initial_bearing_radians(p1, p2)).normalised()
+        } else {
+            Angle::ZERO
         }
     }
 
@@ -343,9 +343,9 @@ impl Sphere {
         if ps.is_empty() || contains_antipodal(ps) {
             None
         } else if ps.len() == 1 {
-            ps.first().cloned()
+            ps.first().copied()
         } else {
-            let vs = ps.iter().map(|nv| nv.as_vec3()).collect::<Vec<_>>();
+            let vs = ps.iter().map(NVector::as_vec3).collect::<Vec<_>>();
             let m = Vec3::mean(&vs);
             Some(NVector::new(m))
         }
