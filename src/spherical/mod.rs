@@ -1,6 +1,7 @@
 //! Geographical position calculations assuming a spherical model.
 
 mod base;
+pub use base::Side;
 
 mod cap;
 pub use cap::Cap;
@@ -12,7 +13,7 @@ mod great_circle;
 pub use great_circle::GreatCircle;
 
 mod minor_arc;
-pub use minor_arc::MinorArc;
+pub use minor_arc::{MinorArc, MinorArcRelation};
 
 mod rectangle;
 pub use rectangle::Rectangle;

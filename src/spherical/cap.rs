@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use crate::{Angle, LatLong, Mat33, NVector, Vec3};
+use crate::{spherical::Side, Angle, LatLong, Mat33, NVector, Vec3};
 
 use super::{ChordLength, Sphere};
 
@@ -49,7 +49,7 @@ impl Cap {
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
         // 3 positions must be in anti-clockwise order
-        let clockwise = Sphere::side(a, b, c) < 0;
+        let clockwise = Sphere::side(a, b, c) == Side::Right;
         let v1 = a.as_vec3();
         let v2 = if clockwise { c.as_vec3() } else { b.as_vec3() };
         let v3 = if clockwise { b.as_vec3() } else { c.as_vec3() };

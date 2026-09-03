@@ -1,6 +1,10 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
-use crate::{numbers::eq, numbers::eq_zero, Angle, NVector, Vec3};
+use crate::{
+    numbers::{eq, eq_zero},
+    spherical::Side,
+    Angle, NVector, Vec3,
+};
 
 use super::{base::angle_radians_between, ChordLength, MinorArc, Rectangle, Sphere};
 
@@ -133,7 +137,7 @@ impl Loop {
             Ordering::Less => false,
             Ordering::Equal => true,
             Ordering::Greater => {
-                let mut cur_side: i8 = i8::MIN;
+                let mut cur_side = Side::Right;
                 let mut found_left_right: bool = false;
                 let len: usize = self.vertices.len();
                 for i in 0..len {
@@ -141,7 +145,7 @@ impl Loop {
                     let cur: NVector = self.vertices[i].0;
                     let next = self.vertices[(i + 1) % len].0;
                     let side = Sphere::side(prev, cur, next);
-                    if side != 0 {
+                    if side != Side::Collinear {
                         if !found_left_right {
                             cur_side = side;
                         } else if cur_side != side {
@@ -633,7 +637,7 @@ pub fn is_loop_clockwise(vs: &[NVector]) -> bool {
     let len = ovs.len();
     match len.cmp(&3) {
         Ordering::Less => false,
-        Ordering::Equal => Sphere::side(ovs[0], ovs[1], ovs[2]) < 0,
+        Ordering::Equal => Sphere::side(ovs[0], ovs[1], ovs[2]) == Side::Right,
         Ordering::Greater => {
             let mut turn: Angle = Angle::ZERO;
             for i in 0..len {
@@ -853,11 +857,11 @@ fn re_classify(vertices: &mut [Vertex], ear_index: usize) {
     }
 }
 
-fn classify(v: &mut Vertex, side: i8) {
-    match side.cmp(&0) {
-        Ordering::Greater => v.1 = Classification::Reflex,
-        Ordering::Less => v.1 = Classification::Convex,
-        Ordering::Equal => v.1 = Classification::Both,
+fn classify(v: &mut Vertex, side: Side) {
+    match side {
+        Side::Left => v.1 = Classification::Reflex,
+        Side::Right => v.1 = Classification::Convex,
+        Side::Collinear => v.1 = Classification::Both,
     }
 }
 
@@ -872,7 +876,7 @@ fn all_outside(v1: NVector, v2: NVector, v3: NVector, vertices: &[Vertex]) -> bo
     true
 }
 
-fn clockwise_side(clockwise: bool, v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
+fn clockwise_side(clockwise: bool, v0: Vec3, v1: Vec3, v2: Vec3) -> Side {
     if clockwise {
         super::base::side(v0, v2, v1)
     } else {
@@ -884,14 +888,14 @@ fn inside_or_edge(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> bool {
     if p == v1 || p == v2 || p == v3 {
         return false;
     }
-    let clockwise = Sphere::side(v1, v2, v3) < 0;
+    let clockwise = Sphere::side(v1, v2, v3) == Side::Right;
     let side_edge1 = clockwise_side(clockwise, p.as_vec3(), v1.as_vec3(), v2.as_vec3());
     let side_edge2 = clockwise_side(clockwise, p.as_vec3(), v2.as_vec3(), v3.as_vec3());
     let side_edge3 = clockwise_side(clockwise, p.as_vec3(), v3.as_vec3(), v1.as_vec3());
 
-    let on_edge1 = side_edge1 == 0;
-    let on_edge2 = side_edge2 == 0;
-    let on_edge3 = side_edge3 == 0;
+    let on_edge1 = side_edge1 == Side::Collinear;
+    let on_edge2 = side_edge2 == Side::Collinear;
+    let on_edge3 = side_edge3 == Side::Collinear;
 
     if on_edge1 && on_edge2 {
         // position is detected on (vertex1, vertex2) and (vertex2, vertex3), assume it is vertex2.
@@ -908,16 +912,16 @@ fn inside_or_edge(p: NVector, v1: NVector, v2: NVector, v3: NVector) -> bool {
         return false;
     }
 
-    if on_edge1 && side_edge2 > 0 && side_edge3 > 0 {
+    if on_edge1 && side_edge2 == Side::Left && side_edge3 == Side::Left {
         return true;
     }
-    if on_edge2 && side_edge1 > 0 && side_edge3 > 0 {
+    if on_edge2 && side_edge1 == Side::Left && side_edge3 == Side::Left {
         return true;
     }
-    if on_edge3 && side_edge1 > 0 && side_edge2 > 0 {
+    if on_edge3 && side_edge1 == Side::Left && side_edge2 == Side::Left {
         return true;
     }
-    side_edge1 > 0 && side_edge2 > 0 && side_edge3 > 0
+    side_edge1 == Side::Left && side_edge2 == Side::Left && side_edge3 == Side::Left
 }
 
 fn vec3_eq(a: Vec3, b: Vec3) -> bool {

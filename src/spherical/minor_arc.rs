@@ -1,4 +1,8 @@
-use crate::{numbers::eq_zero, spherical::ChordLength, Angle, NVector, Vec3};
+use crate::{
+    numbers::eq_zero,
+    spherical::{ChordLength, Side},
+    Angle, NVector, Vec3,
+};
 
 use super::base::{angle_radians_between, side};
 
@@ -10,6 +14,70 @@ pub struct MinorArc {
     start: NVector,
     end: NVector,
     normal: Vec3,
+}
+
+/// The topological relationship between two [`MinorArc`]s.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MinorArcRelation {
+    /// The arcs cross at a single point strictly interior to both arcs.
+    Cross(NVector),
+    /// The arcs meet at exactly one point that is an endpoint of at least one of them.
+    Touch(NVector),
+    /// The arcs lie on the same great circle and overlap along a shared sub-arc (more than a
+    /// single point).
+    Overlap(MinorArc),
+    /// The arcs share no points.
+    None,
+}
+
+/// result of contains_vec3.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ContainsResult {
+    Endpoint,
+    Within,
+    Outside,
+}
+
+/// result of intersection_details.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Intersection {
+    relation: MinorArcRelation,
+    same_or_opposite_arcs: bool,
+}
+
+impl Intersection {
+    const SAME_OR_OPPOSITE: Intersection = Intersection {
+        relation: MinorArcRelation::None,
+        same_or_opposite_arcs: true,
+    };
+
+    const NONE: Intersection = Intersection {
+        relation: MinorArcRelation::None,
+        same_or_opposite_arcs: false,
+    };
+
+    fn touch(i: Vec3) -> Intersection {
+        Intersection {
+            relation: MinorArcRelation::Touch(NVector::new(i)),
+            same_or_opposite_arcs: false,
+        }
+    }
+
+    fn cross(i: Vec3) -> Intersection {
+        Intersection {
+            relation: MinorArcRelation::Cross(NVector::new(i)),
+            same_or_opposite_arcs: false,
+        }
+    }
+}
+
+impl ContainsResult {
+    fn contains(self) -> bool {
+        match self {
+            ContainsResult::Endpoint | ContainsResult::Within => true,
+            ContainsResult::Outside => false,
+        }
+    }
 }
 
 impl MinorArc {
@@ -97,7 +165,7 @@ impl MinorArc {
         }
 
         let proj = self.normal.orthogonal_to(n2);
-        if self.contains_vec3(proj) {
+        if self.contains_vec3(proj).contains() {
             // p is "within" this edge, return the distance between p and the projection.
             return ChordLength::new(p, NVector::new(proj));
         }
@@ -125,24 +193,10 @@ impl MinorArc {
     /// assert_eq!(i, Some(LatLong::from_degrees(0.0, 0.0).to_nvector()));
     /// ```
     pub fn intersection(&self, other: MinorArc) -> Option<NVector> {
-        let i = self.normal.stable_cross_prod_unit(other.normal);
-        if i == Vec3::ZERO {
-            // equal or opposite minor arcs: no intersection
-            None
-        } else {
-            // select nearest intersection to start of first minor arc.
-            let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
-                i
-            } else {
-                // antipode of i.
-                -i
-            };
-
-            if self.contains_vec3(potential) && other.contains_vec3(potential) {
-                Some(NVector::new(potential))
-            } else {
-                None
-            }
+        let i = self.intersection_details(other);
+        match i.relation {
+            MinorArcRelation::None | MinorArcRelation::Overlap(_) => None,
+            MinorArcRelation::Touch(nv) | MinorArcRelation::Cross(nv) => Some(nv),
         }
     }
 
@@ -172,7 +226,7 @@ impl MinorArc {
             Some(self.start)
         } else {
             let proj = n1.orthogonal_to(n2);
-            if self.contains_vec3(proj) {
+            if self.contains_vec3(proj).contains() {
                 Some(NVector::new(proj))
             } else {
                 None
@@ -198,7 +252,7 @@ impl MinorArc {
     /// ```
     pub fn contains_position(&self, p: NVector) -> bool {
         let v = p.as_vec3();
-        eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v)
+        eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v).contains()
     }
 
     /// Determines whether p if right of (negative integer), left of (positive integer) or on this
@@ -299,14 +353,53 @@ impl MinorArc {
     }
 
     /// Determines whether this minor arc contains the given point which is assumed to be on the great circle.
-    fn contains_vec3(&self, v: Vec3) -> bool {
+    fn contains_vec3(&self, v: Vec3) -> ContainsResult {
         // v is left of (normal, start)
         // and
         // v is right of (normal, end)
         let start = self.start.as_vec3();
         let end = self.end.as_vec3();
         let n = self.normal;
-        side(v, n, start) >= 0 && side(end, n, v) >= 0
+        let s_start = side(v, n, start);
+        let s_end = side(v, n, end);
+        if s_start == Side::Left && s_end == Side::Right {
+            ContainsResult::Within
+        } else if s_start == Side::Collinear && s_end == Side::Right
+            || s_end == Side::Collinear && s_start == Side::Left
+        {
+            ContainsResult::Endpoint
+        } else {
+            ContainsResult::Outside
+        }
+    }
+
+    fn intersection_details(&self, other: MinorArc) -> Intersection {
+        let i = self.normal.stable_cross_prod_unit(other.normal);
+        if i == Vec3::ZERO {
+            // equal or opposite minor arcs: no intersection
+            Intersection::SAME_OR_OPPOSITE
+        } else {
+            // select nearest intersection to start of first minor arc.
+            let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
+                i
+            } else {
+                // antipode of i.
+                -i
+            };
+
+            let self_contains = self.contains_vec3(potential);
+            let other_contains = other.contains_vec3(potential);
+
+            match (self_contains, other_contains) {
+                (ContainsResult::Outside, _) | (_, ContainsResult::Outside) => Intersection::NONE,
+                (ContainsResult::Endpoint, ContainsResult::Endpoint) => {
+                    Intersection::touch(potential)
+                }
+                (ContainsResult::Within, _) | (_, ContainsResult::Within) => {
+                    Intersection::cross(potential)
+                }
+            }
+        }
     }
 }
 
@@ -315,7 +408,9 @@ mod tests {
 
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::{ChordLength, GreatCircle, MinorArc, Sphere},
+        spherical::{
+            base::side, minor_arc::ContainsResult, ChordLength, GreatCircle, MinorArc, Side, Sphere,
+        },
         Angle, LatLong, Length, NVector, Vec3,
     };
 
@@ -680,8 +775,8 @@ mod tests {
         assert_nv_eq_d7(expected, i);
 
         // intersection is on both minor arc
-        assert_eq!(0, Sphere::side(i, arc1.start(), arc1.end()));
-        assert_eq!(0, Sphere::side(i, arc2.start(), arc2.end()));
+        assert_eq!(Side::Collinear, Sphere::side(i, arc1.start(), arc1.end()));
+        assert_eq!(Side::Collinear, Sphere::side(i, arc2.start(), arc2.end()));
     }
 
     // projection
@@ -767,6 +862,23 @@ mod tests {
         assert_opt_nv_eq_d7(
             NVector::from_lat_long_degrees(90.0, 0.0),
             MinorArc::new(start, end).projection(NVector::from_lat_long_degrees(0.0, 0.0)),
+        );
+    }
+
+    #[test]
+    fn contains_vec3_start_or_end() {
+        let start = NVector::from_lat_long_degrees(54.0, 154.0);
+        let end = NVector::from_lat_long_degrees(54.1, 154.1);
+        let a = MinorArc::new(start, end);
+        assert_eq!(ContainsResult::Endpoint, a.contains_vec3(start.as_vec3()));
+        assert_eq!(ContainsResult::Endpoint, a.contains_vec3(end.as_vec3()));
+        assert_eq!(
+            Side::Collinear,
+            side(start.as_vec3(), a.normal(), start.as_vec3())
+        );
+        assert_eq!(
+            Side::Collinear,
+            side(end.as_vec3(), a.normal(), end.as_vec3())
         );
     }
 }

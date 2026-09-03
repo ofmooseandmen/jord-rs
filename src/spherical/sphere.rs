@@ -1,8 +1,8 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, Mat33, NVector,
-    PositionVector, Speed, Vec3, Vehicle,
+    spherical::Side, surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong,
+    Length, Mat33, NVector, PositionVector, Speed, Vec3, Vehicle,
 };
 
 use super::{
@@ -385,23 +385,22 @@ impl Sphere {
         }
     }
 
-    /// Determines whether v0 if right of (negative integer), left of (positive integer) or on the
-    /// great circle (zero), from v1 to v2.
+    /// Determines whether `p0` is right of, left of, or on the great circle, from `p1` to `p2`.
     ///
     /// # Examples
     ///
     /// ```
     /// use jord::LatLong;
-    /// use jord::spherical::Sphere;
+    /// use jord::spherical::{Side, Sphere};
     ///
     /// let p1 = LatLong::from_degrees(55.4295, 13.82).to_nvector();
     /// let p2 = LatLong::from_degrees(56.0465, 12.6945).to_nvector();
     /// let p3 = LatLong::from_degrees(56.0294, 14.1567).to_nvector();
     ///
-    /// assert_eq!(-1, Sphere::side(p1, p2, p3));
-    /// assert_eq!(1, Sphere::side(p1, p3, p2));
+    /// assert_eq!(Side::Right, Sphere::side(p1, p2, p3));
+    /// assert_eq!(Side::Left, Sphere::side(p1, p3, p2));
     /// ```
-    pub fn side(p0: NVector, p1: NVector, p2: NVector) -> i8 {
+    pub fn side(p0: NVector, p1: NVector, p2: NVector) -> Side {
         side(p0.as_vec3(), p1.as_vec3(), p2.as_vec3())
     }
 
@@ -835,7 +834,7 @@ mod tests {
 
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::{GreatCircle, MinorArc, Sphere},
+        spherical::{GreatCircle, MinorArc, Side, Sphere},
         Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, NVector, Speed, Surface,
         Vec3, Vehicle,
     };
@@ -1234,7 +1233,7 @@ mod tests {
         let p0 = NVector::from_lat_long_degrees(154.0, 54.0);
         let p1 = NVector::from_lat_long_degrees(155.0, 55.0);
         let i = Sphere::interpolated_position(p0, p1, 0.25).unwrap();
-        assert_eq!(0, Sphere::side(i, p0, p1));
+        assert_eq!(Side::Collinear, Sphere::side(i, p0, p1));
     }
 
     #[test]
@@ -1292,7 +1291,7 @@ mod tests {
     #[test]
     fn side_collinear() {
         assert_eq!(
-            0,
+            Side::Collinear,
             Sphere::side(
                 NVector::from_lat_long_degrees(0.0, 0.0),
                 NVector::from_lat_long_degrees(45.0, 0.0),
@@ -1305,13 +1304,16 @@ mod tests {
     fn side_equal() {
         let v1 = NVector::new(Vec3::new_unit(1.0, 2.0, 3.0));
         // largest component is z, orthogonal vector in x-z plan.
-        assert_eq!(0, Sphere::side(NVector::new(Vec3::UNIT_Y), v1, v1));
         assert_eq!(
-            -1,
+            Side::Collinear,
+            Sphere::side(NVector::new(Vec3::UNIT_Y), v1, v1)
+        );
+        assert_eq!(
+            Side::Right,
             Sphere::side(NVector::new(Vec3::new_unit(1.0, -3.0, 0.0)), v1, v1)
         );
         assert_eq!(
-            1,
+            Side::Left,
             Sphere::side(NVector::new(Vec3::new_unit(-1.0, 3.0, 0.0)), v1, v1)
         );
     }
@@ -1321,8 +1323,8 @@ mod tests {
         let v0 = NVector::from_lat_long_degrees(-78.0, 55.0);
         let v1 = NVector::from_lat_long_degrees(-85.0, 55.0);
         let v2 = NVector::from_lat_long_degrees(10.0, 55.0);
-        assert_eq!(0, Sphere::side(v0, v1, v2));
-        assert_eq!(0, Sphere::side(v0, v2, v1));
+        assert_eq!(Side::Collinear, Sphere::side(v0, v1, v2));
+        assert_eq!(Side::Collinear, Sphere::side(v0, v2, v1));
     }
 
     #[test]
@@ -1330,13 +1332,16 @@ mod tests {
         let v1 = NVector::new(Vec3::new_unit(1.0, 2.0, 3.0));
         let v2 = NVector::new(Vec3::new_unit(-1.0, -2.0, -3.0));
         // largest component is z, orthogonal vector in x-z plan.
-        assert_eq!(0, Sphere::side(NVector::new(Vec3::UNIT_Y), v1, v2));
         assert_eq!(
-            -1,
+            Side::Collinear,
+            Sphere::side(NVector::new(Vec3::UNIT_Y), v1, v2)
+        );
+        assert_eq!(
+            Side::Right,
             Sphere::side(NVector::new(Vec3::new_unit(1.0, -3.0, 0.0)), v1, v2)
         );
         assert_eq!(
-            1,
+            Side::Left,
             Sphere::side(NVector::new(Vec3::new_unit(-1.0, 3.0, 0.0)), v1, v2)
         );
     }
@@ -1350,9 +1355,9 @@ mod tests {
         let v1 = NVector::from_lat_long_degrees(-85.0, lng.as_degrees());
         let v2 = NVector::from_lat_long_degrees(10.0, lng.as_degrees());
         let right = LatLong::new(Angle::from_degrees(-78.0), lng + one_mas).to_nvector();
-        assert_eq!(-1, Sphere::side(right, v1, v2));
+        assert_eq!(Side::Right, Sphere::side(right, v1, v2));
         let left = LatLong::new(Angle::from_degrees(-78.0), lng - one_mas).to_nvector();
-        assert_eq!(1, Sphere::side(left, v1, v2));
+        assert_eq!(Side::Left, Sphere::side(left, v1, v2));
     }
 
     // turn
