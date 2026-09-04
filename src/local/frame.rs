@@ -2,12 +2,12 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::{
+    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
     local::{
-        orientation::align_to_z_down_matrix, Body, Enu, FrameOrientation, LocalNavigationFrame,
-        LocalVector, Ned, WanderAzimuth,
+        Body, Enu, FrameOrientation, LocalNavigationFrame, LocalVector, Ned, WanderAzimuth,
+        orientation::align_to_z_down_matrix,
     },
     surface::Surface,
-    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
 };
 
 /// A 3D local Cartesian coordinate frame anchored at a reference origin on or relative
@@ -556,10 +556,10 @@ mod tests {
     #![allow(clippy::pedantic)]
 
     use crate::{
-        ellipsoidal::Ellipsoid,
-        local::{r2xyz, r2zyx, BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame},
-        positions::assert_geod_eq_d7_mm,
         Angle, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector, Surface, Vec3,
+        ellipsoidal::Ellipsoid,
+        local::{BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame, r2xyz, r2zyx},
+        positions::assert_geod_eq_d7_mm,
     };
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::{numbers::eq_zero, Vec3};
+use crate::{Vec3, numbers::eq_zero};
 
 /// epsilon below which expensive side is called.
 const TRIAGE_SIDE_EPS: f64 = 10.0 * f64::EPSILON;
@@ -26,11 +26,7 @@ pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64
         None => norm,
         Some(v) => {
             let d = p1xp2.dot_prod(v);
-            if d >= 0.0 {
-                norm
-            } else {
-                -norm
-            }
+            if d >= 0.0 { norm } else { -norm }
         }
     };
     let cos_o = v1.dot_prod(v2);
@@ -59,11 +55,7 @@ pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> Side {
         if eq_zero(side) {
             return Side::Collinear;
         }
-        if side > 0.0 {
-            Side::Left
-        } else {
-            Side::Right
-        }
+        if side > 0.0 { Side::Left } else { Side::Right }
     } else {
         // either right or left.
         if triage_side > 0.0 {
@@ -81,7 +73,7 @@ mod tests {
 
     use std::f64::consts::PI;
 
-    use crate::{spherical::base::angle_radians_between, Vec3};
+    use crate::{Vec3, spherical::base::angle_radians_between};
 
     #[test]
     fn angle_radians_between_signed() {

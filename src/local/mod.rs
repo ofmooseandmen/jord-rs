@@ -41,12 +41,12 @@
 //!   exposed publicly for callers who need the same conversions directly.
 mod frame;
 pub use frame::{
-    r2xyz, r2zyx, xyz2r, zyx2r, BodyFrame, EnuFrame, LocalFrame, NedFrame, WanderAzimuthFrame,
+    BodyFrame, EnuFrame, LocalFrame, NedFrame, WanderAzimuthFrame, r2xyz, r2zyx, xyz2r, zyx2r,
 };
 
 mod orientation;
 pub use orientation::{
-    align_to_z_down_matrix, Body, Enu, FrameOrientation, LocalNavigationFrame, Ned, WanderAzimuth,
+    Body, Enu, FrameOrientation, LocalNavigationFrame, Ned, WanderAzimuth, align_to_z_down_matrix,
 };
 
 mod vector;

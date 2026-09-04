@@ -1,13 +1,13 @@
 use std::{f64::consts::PI, time::Duration};
 
 use crate::{
-    spherical::Side, surface::Surface, Angle, GeocentricPosition, GeodeticPosition, LatLong,
-    Length, Mat33, NVector, PositionVector, Speed, Vec3, Vehicle,
+    Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector,
+    Speed, Vec3, Vehicle, spherical::Side, surface::Surface,
 };
 
 use super::{
-    base::{angle_radians_between, easting, side},
     GreatCircle, MinorArc,
+    base::{angle_radians_between, easting, side},
 };
 
 /// A sphere; for most use cases, a sphere is an acceptable approximation of the figure of a cellestial body (e.g. Earth).
@@ -835,10 +835,10 @@ mod tests {
     use std::{f64::consts::PI, time::Duration};
 
     use crate::{
-        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::{GreatCircle, MinorArc, Side, Sphere},
         Angle, GeocentricPosition, GeodeticPosition, LatLong, Length, NVector, Speed, Surface,
         Vec3, Vehicle,
+        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
+        spherical::{GreatCircle, MinorArc, Side, Sphere},
     };
 
     use super::newton_raphson;
@@ -1668,9 +1668,11 @@ mod tests {
             Angle::from_degrees(54.0),
             Speed::from_knots(400.0),
         );
-        assert!(Sphere::EARTH
-            .max_time_to_intercept(interceptor_pos, intruder)
-            .is_none());
+        assert!(
+            Sphere::EARTH
+                .max_time_to_intercept(interceptor_pos, intruder)
+                .is_none()
+        );
     }
 
     #[test]
@@ -1700,9 +1702,11 @@ mod tests {
         );
 
         // minimum interceptor speed to achieve intercept is ~ 53 knots
-        assert!(Sphere::EARTH
-            .time_to_intercept(interceptor_pos, Speed::from_knots(50.0), intruder)
-            .is_none());
+        assert!(
+            Sphere::EARTH
+                .time_to_intercept(interceptor_pos, Speed::from_knots(50.0), intruder)
+                .is_none()
+        );
 
         let opt_time =
             Sphere::EARTH.time_to_intercept(interceptor_pos, Speed::from_knots(700.0), intruder);

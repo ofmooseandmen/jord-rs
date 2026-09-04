@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use jord::{spherical::MinorArc, NVector};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use jord::{NVector, spherical::MinorArc};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("MinorArc::intersection_some", |b| {

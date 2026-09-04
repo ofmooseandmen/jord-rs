@@ -142,7 +142,7 @@ impl Ord for ChordLength {
 mod tests {
     use std::ops::Neg;
 
-    use crate::{spherical::ChordLength, Angle, NVector};
+    use crate::{Angle, NVector, spherical::ChordLength};
 
     #[test]
     fn from_pos() {

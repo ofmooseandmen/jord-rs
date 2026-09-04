@@ -1,6 +1,6 @@
 use crate::{
-    surface::Surface, Angle, GeocentricPosition, GeodeticPosition, Length, NVector, PositionVector,
-    Vec3,
+    Angle, GeocentricPosition, GeodeticPosition, Length, NVector, PositionVector, Vec3,
+    surface::Surface,
 };
 
 /// An ellipsoid.
@@ -262,7 +262,7 @@ mod tests {
 
     #![allow(clippy::pedantic)]
 
-    use crate::{spherical::Sphere, Angle, Length};
+    use crate::{Angle, Length, spherical::Sphere};
 
     use super::Ellipsoid;
 

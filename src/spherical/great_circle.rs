@@ -77,7 +77,7 @@ impl GreatCircle {
 #[cfg(test)]
 mod tests {
 
-    use crate::{positions::assert_opt_nv_eq_d7, spherical::GreatCircle, Angle, NVector, Vec3};
+    use crate::{Angle, NVector, Vec3, positions::assert_opt_nv_eq_d7, spherical::GreatCircle};
 
     // projection
 

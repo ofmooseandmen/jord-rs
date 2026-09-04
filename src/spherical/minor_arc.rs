@@ -1,7 +1,7 @@
 use crate::{
+    Angle, NVector, Vec3,
     numbers::eq_zero,
     spherical::{ChordLength, Side},
-    Angle, NVector, Vec3,
 };
 
 use super::base::{angle_radians_between, side};
@@ -471,12 +471,12 @@ mod tests {
     #![allow(clippy::pedantic)]
 
     use crate::{
+        Angle, LatLong, Length, NVector, Vec3,
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
         spherical::{
-            base::side, minor_arc::OnMinorArcLocation, ChordLength, GreatCircle, MinorArc,
-            MinorArcRelation, Side, Sphere,
+            ChordLength, GreatCircle, MinorArc, MinorArcRelation, Side, Sphere, base::side,
+            minor_arc::OnMinorArcLocation,
         },
-        Angle, LatLong, Length, NVector, Vec3,
     };
 
     // distance_to

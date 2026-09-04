@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
-use jord::spherical::{is_loop_clockwise, Loop};
+use criterion::{Bencher, Criterion, black_box, criterion_group, criterion_main};
 use jord::NVector;
+use jord::spherical::{Loop, is_loop_clockwise};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Loop::new_5_vertices", |b| {

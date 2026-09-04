@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use crate::{spherical::Side, Angle, LatLong, Mat33, NVector, Vec3};
+use crate::{Angle, LatLong, Mat33, NVector, Vec3, spherical::Side};
 
 use super::{ChordLength, Sphere};
 
@@ -284,7 +284,7 @@ impl Cap {
 
 #[cfg(test)]
 mod tests {
-    use crate::{positions::assert_nv_eq_d7, spherical::Cap, Angle, LatLong, NVector};
+    use crate::{Angle, LatLong, NVector, positions::assert_nv_eq_d7, spherical::Cap};
     use std::f64::consts::PI;
 
     #[test]

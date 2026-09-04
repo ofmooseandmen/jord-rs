@@ -640,7 +640,7 @@ mod geo_traits_tests {
     }
 
     #[test]
-    #[should_panic(expected="Index 2 out of bounds for LatLong")]
+    #[should_panic(expected = "Index 2 out of bounds for LatLong")]
     fn nth_panic() {
         let ll = LatLong::from_degrees(54.0, 154.0);
         ll.nth_or_panic(2);

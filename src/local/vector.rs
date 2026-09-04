@@ -2,9 +2,9 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::{
+    Angle, Length, PositionVector, Vec3,
     local::{Body, Enu, FrameOrientation, Ned, WanderAzimuth},
     numbers::eq_zero,
-    Angle, Length, PositionVector, Vec3,
 };
 
 /// A vector whose length and direction is such that it goes from the origin
@@ -127,11 +127,7 @@ impl<O: FrameOrientation> LocalVector<O> {
             Angle::ZERO
         } else {
             let r = Angle::from_radians((self.z() / self.slant_range()).clamp(-1.0, 1.0).asin());
-            if O::is_z_up() {
-                r
-            } else {
-                -r
-            }
+            if O::is_z_up() { r } else { -r }
         }
     }
 
@@ -265,8 +261,8 @@ mod tests {
     #![allow(clippy::pedantic)]
 
     use crate::{
-        local::BodyVector, local::EnuVector, local::LocalVector, local::NedVector,
-        local::WanderAzimuthVector, Angle, Length, PositionVector, Vec3,
+        Angle, Length, PositionVector, Vec3, local::BodyVector, local::EnuVector,
+        local::LocalVector, local::NedVector, local::WanderAzimuthVector,
     };
 
     #[test]
