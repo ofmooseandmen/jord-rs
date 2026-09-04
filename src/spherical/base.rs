@@ -16,7 +16,7 @@ pub enum Side {
 
 /// Computes the signed angle in radians between the given vectors.
 ///
-/// - if vn is `None; the angle is always in [0..PI],
+/// - if vn is `None`; the angle is always in [0..PI],
 /// - otherwise, the angle is positive if v1 is clockzise looking along vn,
 /// - and negative if anti-clockwise looking along vn
 pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {

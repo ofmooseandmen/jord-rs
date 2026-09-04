@@ -41,7 +41,7 @@ pub struct LocalFrame<O: FrameOrientation> {
 /// - the z-axis points away from the interior of the earth
 /// - the x-axis completes the right-handed system pointing east
 ///
-/// See note in [NedFrame] for suitability.
+/// See note in [`NedFrame`] for suitability.
 pub type EnuFrame = LocalFrame<Enu>;
 
 impl EnuFrame {
@@ -298,9 +298,9 @@ impl WanderAzimuthFrame {
 impl<O: LocalNavigationFrame> LocalFrame<O> {
     /// Rotates this local navigation frame around the local vertical axis by the specified
     /// angle (clockwise from North toward East following the right-hand rule around Z-down),
-    /// yielding a Z-down [WanderAzimuthFrame].
+    /// yielding a Z-down [`WanderAzimuthFrame`].
     ///
-    /// If called on a Z-up frame like [EnuFrame], the frame axes are first aligned to Z-down
+    /// If called on a Z-up frame like [`EnuFrame`], the frame axes are first aligned to Z-down
     /// prior to applying the vertical rotation.
     ///
     /// # Examples
@@ -491,7 +491,7 @@ pub fn r2zyx(m: Mat33) -> (Angle, Angle, Angle) {
 /// that the relation between a vector v decomposed in A and B is given by:
 /// `v_A = R_AB * v_B`
 ///
-/// The rotation matrix R_AB is created based on 3 angles
+/// The rotation matrix `R_AB` is created based on 3 angles
 /// z,y,x about new axes (intrinsic) in the order z-y-x. The angles are called
 /// Euler angles or Tait-Bryan angles and are defined by the following
 /// procedure of successive rotations:
@@ -525,7 +525,7 @@ pub fn zyx2r(z: Angle, y: Angle, x: Angle) -> Mat33 {
 /// that the relation between a vector v decomposed in A and B is given by:
 /// `v_A = R_AB * v_B`
 ///
-/// The rotation matrix R_AB is created based on 3 angles x,y,z about new axes
+/// The rotation matrix `R_AB` is created based on 3 angles x,y,z about new axes
 /// (intrinsic) in the order x-y-z. The angles are called Euler angles or
 /// Tait-Bryan angles and are defined by the following procedure of successive
 /// rotations:

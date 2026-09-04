@@ -10,10 +10,10 @@ use crate::{
 /// A vector whose length and direction is such that it goes from the origin
 /// of frame A to the origin of frame B, i.e. the position of B relative to A.
 ///
-/// [LocalVector] implements [PositionVector], as such it can be
+/// [`LocalVector`] implements [`PositionVector`], as such it can be
 /// turned into a [Vec3] to perform linear algebra calculations.
 ///
-/// [LocalVector] also implements [Add](::std::ops::Add), [Sub](::std::ops::Sub),
+/// [`LocalVector`] also implements [Add](::std::ops::Add), [Sub](::std::ops::Sub),
 /// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
@@ -25,20 +25,20 @@ pub struct LocalVector<O: FrameOrientation> {
     _o: PhantomData<O>,
 }
 
-/// [LocalVector] for [ENU frame](crate::local::EnuFrame).
+/// [`LocalVector`] for [ENU frame](crate::local::EnuFrame).
 ///
-/// Can be converted to an [NedVector] using [From].
+/// Can be converted to an [`NedVector`] using [From].
 pub type EnuVector = LocalVector<Enu>;
 
-/// [LocalVector] for [NED frame](crate::local::NedFrame).
+/// [`LocalVector`] for [NED frame](crate::local::NedFrame).
 ///
-/// Can be converted to an [EnuVector] using [From].
+/// Can be converted to an [`EnuVector`] using [From].
 pub type NedVector = LocalVector<Ned>;
 
-/// [LocalVector] for [body frame](crate::local::BodyFrame).
+/// [`LocalVector`] for [body frame](crate::local::BodyFrame).
 pub type BodyVector = LocalVector<Body>;
 
-/// [LocalVector] for [wander azimuth](crate::local::WanderAzimuthFrame).
+/// [`LocalVector`] for [wander azimuth](crate::local::WanderAzimuthFrame).
 pub type WanderAzimuthVector = LocalVector<WanderAzimuth>;
 
 impl<O: FrameOrientation> LocalVector<O> {
@@ -50,7 +50,7 @@ impl<O: FrameOrientation> LocalVector<O> {
         _o: PhantomData,
     };
 
-    /// Creates a [LocalVector] from the given coordinates.
+    /// Creates a [`LocalVector`] from the given coordinates.
     pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self {
             x,
@@ -60,7 +60,7 @@ impl<O: FrameOrientation> LocalVector<O> {
         }
     }
 
-    /// Creates a [LocalVector] from the given coordinates in metres.
+    /// Creates a [`LocalVector`] from the given coordinates in metres.
     pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
         Self::new(
             Length::from_metres(x),

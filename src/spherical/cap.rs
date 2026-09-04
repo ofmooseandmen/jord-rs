@@ -190,8 +190,7 @@ impl Cap {
 
     /// Returns the radius of this cap: central angle between the centre of this cap and
     /// any position on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
-    /// The returned value may not exactly equal the value passed
-    /// to [from_centre_and_boundary_position](crate::spherical::Cap::from_centre_and_boundary_position).
+    /// The returned value may not exactly equal the value passed to [`from_centre_and_boundary_position`](crate::spherical::Cap::from_centre_and_boundary_position).
     ///
     /// # Examples
     ///

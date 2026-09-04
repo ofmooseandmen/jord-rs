@@ -478,7 +478,7 @@ impl Loop {
 
     /// Computes the distance from the given position to the boundary of this polygon.
     /// Note: if the given position is inside this polygon a non-zero length is returned. If this is not desirable,
-    /// use [contains_position](crate::spherical::Loop::contains_position) beforehand.
+    /// use [`contains_position`](crate::spherical::Loop::contains_position) beforehand.
     ///
     /// # Examples
     ///
@@ -523,7 +523,7 @@ impl Loop {
 
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
     ///
-    /// This method returns either ([loop number vertices](crate::spherical::Loop::num_vertices) - 2) triangles - as triples of [NVector]s, if
+    /// This method returns either ([loop number vertices](crate::spherical::Loop::num_vertices) - 2) triangles - as triples of [`NVector`]s, if
     /// the triangulation succeeds, or [empty](Vec::new) if the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
     ///
     /// # Examples

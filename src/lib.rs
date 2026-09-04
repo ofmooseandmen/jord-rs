@@ -18,7 +18,6 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::return_self_not_must_use)]
-#![allow(clippy::doc_markdown)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::cast_possible_truncation)]

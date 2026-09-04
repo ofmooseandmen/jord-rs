@@ -67,12 +67,12 @@ pub struct GeocentricPosition {
 }
 
 impl GeocentricPosition {
-    /// Creates a [GeocentricPosition] from the given coordinates.
+    /// Creates a [`GeocentricPosition`] from the given coordinates.
     pub const fn new(x: Length, y: Length, z: Length) -> Self {
         Self { x, y, z }
     }
 
-    /// Creates a [GeocentricPosition] from the given coordinates in metres.
+    /// Creates a [`GeocentricPosition`] from the given coordinates in metres.
     pub fn from_metres(x: f64, y: f64, z: f64) -> Self {
         Self::new(
             Length::from_metres(x),
@@ -80,7 +80,7 @@ impl GeocentricPosition {
             Length::from_metres(z),
         )
     }
-    /// Creates a [GeocentricPosition] from the given coordinates in metres.
+    /// Creates a [`GeocentricPosition`] from the given coordinates in metres.
     pub(crate) fn from_vec3_metres(v: Vec3) -> Self {
         Self::from_metres(v.x(), v.y(), v.z())
     }
@@ -110,7 +110,7 @@ impl PositionVector for GeocentricPosition {
     }
 }
 
-/// A geodetic position: the horiztonal coordinates (as a [NVector]) and height above the surface.
+/// A geodetic position: the horiztonal coordinates (as a [`NVector`]) and height above the surface.
 #[derive(PartialEq, Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct GeodeticPosition {
@@ -119,18 +119,18 @@ pub struct GeodeticPosition {
 }
 
 impl GeodeticPosition {
-    /// Creates a new [GeodeticPosition] from the given horizontal coordinates and height above the surface.
+    /// Creates a new [`GeodeticPosition`] from the given horizontal coordinates and height above the surface.
     pub const fn new(hp: NVector, height: Length) -> Self {
         Self { hp, height }
     }
 
-    /// Returns the [NVector] representing the horizontal coordinates of this [GeodeticPosition].
+    /// Returns the [`NVector`] representing the horizontal coordinates of this [`GeodeticPosition`].
     #[inline]
     pub fn horizontal_position(&self) -> NVector {
         self.hp
     }
 
-    /// Returns the height above the surface of this [GeodeticPosition].
+    /// Returns the height above the surface of this [`GeodeticPosition`].
     #[inline]
     pub fn height(&self) -> Length {
         self.height
@@ -148,7 +148,7 @@ pub struct LatLong {
 impl LatLong {
     // TODO(CL): normalise?
 
-    /// Creates a new [LatLong] from the given latitude and longitude.
+    /// Creates a new [`LatLong`] from the given latitude and longitude.
     pub const fn new(latitude: Angle, longitude: Angle) -> Self {
         Self {
             latitude,
@@ -156,7 +156,7 @@ impl LatLong {
         }
     }
 
-    /// Creates a new [LatLong] from the given latitude and longitudes in degrees.
+    /// Creates a new [`LatLong`] from the given latitude and longitudes in degrees.
     pub fn from_degrees(latitude: f64, longitude: f64) -> Self {
         Self::new(
             Angle::from_degrees(latitude),
@@ -164,24 +164,24 @@ impl LatLong {
         )
     }
 
-    /// Converts the given [NVector] into a [LatLong].
+    /// Converts the given [`NVector`] into a [`LatLong`].
     pub fn from_nvector(nvector: NVector) -> Self {
         let (lat, lng) = nvector_to_latlong(nvector.0);
         Self::new(lat, lng)
     }
 
-    /// Converts this [LatLong] into an [NVector].
+    /// Converts this [`LatLong`] into an [`NVector`].
     pub fn to_nvector(&self) -> NVector {
         NVector::new(latlong_to_nvector(self.latitude, self.longitude))
     }
 
-    /// Returns the latitude of this [LatLong].
+    /// Returns the latitude of this [`LatLong`].
     #[inline]
     pub fn latitude(&self) -> Angle {
         self.latitude
     }
 
-    /// Returns the longitude of this [LatLong].
+    /// Returns the longitude of this [`LatLong`].
     #[inline]
     pub fn longitude(&self) -> Angle {
         self.longitude
@@ -192,7 +192,7 @@ impl LatLong {
     /// The precision of the returned latlong corresponds to the accuracy achieved by commercial GPS
     /// units with differential correction; it allows to distinguish 2 positions about 1.11 metres apart.
     ///
-    /// See also: [Angle::round_d5](crate::Angle::round_d5).
+    /// See also: [`round_d5`](crate::Angle::round_d5).
     pub fn round_d5(&self) -> Self {
         Self {
             latitude: self.latitude.round_d5(),
@@ -205,7 +205,7 @@ impl LatLong {
     /// The precision of the returned latlong corresponds to the accuracy achieved by
     /// differentially corrected GPS; it allows to distinguish 2 positions about 111 millimetres apart.
     ///
-    /// See also: [Angle::round_d6](crate::Angle::round_d6).
+    /// See also: [`round_d6`](crate::Angle::round_d6).
     pub fn round_d6(&self) -> Self {
         Self {
             latitude: self.latitude.round_d6(),
@@ -218,7 +218,7 @@ impl LatLong {
     /// The precision of the returned latlong corresponds to the near limit of GPS-based
     /// techniques; it allows to distinguish 2 positions about 11.1 millimetres apart.
     ///
-    /// See also: [Angle::round_d7](crate::Angle::round_d7).
+    /// See also: [`round_d7`](crate::Angle::round_d7).
     pub fn round_d7(&self) -> Self {
         Self {
             latitude: self.latitude.round_d7(),
@@ -380,17 +380,17 @@ impl PointTrait for LatLong {
 pub struct NVector(Vec3);
 
 impl NVector {
-    /// Creates a new [NVector] from the given [unit](crate::Vec3::new_unit) 3D vector.
+    /// Creates a new [`NVector`] from the given [unit](crate::Vec3::new_unit) 3D vector.
     pub const fn new(v: Vec3) -> Self {
         Self(v)
     }
 
-    /// Creates a new [NVector] from the given latitude and longitude.
+    /// Creates a new [`NVector`] from the given latitude and longitude.
     pub fn from_lat_long(latitude: Angle, longitude: Angle) -> Self {
         Self::new(latlong_to_nvector(latitude, longitude))
     }
 
-    /// Creates a new [NVector] from the given latitude and longitude in degrees.
+    /// Creates a new [`NVector`] from the given latitude and longitude in degrees.
     pub fn from_lat_long_degrees(latitude_degrees: f64, longitude_degrees: f64) -> Self {
         Self::from_lat_long(
             Angle::from_degrees(latitude_degrees),
@@ -398,17 +398,17 @@ impl NVector {
         )
     }
 
-    /// Returns the [NVector] which is the antipode of this [NVector].
+    /// Returns the [`NVector`] which is the antipode of this [`NVector`].
     pub fn antipode(&self) -> Self {
         Self::new(-self.0)
     }
 
-    /// Determines whether the given [NVector] is the antipode of this [NVector].
+    /// Determines whether the given [`NVector`] is the antipode of this [`NVector`].
     pub fn is_antipode_of(&self, o: Self) -> bool {
         self.0 + o.0 == Vec3::ZERO
     }
 
-    /// Returns this [NVector] as a [Vec3].
+    /// Returns this [`NVector`] as a [`Vec3`].
     #[inline]
     pub fn as_vec3(&self) -> Vec3 {
         self.0

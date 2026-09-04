@@ -1,3 +1,7 @@
+### 0.18.0
+- Added: MinorArc::relate and Loop::relate
+- Added: direct/inverse rotation matrix and origin of local frame
+
 ### 0.17.0
 - Added: geo-types and geo-traits (behind a feature flag)
 - Improved: Local frames API

@@ -230,7 +230,7 @@ impl Sphere {
     /// Computes the final bearing arriving at `p2` from `p1` in compass angle.
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
     /// The final bearing will differ from the initial bearing by varying degrees according to distance and latitude.
-    /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle).
+    /// Returns 0 if both positions are equal or the antipode of each other, see [`is_great_cirle`](crate::spherical::Sphere::is_great_circle).
     ///
     /// # Examples
     ///
@@ -253,7 +253,7 @@ impl Sphere {
 
     /// Computes the initial bearing from `p1` to `p2` in compass angle.
     /// Compass angles are clockwise angles from true north: 0 = north, 90 = east, 180 = south, 270 = west.
-    /// Returns 0 if both positions are equal or the antipode of each other - [is_great_cirle](crate::spherical::Sphere::is_great_circle)
+    /// Returns 0 if both positions are equal or the antipode of each other, see [`is_great_cirle`](crate::spherical::Sphere::is_great_circle).
     ///
     /// # Examples
     ///
@@ -298,7 +298,7 @@ impl Sphere {
     }
 
     /// Computes the position at given fraction between this position and the given position.
-    /// Returns `None` if the given fraction is `< 0` or `> 1`.`
+    /// Returns `None` if the given fraction is `< 0` or `> 1`.
     pub fn interpolated_position(p1: NVector, p2: NVector, f: f64) -> Option<NVector> {
         if !(0.0..=1.0).contains(&f) {
             None
@@ -654,7 +654,7 @@ fn contains_antipodal(ps: &[NVector]) -> bool {
 }
 
 /// Implementation of the Newton Raphson root-finding algorithm.
-/// See: https://en.wikipedia.org/wiki/Newton%27s_method
+/// See: <https://en.wikipedia.org/wiki/Newton%27s_method>
 fn newton_raphson<F>(f: F, df: F, x0: f64, epsilon: f64, max_iters: u64) -> Option<f64>
 where
     F: Fn(f64) -> f64,
