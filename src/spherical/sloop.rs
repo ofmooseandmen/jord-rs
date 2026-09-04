@@ -300,7 +300,7 @@ impl Loop {
 
     /// Determines whether this loop and the given loop have the same vertices, allowing for a different
     /// starting vertex or winding direction.
-    pub fn has_same_vertices(&self, o: &Self) -> bool {
+    pub fn is_equivalent(&self, o: &Self) -> bool {
         let v1 = &self.vertices;
         let v2 = &o.vertices;
         if v1.len() != v2.len() {
@@ -580,7 +580,7 @@ impl Loop {
             return LoopRelation::Disjoint;
         }
 
-        if self.has_same_vertices(other) {
+        if self.is_equivalent(other) {
             return LoopRelation::Equal;
         }
 
@@ -1057,7 +1057,7 @@ mod tests {
 
     use crate::{
         Angle, LatLong, Length, NVector, Vec3,
-        spherical::{ChordLength, Loop, Sphere, is_loop_clockwise},
+        spherical::{ChordLength, Loop, LoopRelation, Sphere, is_loop_clockwise},
     };
 
     fn antananrivo() -> NVector {
@@ -1843,6 +1843,113 @@ mod tests {
             Angle::from_radians(0.0018241779916116775),
             l.spherical_excess().round_d7()
         );
+    }
+
+    // is_equivalent
+
+    #[test]
+    fn is_equivalent() {
+        let vs = vec![
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 3.0),
+        ];
+        let l1 = Loop::new(&vs);
+        assert!(l1.is_equivalent(&l1));
+
+        let mut rvs = vs.to_vec();
+        rvs.reverse();
+        let l2 = Loop::new(&rvs);
+        assert!(l1.is_equivalent(&l2));
+
+        let cvs = vec![vs[1], vs[2], vs[0]];
+        let l3 = Loop::new(&cvs);
+        assert!(l1.is_equivalent(&l3));
+
+        let l4 = Loop::new(&[
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 3.0),
+            NVector::from_lat_long_degrees(6.0, 4.0),
+        ]);
+        assert!(!l1.is_equivalent(&l4));
+
+        let l5 = Loop::new(&[
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 1.0),
+            NVector::from_lat_long_degrees(6.0, 3.0),
+        ]);
+        assert!(!l1.is_equivalent(&l5));
+    }
+
+    #[test]
+    fn relate_disjoint_far_apart() {
+        let a = square(0.0, 0.0, 1.0);
+        let b = square(50.0, 50.0, 1.0);
+        assert_eq!(LoopRelation::Disjoint, a.relate(&b));
+    }
+
+    #[test]
+    fn relate_contains_and_within_are_inverses() {
+        let outer = square(0.0, 0.0, 10.0);
+        let inner = square(4.0, 4.0, 2.0);
+        assert_eq!(LoopRelation::Contain, outer.relate(&inner));
+        assert_eq!(LoopRelation::Within, inner.relate(&outer));
+    }
+
+    #[test]
+    fn relate_intersects_on_partial_overlap() {
+        let a = square(0.0, 0.0, 5.0);
+        let b = square(3.0, 3.0, 5.0);
+        assert_eq!(LoopRelation::Intersect, a.relate(&b));
+        assert_eq!(LoopRelation::Intersect, b.relate(&a)); // symmetric
+    }
+
+    /// Two loops sharing exactly one boundary edge, but with disjoint interiors -- exercises
+    /// the collinear-overlap case in `MinorArcRelation`, not just single-point crossings.
+    #[test]
+    fn relate_touches_on_shared_edge() {
+        let a = square(0.0, 0.0, 5.0);
+        let b = square(0.0, 5.0, 5.0); // shares the edge at longitude 5.0
+        assert_eq!(LoopRelation::Touch, a.relate(&b));
+    }
+
+    #[test]
+    fn relate_touches_at_a_single_shared_vertex() {
+        let a = square(0.0, 0.0, 5.0);
+        let b = square(5.0, 5.0, 5.0); // shares only the corner at (5.0, 5.0)
+        assert_eq!(LoopRelation::Touch, a.relate(&b));
+    }
+
+    #[test]
+    fn relate_equals_for_same_boundary_different_starting_vertex() {
+        let a = square(10.0, 10.0, 3.0);
+        // same four vertices, rotated starting point
+        let b = Loop::new(&[
+            NVector::from_lat_long_degrees(13.0, 13.0),
+            NVector::from_lat_long_degrees(13.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 10.0),
+            NVector::from_lat_long_degrees(10.0, 13.0),
+        ]);
+        assert_eq!(LoopRelation::Equal, a.relate(&b));
+    }
+
+    #[test]
+    fn convenience_predicates_match_relate() {
+        let outer = square(0.0, 0.0, 10.0);
+        let inner = square(4.0, 4.0, 2.0);
+        assert!(outer.contains(&inner));
+        assert!(inner.intersects(&outer));
+        assert!(!inner.touches(&outer));
+    }
+
+    fn square(lat0: f64, lon0: f64, size: f64) -> Loop {
+        Loop::new(&[
+            NVector::from_lat_long_degrees(lat0, lon0),
+            NVector::from_lat_long_degrees(lat0, lon0 + size),
+            NVector::from_lat_long_degrees(lat0 + size, lon0 + size),
+            NVector::from_lat_long_degrees(lat0 + size, lon0),
+        ])
     }
 
     fn assert_loop_triangulation(e: &[(NVector, NVector, NVector)], vs: &[NVector]) {
