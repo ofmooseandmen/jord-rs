@@ -20,7 +20,7 @@ pub use rectangle::Rectangle;
 
 mod sloop;
 pub use sloop::is_loop_clockwise;
-pub use sloop::Loop;
+pub use sloop::{Loop, LoopRelation};
 
 mod sphere;
 pub use sphere::Sphere;

@@ -149,6 +149,8 @@ impl From<Speed> for uom::si::f64::Velocity {
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use crate::{Length, Speed};
     use std::time::Duration;
 

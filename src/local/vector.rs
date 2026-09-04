@@ -262,6 +262,8 @@ impl From<NedVector> for EnuVector {
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use crate::{
         local::BodyVector, local::EnuVector, local::LocalVector, local::NedVector,
         local::WanderAzimuthVector, Angle, Length, PositionVector, Vec3,

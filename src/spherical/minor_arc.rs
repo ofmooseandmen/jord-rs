@@ -19,6 +19,8 @@ pub struct MinorArc {
 /// The topological relationship between two [`MinorArc`]s.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MinorArcRelation {
+    /// The arcs share no points.
+    Disjoint,
     /// The arcs intersect at a single point strictly interior to both arcs.
     Intersect(NVector),
     /// The arcs meet at exactly one point that is an endpoint of at least one of them.
@@ -26,8 +28,6 @@ pub enum MinorArcRelation {
     /// The arcs lie on the same great circle and overlap along a shared sub-arc (more than a
     /// single point).
     Overlap(MinorArc),
-    /// The arcs share no points.
-    Disjoint,
 }
 
 /// result of `triage_on_minor_arc`.
@@ -184,7 +184,40 @@ impl MinorArc {
         }
     }
 
-    /// Computes the projection of the given position on this minor arc. Returns [None] if the projection is not
+    /// Determines the [topological relationship](MinorArcRelation) between
+    /// this minor arc and the `other` minor arc.
+    ///
+    /// # Exmaples
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::{MinorArc, MinorArcRelation};
+    ///
+    /// let ma1 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -10.0),
+    ///     NVector::from_lat_long_degrees(0.0, 5.0)
+    /// );
+    /// let ma2 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -5.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -5.0),
+    ///     NVector::from_lat_long_degrees(0.0, 5.0)
+    /// );
+    /// assert_eq!(MinorArcRelation::Overlap(o), ma1.relate(ma2));
+    /// ```
+    pub fn relate(&self, other: MinorArc) -> MinorArcRelation {
+        let i = self.intersection_details(other);
+        match i {
+            Intersection::Collinear => self.relate_collinear(other),
+            Intersection::Some(r) => r,
+            Intersection::None => MinorArcRelation::Disjoint,
+        }
+    }
+
+    /// Computes the projection of the given position on this minor arc. Returns [`None`] if the projection is not
     /// within the minor arc (including start and end). If the given position is strictly "perpendicular" to this
     /// minor arc, this method arbitrarily returns the start (p can be projected anywhere on the minor arc).
     ///
@@ -239,42 +272,9 @@ impl MinorArc {
         eq_zero(v.dot_prod(self.normal)) && self.triage_on_minor_arc(v).is_within()
     }
 
-    /// Determines the [topological relationship](MinorArcRelation) between this and
-    /// the `other` minor arcs.
-    /// # Exmaples
+    /// Determines whether p if right of, left of or on this minor arc.
     ///
-    /// ```
-    /// use jord::{Angle, NVector};
-    /// use jord::spherical::{MinorArc, MinorArcRelation};
-    ///
-    /// let ma1 = MinorArc::new(
-    ///     NVector::from_lat_long_degrees(0.0, -10.0),
-    ///     NVector::from_lat_long_degrees(0.0, 5.0)
-    /// );
-    /// let ma2 = MinorArc::new(
-    ///     NVector::from_lat_long_degrees(0.0, -5.0),
-    ///     NVector::from_lat_long_degrees(0.0, 10.0)
-    /// );
-    ///
-    /// let o = MinorArc::new(
-    ///     NVector::from_lat_long_degrees(0.0, -5.0),
-    ///     NVector::from_lat_long_degrees(0.0, 5.0)
-    /// );
-    /// assert_eq!(MinorArcRelation::Overlap(o), ma1.relate(ma2));
-    /// ```
-    pub fn relate(&self, other: MinorArc) -> MinorArcRelation {
-        let i = self.intersection_details(other);
-        match i {
-            Intersection::Collinear => self.relate_collinear(other),
-            Intersection::Some(r) => r,
-            Intersection::None => MinorArcRelation::Disjoint,
-        }
-    }
-
-    /// Determines whether p if right of (negative integer), left of (positive integer) or on this
-    /// minor arc (zero).
-    ///
-    /// This is similar to [side(p, self.start, self.end)](crate::spherical::Sphere::side) but avoids the calculation of the orthogonal
+    /// This is similar to [`side(p, self.start, self.end)`](crate::spherical::Sphere::side) but avoids the calculation of the orthogonal
     /// vector to (`self.start`, `self.end`).
     ///
     /// # Examples
@@ -467,6 +467,8 @@ impl MinorArc {
 
 #[cfg(test)]
 mod tests {
+
+    #![allow(clippy::pedantic)]
 
     use crate::{
         positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},

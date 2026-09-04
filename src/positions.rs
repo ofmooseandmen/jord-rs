@@ -453,15 +453,16 @@ fn latlong_to_nvector(latitude: Angle, longitude: Angle) -> Vec3 {
 }
 
 #[cfg(test)]
+#[allow(clippy::uninlined_format_args)]
 pub(crate) fn assert_nv_eq_d7(expected: NVector, actual: NVector) {
     let lle = LatLong::from_nvector(expected).round_d7();
     let lla: LatLong = LatLong::from_nvector(actual).round_d7();
-    if lle != lla {
-        panic!(
-            "Expected position was {:#?} but actual position is {:#?}",
-            lle, lla
-        )
-    }
+    assert!(
+        lle == lla,
+        "Expected position was {:#?} but actual position is {:#?}",
+        lle,
+        lla
+    );
 }
 
 #[cfg(test)]
@@ -483,6 +484,9 @@ pub(crate) fn assert_geod_eq_d7_mm(expected: GeodeticPosition, actual: GeodeticP
 
 #[cfg(test)]
 mod tests {
+
+    #![allow(clippy::pedantic)]
+
     use crate::{GeocentricPosition, LatLong, NVector, PositionVector, Vec3};
 
     #[test]
@@ -636,7 +640,7 @@ mod geo_traits_tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected="Index 2 out of bounds for LatLong")]
     fn nth_panic() {
         let ll = LatLong::from_degrees(54.0, 154.0);
         ll.nth_or_panic(2);

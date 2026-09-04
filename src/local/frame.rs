@@ -553,6 +553,8 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use crate::{
         ellipsoidal::Ellipsoid,
         local::{r2xyz, r2zyx, BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame},

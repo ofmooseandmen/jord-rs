@@ -259,6 +259,9 @@ impl Surface for Ellipsoid {
 
 #[cfg(test)]
 mod tests {
+
+    #![allow(clippy::pedantic)]
+
     use crate::{spherical::Sphere, Angle, Length};
 
     use super::Ellipsoid;

@@ -830,6 +830,8 @@ where
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use std::{f64::consts::PI, time::Duration};
 
     use crate::{

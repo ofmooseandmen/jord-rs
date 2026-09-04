@@ -1,12 +1,12 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
 use crate::{
-    numbers::{eq, eq_zero},
-    spherical::Side,
     Angle, NVector, Vec3,
+    numbers::{eq, eq_zero},
+    spherical::{MinorArcRelation, Side},
 };
 
-use super::{base::angle_radians_between, ChordLength, MinorArc, Rectangle, Sphere};
+use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_between};
 
 /// A single chain of vertices where the first vertex is implicitly connected to the last.
 ///
@@ -22,6 +22,32 @@ pub struct Loop {
     insides: Option<(NVector, NVector)>,
     /// edges in clockwise order.
     edges: Vec<MinorArc>,
+}
+
+/// The topological relationship between two [Loop]s on a sphere.
+///
+/// This assumes both loops are [simple](crate::spherical::Loop::is_simple); the relationship between
+/// self-intersecting loops is not well-defined by this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoopRelation {
+    /// The loops share no points at all — neither boundary nor interior overlaps.
+    Disjoint,
+    /// The loops' boundaries touch or overlap at one or more points, but neither loop's
+    /// interior extends into the other's — e.g. they share an edge, or meet at a single vertex,
+    /// like two adjacent countries.
+    Touch,
+    /// The loops' boundaries cross transversally: each loop has some interior area inside the
+    /// other and some outside — a genuine partial overlap, distinct from either loop fully
+    /// containing the other.
+    Intersect,
+    /// `other`'s interior lies entirely within `self`'s interior (their boundaries may also
+    /// touch, but `other` never crosses to the outside of `self`).
+    Contain,
+    /// `self`'s interior lies entirely within `other`'s interior — the inverse of `Contains`.
+    Within,
+    /// The two loops share the same boundary (same vertices, allowing for a different
+    /// starting vertex or winding direction).
+    Equal,
 }
 
 impl Loop {
@@ -272,6 +298,31 @@ impl Loop {
         self.vertices.iter().any(|v| v.0 == p)
     }
 
+    /// Determines whether this loop and the given loop have the same vertices, allowing for a different
+    /// starting vertex or winding direction.
+    pub fn has_same_vertices(&self, o: &Self) -> bool {
+        let v1 = &self.vertices;
+        let v2 = &o.vertices;
+        if v1.len() != v2.len() {
+            return false;
+        }
+        if v1.is_empty() {
+            return true;
+        }
+
+        let n = v1.len();
+
+        // Check forward and backward starting from every possible offset
+        (0..n).any(|offset| {
+            // forward
+            if (0..n).all(|i| v1[i] == v2[(i + offset) % n]) {
+                return true;
+            }
+            // backward
+            (0..n).all(|i| v1[i] == v2[(n + offset - i) % n])
+        })
+    }
+
     /// Determines whether the given position is on an edge of this loop.
     ///
     /// # Examples
@@ -519,6 +570,77 @@ impl Loop {
             res = res.min(cl);
         }
         res
+    }
+
+    /// Determines the topological relationship between this loop and `other`.
+    pub fn relate(&self, other: &Loop) -> LoopRelation {
+        // Fast rejection: skip all per-edge work entirely if the bounding rectangles don't
+        // even overlap. Cheap, and likely the common case for unrelated loops.
+        if !self.bound().intersects(other.bound()) {
+            return LoopRelation::Disjoint;
+        }
+
+        if self.has_same_vertices(other) {
+            return LoopRelation::Equal;
+        }
+
+        let mut any_touch = false;
+
+        for a in &self.edges {
+            for b in &other.edges {
+                match a.relate(*b) {
+                    MinorArcRelation::Intersect(_) => {
+                        return LoopRelation::Intersect;
+                    }
+                    MinorArcRelation::Touch(_) | MinorArcRelation::Overlap(_) => any_touch = true,
+                    MinorArcRelation::Disjoint => {}
+                }
+            }
+        }
+
+        // No edges cross, so containment reduces to a single point-in-loop test per side —
+        // but the test vertex must not itself lie on the other loop's boundary, or the
+        // contains-position test is ambiguous (it's simultaneously "on" both loops).
+        let self_in_other = self
+            .iter_vertices()
+            .find(|v| !other.has_vertex(**v))
+            .is_some_and(|v| other.contains_position(*v));
+
+        let other_in_self = other
+            .iter_vertices()
+            .find(|v| !self.has_vertex(**v))
+            .is_some_and(|v| self.contains_position(*v));
+
+        match (self_in_other, other_in_self, any_touch) {
+            (true, false, _) => LoopRelation::Within,
+            (false, true, _) => LoopRelation::Contain,
+            (false, false, true) => LoopRelation::Touch,
+            (false, false, false) => LoopRelation::Disjoint,
+            // A loop can't simultaneously have a vertex strictly inside the other AND vice
+            // versa without their edges crossing somewhere -- reaching this would mean a bug
+            // upstream (in `relate`/`contains_position`), not a valid geometric configuration.
+            (true, true, _) => {
+                unreachable!("both loops contain a vertex of the other without any edge crossing")
+            }
+        }
+    }
+
+    /// True if `self` and `other` share at least one boundary or interior point.
+    pub fn intersects(&self, other: &Loop) -> bool {
+        !matches!(self.relate(other), LoopRelation::Disjoint)
+    }
+
+    /// True if `other`'s interior lies entirely within `self`'s interior (or they're equal).
+    pub fn contains(&self, other: &Loop) -> bool {
+        matches!(
+            self.relate(other),
+            LoopRelation::Contain | LoopRelation::Equal
+        )
+    }
+
+    /// True if the loops' boundaries touch but their interiors don't overlap.
+    pub fn touches(&self, other: &Loop) -> bool {
+        matches!(self.relate(other), LoopRelation::Touch)
     }
 
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
@@ -930,9 +1052,12 @@ fn vec3_eq(a: Vec3, b: Vec3) -> bool {
 
 #[cfg(test)]
 mod tests {
+
+    #![allow(clippy::pedantic)]
+
     use crate::{
-        spherical::{is_loop_clockwise, ChordLength, Loop, Sphere},
         Angle, LatLong, Length, NVector, Vec3,
+        spherical::{ChordLength, Loop, Sphere, is_loop_clockwise},
     };
 
     fn antananrivo() -> NVector {
@@ -1026,23 +1151,29 @@ mod tests {
     fn new_empty() {
         assert!(Loop::new(&[]).is_empty());
         assert!(Loop::new(&[NVector::from_lat_long_degrees(0.0, 0.0)]).is_empty());
-        assert!(Loop::new(&[
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            NVector::from_lat_long_degrees(1.0, 0.0),
-        ])
-        .is_empty());
-        assert!(Loop::new(&[
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            NVector::from_lat_long_degrees(1.0, 0.0),
-            NVector::from_lat_long_degrees(0.0, 0.0),
-        ])
-        .is_empty());
-        assert!(Loop::new(&[
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            NVector::from_lat_long_degrees(0.0, 1.0),
-            NVector::from_lat_long_degrees(0.0, 2.0),
-        ])
-        .is_empty());
+        assert!(
+            Loop::new(&[
+                NVector::from_lat_long_degrees(0.0, 0.0),
+                NVector::from_lat_long_degrees(1.0, 0.0),
+            ])
+            .is_empty()
+        );
+        assert!(
+            Loop::new(&[
+                NVector::from_lat_long_degrees(0.0, 0.0),
+                NVector::from_lat_long_degrees(1.0, 0.0),
+                NVector::from_lat_long_degrees(0.0, 0.0),
+            ])
+            .is_empty()
+        );
+        assert!(
+            Loop::new(&[
+                NVector::from_lat_long_degrees(0.0, 0.0),
+                NVector::from_lat_long_degrees(0.0, 1.0),
+                NVector::from_lat_long_degrees(0.0, 2.0),
+            ])
+            .is_empty()
+        );
     }
 
     // asserts [v0, v1, .. , vn] = [vn, .., v1, v0] == [v0, v1, .. , vn, v0].
