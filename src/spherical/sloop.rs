@@ -14,6 +14,11 @@ use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_betwee
 /// - [simple](crate::spherical::Loop::is_simple) - this property is not enforced at runtime, therefore operations are undefined on non-simple loops
 /// - or, [empty](crate::spherical::Loop::is_empty).
 ///
+/// A loop's boundary divides the sphere into two regions; [`Loop::new`] always normalises so
+/// that the loop's interior (as used by [`contains_position`](Self::contains_position) and
+/// everything built on it) is the smaller of the two — see [`Loop::new`]'s docs for why this
+/// holds regardless of the winding of the vertices originally supplied.
+///
 /// Beyond properties of a single loop (convexity, containment of a position, bounding
 /// rectangle, triangulation, spherical excess), two loops can be compared against each
 /// other via [`relate`](Self::relate), which determines their full [topological
@@ -76,7 +81,16 @@ impl Loop {
     /// - be given in clockwise or anti-clockwise order,
     /// - define a loop explicity closed (first == last) or opened (first != last)
     ///
-    /// An [empty](crate::spherical::Loop::EMPTY) loop is returned if the given vertices are [empty](crate::spherical::Loop::is_empty).
+    /// Regardless of the winding of the vertices supplied, a non-empty loop's interior — the
+    /// region [`contains_position`](Self::contains_position) reports as inside — is always the
+    /// strictly smaller of the two regions the boundary divides the sphere into. A loop can
+    /// never end up representing "everywhere except a small area" as its interior.
+    ///
+    /// The one case where the two regions are exactly equal — vertices lying on a single great
+    /// circle, which by definition splits the sphere into two equal hemispheres, e.g. several
+    /// points spaced along the equator — is a separate, degenerate case: every vertex is then
+    /// collinear with its neighbours, and this constructor detects that directly and returns
+    /// an [empty](Self::is_empty) loop rather than a loop with an ambiguous interior.
     ///
     /// # Examples
     ///
@@ -310,6 +324,13 @@ impl Loop {
 
     /// Determines whether this loop and the given loop have the same vertices, allowing for a different
     /// starting vertex or winding direction.
+    ///
+    /// Note: this is differs from `Partial_Eq` which also tests the starting vertex
+    /// (due to the vertices being stored in clockwise order, the winding direction is also ignored by `Partial_Eq`):
+    /// - `[A, B, C] = [C, B, A]`
+    /// - `[A, B, C] != [B, C, A]`
+    /// - `[A, B, C] is_equivalent [C, B, A]`
+    /// - `[A, B, C] is_equivalent [B, C, A]`
     pub fn is_equivalent(&self, o: &Self) -> bool {
         let v1 = &self.vertices;
         let v2 = &o.vertices;
@@ -860,11 +881,12 @@ impl Loop {
             return Cap::EMPTY;
         };
 
-        let cap = Cap::from_centre_and_boundary_position(centre, farthest);
+        let cap = Cap::from_centre_and_boundary_position(centre, farthest)
+            .expand(Self::bound_expansion());
         if cap.radius() >= Angle::QUARTER_CIRCLE {
             Cap::FULL
         } else {
-            cap.expand(Self::bound_expansion())
+            cap
         }
     }
 
@@ -1333,6 +1355,19 @@ mod tests {
             ])
             .is_empty()
         );
+    }
+
+    #[test]
+    fn new_exact_hemisphere_split() {
+        let l: Loop = Loop::new(&[
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 90.0),
+            NVector::from_lat_long_degrees(0.0, 179.0),
+            NVector::from_lat_long_degrees(0.0, -179.0),
+            NVector::from_lat_long_degrees(0.0, -90.0),
+        ]);
+        // all vertices are collinear
+        assert!(l.is_empty());
     }
 
     // asserts [v0, v1, .. , vn] = [vn, .., v1, v0] == [v0, v1, .. , vn, v0].
@@ -2038,6 +2073,8 @@ mod tests {
 
     #[test]
     fn is_equivalent() {
+        assert!(Loop::EMPTY.is_equivalent(&Loop::EMPTY));
+
         let vs = vec![
             NVector::from_lat_long_degrees(1.0, 1.0),
             NVector::from_lat_long_degrees(5.0, 1.0),

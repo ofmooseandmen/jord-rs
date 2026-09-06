@@ -514,6 +514,16 @@ mod tests {
         },
     };
 
+    #[test]
+    fn partial_eq() {
+        let start = NVector::from_lat_long_degrees(154.0, 54.0);
+        let end = NVector::from_lat_long_degrees(155.0, 55.0);
+        let end2 = NVector::from_lat_long_degrees(156.0, 56.0);
+        assert_eq!(MinorArc::new(start, end), MinorArc::new(start, end));
+        assert_ne!(MinorArc::new(start, end), MinorArc::new(end, start));
+        assert_ne!(MinorArc::new(start, end), MinorArc::new(start, end2));
+    }
+
     // distance_to
     #[test]
     fn distance_to_close_interior() {

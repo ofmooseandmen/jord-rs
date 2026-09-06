@@ -564,7 +564,7 @@ mod tests {
 
     #[test]
     fn from_geodetic_and_from_geocentric() {
-        let s = Ellipsoid::WGS84;
+        let s: Ellipsoid = Ellipsoid::WGS84;
 
         let o_geod = GeodeticPosition::new(
             NVector::from_lat_long_degrees(54.0, 154.0),
@@ -627,6 +627,28 @@ mod tests {
             BodyFrame::looking_at_geodetic(o_geod, t_geod, roll, s),
             BodyFrame::looking_at_geocentric(o_geoc, t_geoc, roll, s)
         )
+    }
+
+    #[test]
+    fn accessors() {
+        let s: Ellipsoid = Ellipsoid::WGS84;
+
+        let o_geod = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Length::from_metres(10_000.0),
+        );
+        let o_geoc = s.geodetic_to_geocentric_position(o_geod);
+
+        let enu = EnuFrame::from_geodetic(o_geod, s);
+        assert_eq!(o_geoc, enu.origin());
+        assert_eq!(
+            Mat33::new(Vec3::UNIT_Y, Vec3::UNIT_Z, Vec3::UNIT_X),
+            enu.earth_to_local_matrix()
+        );
+        assert_eq!(
+            Mat33::new(Vec3::UNIT_Z, Vec3::UNIT_X, Vec3::UNIT_Y),
+            enu.local_to_earth_matrix()
+        );
     }
 
     // local_vector_to

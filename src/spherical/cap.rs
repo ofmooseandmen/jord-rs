@@ -435,6 +435,18 @@ mod tests {
     }
 
     #[test]
+    fn expand() {
+        assert_eq!(Cap::EMPTY, Cap::EMPTY.expand(Angle::from_degrees(1.0)));
+        let c = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(1.0),
+        );
+        assert!(!c.contains_position(NVector::from_lat_long_degrees(0.0, 1.5)));
+        let e = c.expand(Angle::from_degrees(1.0));
+        assert!(e.contains_position(NVector::from_lat_long_degrees(0.0, 1.5)));
+    }
+
+    #[test]
     fn radius() {
         assert_eq!(
             Angle::QUARTER_CIRCLE,

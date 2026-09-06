@@ -233,4 +233,14 @@ mod tests {
             ChordLength::from_angle(b).cmp(&ChordLength::from_angle(a))
         );
     }
+
+    #[test]
+    fn add() {
+        let a = ChordLength::from_squared_length(1.0);
+        assert_eq!(a, a + ChordLength::NEGATIVE);
+        assert_eq!(a, a + ChordLength::ZERO);
+        assert_eq!(a, ChordLength::NEGATIVE + a);
+        assert_eq!(a, ChordLength::ZERO + a);
+        assert_eq!(ChordLength::from_squared_length(4.0), a + a);
+    }
 }
