@@ -3,7 +3,7 @@ use std::{cmp::Ordering, f64::consts::PI};
 use crate::{
     Angle, NVector, Vec3,
     numbers::{eq, eq_zero},
-    spherical::{MinorArcRelation, Side},
+    spherical::{Cap, MinorArcRelation, Side},
 };
 
 use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_between};
@@ -13,7 +13,13 @@ use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_betwee
 /// Loops are either:
 /// - [simple](crate::spherical::Loop::is_simple) - this property is not enforced at runtime, therefore operations are undefined on non-simple loops
 /// - or, [empty](crate::spherical::Loop::is_empty).
-#[derive(PartialEq, Clone, Debug, Default)]
+///
+/// Beyond properties of a single loop (convexity, containment of a position, bounding
+/// rectangle, triangulation, spherical excess), two loops can be compared against each
+/// other via [`relate`](Self::relate), which determines their full [topological
+/// relationship](LoopRelation) — disjoint, touching, intersecting, one containing the
+/// other, or equal.
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Loop {
     /// vertices in clockwise order.
@@ -22,6 +28,8 @@ pub struct Loop {
     insides: Option<(NVector, NVector)>,
     /// edges in clockwise order.
     edges: Vec<MinorArc>,
+    /// bounding cap.
+    bounding_cap: Cap,
 }
 
 /// The topological relationship between two [Loop]s on a sphere.
@@ -35,14 +43,14 @@ pub enum LoopRelation {
     /// The loops' boundaries touch or overlap at one or more points, but neither loop's
     /// interior extends into the other's — e.g. they share an edge, or meet at a single vertex,
     /// like two adjacent countries.
-    Touch,
+    Touching,
     /// The loops' boundaries cross transversally: each loop has some interior area inside the
     /// other and some outside — a genuine partial overlap, distinct from either loop fully
     /// containing the other.
-    Intersect,
+    Intersecting,
     /// `other`'s interior lies entirely within `self`'s interior (their boundaries may also
     /// touch, but `other` never crosses to the outside of `self`).
-    Contain,
+    Containing,
     /// `self`'s interior lies entirely within `other`'s interior — the inverse of `Contains`.
     Within,
     /// The two loops share the same boundary (same vertices, allowing for a different
@@ -56,6 +64,7 @@ impl Loop {
         vertices: Vec::new(),
         insides: None,
         edges: Vec::new(),
+        bounding_cap: Cap::EMPTY,
     };
 
     const NP: NVector = NVector::new(Vec3::UNIT_Z);
@@ -132,6 +141,7 @@ impl Loop {
                     vertices,
                     insides,
                     edges: clockwise_edges,
+                    bounding_cap: Self::calc_bounding_cap(opened),
                 }
             }
         }
@@ -364,9 +374,16 @@ impl Loop {
         self.edges.iter()
     }
 
-    /// Calculates the [minimum bounding rectangle](crate::spherical::Rectangle) of this loop. The returned bound is
-    /// conservative in that if this loop [contains](crate::spherical::Loop::contains_position) the position `P`,
-    /// then the bound also [contains](crate::spherical::Rectangle::contains_position) `P`.
+    /// **Calculates** the [minimum bounding rectangle](crate::spherical::Rectangle) of this loop.
+    /// The returned bound is conservative in that if this loop [contains](crate::spherical::Loop::contains_position)
+    /// the position `P`, then the bound also [contains](crate::spherical::Rectangle::contains_position) `P`.
+    ///
+    /// This is typically usefull for spatial indexing (e.g. inserting loops into an R-Tree).
+    ///
+    /// # Performance
+    /// This is `O(edges)` with a non-trivial constant factor, it may need up to two full
+    /// boundary ray-casts (via [`contains_position`](Self::contains_position)) to correctly detect
+    /// whether this loop's interior wraps a pole.
     ///
     /// # Examples
     ///
@@ -383,13 +400,13 @@ impl Loop {
     /// ];
     ///
     /// let l = Loop::new(&vs);
-    /// let b = l.bound();
+    /// let b = l.bounding_rectangle();
     /// for v in vs.iter() {
     ///     let ll = LatLong::from_nvector(*v);
     ///     assert!(b.contains_position(ll));
     /// }
     /// ```
-    pub fn bound(&self) -> Rectangle {
+    pub fn bounding_rectangle(&self) -> Rectangle {
         let all: Vec<Rectangle> = self
             .edges
             .iter()
@@ -397,11 +414,8 @@ impl Loop {
             .collect();
         let mut mbr = Rectangle::from_union(&all);
 
-        // expand by 1e-7 degrees which is about 11.1 millimetres at the equator and
-        // is the near limit of GPS-based technique - this is to make sure that floating-point
-        // error introduced when converting NVector <-> LatLong does not break the bound
-        // invariant: loop.contains_position(p) -> loop.bound().contains_position(LatLong::from_nvector(p))
-        mbr = mbr.expand(Angle::from_degrees(1.0e-7));
+        // expand to account to floating point errors.
+        mbr = mbr.expand(Self::bound_expansion());
 
         // expand the longitude interval to full if the latitude interval includes any of the 2 poles.
         mbr = mbr.polar_closure();
@@ -417,6 +431,34 @@ impl Loop {
             mbr = mbr.expand_to_south_pole();
         }
         mbr
+    }
+
+    /// Return a spherical cap that is cheap to test for overlap (see [`Cap::intersects`]),
+    /// as an alternative to the more expensive, but exact, [`bounding_rectangle`](Self::bounding_rectangle).
+    /// This is an accessor method which performs no calculation (the cap is calculated
+    /// at the creation of this `Loop` since this is a cheap operation).
+    ///
+    /// The returned cap falls back to  [`Cap::FULL`] — which contains every position,
+    /// and is therefore always a safe (if uninformative) answer — in the two situations
+    /// where the cap could otherwise still fail to bound the interior:
+    ///
+    /// - **The vertices are close to symmetric about the sphere's centre** (e.g. evenly spaced
+    ///   around a great circle), so their mean direction is close to the zero vector and no
+    ///   well-defined centre exists. This is exactly the exact-hemisphere-split case the
+    ///   normalisation guarantee above treats as a tie, where "smaller region" isn't meaningfully
+    ///   defined in the first place.
+    /// - **The computed radius would be 90 degrees or more.** Spherical caps are only
+    ///   geodesically convex — guaranteed to contain every point of the minor arc between any two
+    ///   of their own contained points, not just the points themselves — when their radius is
+    ///   under 90 degrees. At or beyond that, an edge between two vertices can bulge outside the
+    ///   cap even though both its endpoints are inside it, so the cap could contain every vertex
+    ///   while still failing to contain the edges between them.
+    ///
+    /// The returned cap is otherwise exact (not merely a heuristic) given the normalisation guarantee
+    /// above: whenever a non-full cap, that cap is a true superset of this loop's entire boundary
+    /// and interior, not just an approximation of one.
+    pub fn bounding_cap(&self) -> Cap {
+        self.bounding_cap
     }
 
     /// Determines whether the **interior** of this loop contains the given position (i.e. excluding positions which are
@@ -445,6 +487,9 @@ impl Loop {
     pub fn contains_position(&self, p: NVector) -> bool {
         match self.insides {
             Some((a, b)) => {
+                if !self.bounding_cap.contains_position(p) {
+                    return false;
+                }
                 if p == a || p == b {
                     return true;
                 }
@@ -572,11 +617,61 @@ impl Loop {
         res
     }
 
-    /// Determines the topological relationship between this loop and `other`.
+    /// Determines the [topological relationship](LoopRelation) between this loop and `other`.
+    ///
+    /// This proceeds in four stages, each cheaper than the next, so the more expensive checks
+    /// are only reached when actually needed:
+    ///
+    /// 1. **Bounding-cap rejection** — if `self.bounding_cap()` and `other.bounding_cap()` don't
+    ///    overlap, the loops can't either; returns [`LoopRelation::Disjoint`] immediately.
+    /// 2. **Vertex-set equivalence** — if the two loops have exactly the same vertices (any
+    ///    starting point, either winding direction — see [`is_equivalent`](Self::is_equivalent)),
+    ///    returns [`LoopRelation::Equal`].
+    /// 3. **Edge-by-edge crossing test** — every edge of `self` is related
+    ///    ([`MinorArc::relate`](crate::spherical::MinorArc::relate)) to every edge of `other`. A
+    ///    single genuine crossing is enough to conclude [`LoopRelation::Intersecting`] and return
+    ///    immediately, without checking the remaining edge pairs — nothing else in this stage
+    ///    could change that verdict. A boundary touch or collinear overlap is recorded but does
+    ///    *not* short-circuit, since it doesn't rule out [`LoopRelation::Containing`]/
+    ///    [`LoopRelation::Within`] on its own.
+    /// 4. **Containment fallback** — reached only when no edges cross: a single point of each
+    ///    loop, known not to lie on the other's boundary, is tested with
+    ///    [`contains_position`](Self::contains_position). That's enough to decide between
+    ///    [`LoopRelation::Containing`], [`LoopRelation::Within`], [`LoopRelation::Touching`] and
+    ///    [`LoopRelation::Disjoint`].
+    ///
+    /// # Performance
+    ///
+    /// Worst-case cost is `O(n * m)` in the number of edges of `self` and `other` (stage 3
+    /// dominates) — calling this repeatedly over many loop pairs, e.g. a spatial join, should
+    /// generally be preceded by a coarser spatial index if the loop count is large.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::{Loop, LoopRelation};
+    ///
+    /// let outer = Loop::new(&[
+    ///     NVector::from_lat_long_degrees(0.0, 0.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 10.0),
+    ///     NVector::from_lat_long_degrees(10.0, 0.0),
+    /// ]);
+    /// let inner = Loop::new(&[
+    ///     NVector::from_lat_long_degrees(4.0, 4.0),
+    ///     NVector::from_lat_long_degrees(4.0, 6.0),
+    ///     NVector::from_lat_long_degrees(6.0, 6.0),
+    ///     NVector::from_lat_long_degrees(6.0, 4.0),
+    /// ]);
+    ///
+    /// assert_eq!(LoopRelation::Contain, outer.relate(&inner));
+    /// assert_eq!(LoopRelation::Within, inner.relate(&outer));
+    /// ```
     pub fn relate(&self, other: &Loop) -> LoopRelation {
-        // Fast rejection: skip all per-edge work entirely if the bounding rectangles don't
+        // Fast rejection: skip all per-edge work entirely if the bounding caps don't
         // even overlap. Cheap, and likely the common case for unrelated loops.
-        if !self.bound().intersects(other.bound()) {
+        if !self.bounding_cap().intersects(other.bounding_cap()) {
             return LoopRelation::Disjoint;
         }
 
@@ -589,10 +684,12 @@ impl Loop {
         for a in &self.edges {
             for b in &other.edges {
                 match a.relate(*b) {
-                    MinorArcRelation::Intersect(_) => {
-                        return LoopRelation::Intersect;
+                    MinorArcRelation::Intersecting(_) => {
+                        return LoopRelation::Intersecting;
                     }
-                    MinorArcRelation::Touch(_) | MinorArcRelation::Overlap(_) => any_touch = true,
+                    MinorArcRelation::Touching(_) | MinorArcRelation::Overlapping(_) => {
+                        any_touch = true;
+                    }
                     MinorArcRelation::Disjoint => {}
                 }
             }
@@ -601,20 +698,15 @@ impl Loop {
         // No edges cross, so containment reduces to a single point-in-loop test per side —
         // but the test vertex must not itself lie on the other loop's boundary, or the
         // contains-position test is ambiguous (it's simultaneously "on" both loops).
-        let self_in_other = self
-            .iter_vertices()
-            .find(|v| !other.has_vertex(**v))
-            .is_some_and(|v| other.contains_position(*v));
-
-        let other_in_self = other
-            .iter_vertices()
-            .find(|v| !self.has_vertex(**v))
-            .is_some_and(|v| self.contains_position(*v));
+        let self_in_other =
+            Self::find_unambiguous_point(self, other).is_some_and(|p| other.contains_position(p));
+        let other_in_self =
+            Self::find_unambiguous_point(other, self).is_some_and(|p| self.contains_position(p));
 
         match (self_in_other, other_in_self, any_touch) {
             (true, false, _) => LoopRelation::Within,
-            (false, true, _) => LoopRelation::Contain,
-            (false, false, true) => LoopRelation::Touch,
+            (false, true, _) => LoopRelation::Containing,
+            (false, false, true) => LoopRelation::Touching,
             (false, false, false) => LoopRelation::Disjoint,
             // A loop can't simultaneously have a vertex strictly inside the other AND vice
             // versa without their edges crossing somewhere -- reaching this would mean a bug
@@ -634,19 +726,20 @@ impl Loop {
     pub fn contains(&self, other: &Loop) -> bool {
         matches!(
             self.relate(other),
-            LoopRelation::Contain | LoopRelation::Equal
+            LoopRelation::Containing | LoopRelation::Equal
         )
     }
 
     /// True if the loops' boundaries touch but their interiors don't overlap.
     pub fn touches(&self, other: &Loop) -> bool {
-        matches!(self.relate(other), LoopRelation::Touch)
+        matches!(self.relate(other), LoopRelation::Touching)
     }
 
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
     ///
-    /// This method returns either ([loop number vertices](crate::spherical::Loop::num_vertices) - 2) triangles - as triples of [`NVector`]s, if
-    /// the triangulation succeeds, or [empty](Vec::new) if the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
+    /// This method returns either:
+    /// - `loop number vertices - 2` triangles - as triples of [`NVector`]s, if the triangulation succeeds, or
+    /// - [empty](Vec::new) if the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
     ///
     /// # Examples
     ///
@@ -724,6 +817,72 @@ impl Loop {
             // spherical excess.
             Angle::from_radians(sum - (n - 2.0) * PI)
         }
+    }
+
+    /// Finds a point of `probe` that does not lie on `reference`'s boundary, so it can be
+    /// tested unambiguously with `contains_position` (which excludes boundary points by
+    /// design -- see its docs). Tries `probe`'s vertices first (no extra computation beyond
+    /// what's already needed), then falls back to edge midpoints for the case where every
+    /// vertex happens to be a T-junction on `reference`'s boundary (e.g. a diamond inscribed
+    /// in a square, touching each side at its midpoint) -- a case `has_vertex` alone cannot
+    /// detect, and even `any_edge_contains_position` alone cannot resolve on its own, since it
+    /// would also exclude every one of those vertices.
+    fn find_unambiguous_point(probe: &Loop, reference: &Loop) -> Option<NVector> {
+        probe
+            .iter_vertices()
+            .copied()
+            .find(|v| !reference.any_edge_contains_position(*v))
+            .or_else(|| {
+                probe.iter_edges().find_map(|e| {
+                    let mid = Sphere::interpolated_position(e.start(), e.end(), 0.5)?;
+                    (!reference.any_edge_contains_position(mid)).then_some(mid)
+                })
+            })
+    }
+
+    /// Calculates the bounding cap.
+    fn calc_bounding_cap(vs: &[NVector]) -> Cap {
+        let mut sum = Vec3::ZERO;
+        for v in vs {
+            sum = sum + v.as_vec3();
+        }
+
+        if eq_zero(sum.squared_norm()) {
+            return Cap::FULL;
+        }
+        let centre = NVector::new(sum.unit());
+
+        let Some(farthest) = vs
+            .iter()
+            .copied()
+            .max_by_key(|v| ChordLength::new(centre, *v))
+        else {
+            return Cap::EMPTY;
+        };
+
+        let cap = Cap::from_centre_and_boundary_position(centre, farthest);
+        if cap.radius() >= Angle::QUARTER_CIRCLE {
+            Cap::FULL
+        } else {
+            cap.expand(Self::bound_expansion())
+        }
+    }
+
+    /// Bounds are expanded by 1e-7 degrees which is about 11.1 millimetres at the equator and
+    /// is the near limit of GPS-based technique - this is to make sure that floating-point
+    /// error introduced when converting `NVector` <-> `LatLong` does not break the bound
+    /// invariant:
+    /// - `loop.contains_position(p)` -> `loop.bounding_rectangle().contains_position(LatLong::from_nvector(p))`
+    /// - `loop.contains_position(p)` -> `loop.bounding_cap().contains_position(p)`
+    fn bound_expansion() -> Angle {
+        Angle::from_degrees(1.0e-7)
+    }
+}
+
+impl PartialEq for Loop {
+    fn eq(&self, other: &Self) -> bool {
+        // Only vertices, other fields are derived from those.
+        self.vertices == other.vertices
     }
 }
 
@@ -1057,7 +1216,7 @@ mod tests {
 
     use crate::{
         Angle, LatLong, Length, NVector, Vec3,
-        spherical::{ChordLength, Loop, LoopRelation, Sphere, is_loop_clockwise},
+        spherical::{ChordLength, Loop, LoopRelation, Rectangle, Sphere, is_loop_clockwise},
     };
 
     fn antananrivo() -> NVector {
@@ -1416,16 +1575,16 @@ mod tests {
         assert!(l.is_simple());
     }
 
-    // bound
+    // bounding_rectangle
 
     #[test]
-    fn bound_expansion() {
+    fn bounding_rectangle_expansion() {
         let vs = vec![
             NVector::from_lat_long_degrees(0.0, 0.0),
             NVector::from_lat_long_degrees(0.0, 10.0),
             NVector::from_lat_long_degrees(5.0, 0.0),
         ];
-        assert_bound(
+        assert_bounding_rectangle(
             &Loop::new(&vs),
             5.0000001,
             10.0000001,
@@ -1435,29 +1594,34 @@ mod tests {
     }
 
     #[test]
-    fn north_pole_cap_bound() {
+    fn north_pole_cap_bounding_rectangle() {
         let vs: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(85.0, 10.0),
             NVector::from_lat_long_degrees(85.0, 170.0),
             NVector::from_lat_long_degrees(85.0, -170.0),
             NVector::from_lat_long_degrees(85.0, -10.0),
         ];
-        assert_bound(&Loop::new(&vs), 90.0, 180.0, 84.9999999, -180.0);
+        assert_bounding_rectangle(&Loop::new(&vs), 90.0, 180.0, 84.9999999, -180.0);
     }
 
     #[test]
-    fn south_pole_cap_bound() {
+    fn south_pole_cap_bounding_rectangle() {
         let vs: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(-85.0, 10.0),
             NVector::from_lat_long_degrees(-85.0, 170.0),
             NVector::from_lat_long_degrees(-85.0, -170.0),
             NVector::from_lat_long_degrees(-85.0, -10.0),
         ];
-        assert_bound(&Loop::new(&vs), -84.9999999, 180.0, -90.0, -180.0);
+        assert_bounding_rectangle(&Loop::new(&vs), -84.9999999, 180.0, -90.0, -180.0);
     }
 
-    fn assert_bound(l: &Loop, north: f64, east: f64, south: f64, west: f64) {
-        let b = l.bound();
+    #[test]
+    fn empty_bounding_rectangle() {
+        assert_eq!(Rectangle::EMPTY, Loop::new(&[]).bounding_rectangle());
+    }
+
+    fn assert_bounding_rectangle(l: &Loop, north: f64, east: f64, south: f64, west: f64) {
+        let b = l.bounding_rectangle();
         let ne: LatLong = b.north_east();
         assert_eq!(north, ne.latitude().as_degrees());
         assert_eq!(east, ne.longitude().as_degrees());
@@ -1633,6 +1797,31 @@ mod tests {
         let one_mas: f64 = 1.0 / 3_600_000_000.0;
         let p = NVector::from_lat_long_degrees(-one_mas, 0.0);
         assert!(!l.contains_position(p));
+    }
+
+    #[test]
+    fn interior_is_always_smaller_regardless_of_vertex_order() {
+        let vs = [
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 1.0),
+            NVector::from_lat_long_degrees(1.0, 1.0),
+            NVector::from_lat_long_degrees(1.0, 0.0),
+        ];
+        let far_side = NVector::from_lat_long_degrees(-1.0, 179.0);
+
+        // Both winding directions of the same vertices, and a rotated starting point, should all
+        // agree on which side is interior -- the whole point of the proof above is that this
+        // doesn't depend on how the vertices were originally given.
+        let forward = Loop::new(&vs);
+        let mut reversed = vs.to_vec();
+        reversed.reverse();
+        let backward = Loop::new(&reversed);
+        let rotated = Loop::new(&[vs[2], vs[3], vs[0], vs[1]]);
+
+        for l in [&forward, &backward, &rotated] {
+            assert!(!l.contains_position(far_side));
+            assert!(l.contains_position(NVector::from_lat_long_degrees(0.5, 0.5))); // small side
+        }
     }
 
     // distance_to_boundary
@@ -1893,7 +2082,7 @@ mod tests {
     fn relate_contains_and_within_are_inverses() {
         let outer = square(0.0, 0.0, 10.0);
         let inner = square(4.0, 4.0, 2.0);
-        assert_eq!(LoopRelation::Contain, outer.relate(&inner));
+        assert_eq!(LoopRelation::Containing, outer.relate(&inner));
         assert_eq!(LoopRelation::Within, inner.relate(&outer));
     }
 
@@ -1901,8 +2090,8 @@ mod tests {
     fn relate_intersects_on_partial_overlap() {
         let a = square(0.0, 0.0, 5.0);
         let b = square(3.0, 3.0, 5.0);
-        assert_eq!(LoopRelation::Intersect, a.relate(&b));
-        assert_eq!(LoopRelation::Intersect, b.relate(&a)); // symmetric
+        assert_eq!(LoopRelation::Intersecting, a.relate(&b));
+        assert_eq!(LoopRelation::Intersecting, b.relate(&a)); // symmetric
     }
 
     /// Two loops sharing exactly one boundary edge, but with disjoint interiors -- exercises
@@ -1911,14 +2100,14 @@ mod tests {
     fn relate_touches_on_shared_edge() {
         let a = square(0.0, 0.0, 5.0);
         let b = square(0.0, 5.0, 5.0); // shares the edge at longitude 5.0
-        assert_eq!(LoopRelation::Touch, a.relate(&b));
+        assert_eq!(LoopRelation::Touching, a.relate(&b));
     }
 
     #[test]
     fn relate_touches_at_a_single_shared_vertex() {
         let a = square(0.0, 0.0, 5.0);
         let b = square(5.0, 5.0, 5.0); // shares only the corner at (5.0, 5.0)
-        assert_eq!(LoopRelation::Touch, a.relate(&b));
+        assert_eq!(LoopRelation::Touching, a.relate(&b));
     }
 
     #[test]
@@ -1941,6 +2130,25 @@ mod tests {
         assert!(outer.contains(&inner));
         assert!(inner.intersects(&outer));
         assert!(!inner.touches(&outer));
+    }
+
+    #[test]
+    fn relate_within_for_diamond_inscribed_in_square() {
+        let other = square(0.0, 0.0, 10.0); // corners (0,0),(0,10),(10,10),(10,0)
+        let inscribed = Loop::new(&[
+            NVector::from_lat_long_degrees(0.0, 5.0), // midpoint of other's bottom edge
+            NVector::from_lat_long_degrees(5.0, 10.0), // midpoint of other's right edge
+            NVector::from_lat_long_degrees(10.0, 5.0), // midpoint of other's top edge
+            NVector::from_lat_long_degrees(5.0, 0.0), // midpoint of other's left edge
+        ]);
+
+        // Geometrically, inscribed's interior is properly nested inside other's -- per
+        // LoopRelation::Within's own doc ("boundaries may also touch"), this should be Within,
+        // not Touch. But every one of inscribed's 4 vertices is a T-junction on one of other's
+        // edges, not matching any of other's own vertices -- so `has_vertex` never excludes any
+        // of them, `contains_position` correctly reports every one as "not contained" (being a
+        // boundary point), and self_in_other comes out false no matter which vertex is checked.
+        assert_eq!(LoopRelation::Within, inscribed.relate(&other));
     }
 
     fn square(lat0: f64, lon0: f64, size: f64) -> Loop {

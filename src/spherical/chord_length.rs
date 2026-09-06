@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::{Angle, NVector};
 
 /// The length of a chord: the length of the straight line segment joining two positions on the unit sphere.
@@ -135,6 +137,23 @@ impl Ord for ChordLength {
             return std::cmp::Ordering::Less;
         }
         std::cmp::Ordering::Greater
+    }
+}
+
+impl Add for ChordLength {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        let a2 = self.length2();
+        let b2 = rhs.length2();
+        if a2 <= 0.0 {
+            return rhs;
+        }
+        if b2 <= 0.0 {
+            return self;
+        }
+        let c = a2.sqrt() + b2.sqrt();
+        ChordLength::from_squared_length((c * c).min(Self::MAX_CHORD_LENGTH_2))
     }
 }
 

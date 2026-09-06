@@ -22,12 +22,12 @@ pub enum MinorArcRelation {
     /// The arcs share no points.
     Disjoint,
     /// The arcs intersect at a single point strictly interior to both arcs.
-    Intersect(NVector),
+    Intersecting(NVector),
     /// The arcs meet at exactly one point that is an endpoint of at least one of them.
-    Touch(NVector),
+    Touching(NVector),
     /// The arcs lie on the same great circle and overlap along a shared sub-arc (more than a
     /// single point).
-    Overlap(MinorArc),
+    Overlapping(MinorArc),
 }
 
 /// result of `triage_on_minor_arc`.
@@ -53,12 +53,12 @@ enum Intersection {
 }
 
 impl Intersection {
-    fn touch(i: Vec3) -> Intersection {
-        Intersection::Some(MinorArcRelation::Touch(NVector::new(i)))
+    fn touching(i: Vec3) -> Intersection {
+        Intersection::Some(MinorArcRelation::Touching(NVector::new(i)))
     }
 
-    fn intersect(i: Vec3) -> Intersection {
-        Intersection::Some(MinorArcRelation::Intersect(NVector::new(i)))
+    fn intersecting(i: Vec3) -> Intersection {
+        Intersection::Some(MinorArcRelation::Intersecting(NVector::new(i)))
     }
 }
 
@@ -177,17 +177,17 @@ impl MinorArc {
     pub fn intersection(&self, other: MinorArc) -> Option<NVector> {
         let i = self.intersection_details(other);
         match i {
-            Intersection::Some(MinorArcRelation::Intersect(nv) | MinorArcRelation::Touch(nv)) => {
-                Some(nv)
-            }
+            Intersection::Some(
+                MinorArcRelation::Intersecting(nv) | MinorArcRelation::Touching(nv),
+            ) => Some(nv),
             _ => None,
         }
     }
 
     /// Determines the [topological relationship](MinorArcRelation) between
-    /// this minor arc and the `other` minor arc.
+    /// this minor arc and `other`.
     ///
-    /// # Exmaples
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, NVector};
@@ -313,7 +313,7 @@ impl MinorArc {
     /// [turn(self.start, self.end, o.start)](crate::spherical::Sphere::turn) but avoids the calculation of the orthogonal
     /// vector to (`self.start`, `self.end`) and (`o.start`, `o.end`).
     ///
-    /// # Exmaples
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, NVector};
@@ -421,11 +421,11 @@ impl MinorArc {
             if self_contains == OnMinorArcLocation::Endpoint
                 || other_contains == OnMinorArcLocation::Endpoint
             {
-                return Intersection::touch(potential);
+                return Intersection::touching(potential);
             }
 
             // neither is outside but both are not endpoint
-            Intersection::intersect(potential)
+            Intersection::intersecting(potential)
         }
     }
 
@@ -434,33 +434,61 @@ impl MinorArc {
     /// since the overlap of two closed intervals always has each boundary point equal to one
     /// of the four original endpoints, testing just those four candidates is sufficient.
     fn relate_collinear(&self, other: MinorArc) -> MinorArcRelation {
-        let mut on_both: Vec<Vec3> = Vec::new();
-        let ref_on_both: &mut Vec<Vec3> = &mut on_both;
-
-        Self::push_if_new_and_within(*self, other.start(), ref_on_both);
-        Self::push_if_new_and_within(*self, other.end(), ref_on_both);
-        Self::push_if_new_and_within(other, self.start(), ref_on_both);
-        Self::push_if_new_and_within(other, self.end(), ref_on_both);
-
-        match on_both.len() {
-            0 => MinorArcRelation::Disjoint,
-            1 => MinorArcRelation::Touch(NVector::new(on_both[0])),
-            _ => {
-                // More than 2 distinct candidates can't actually occur for two straight
-                // (interval) overlaps -- use 2 first elements.
-                MinorArcRelation::Overlap(MinorArc::new(
-                    NVector::new(on_both[0]),
-                    NVector::new(on_both[1]),
-                ))
+        let mut found: [Option<Vec3>; 2] = [None, None];
+        let mut push = |v: Vec3| {
+            if found[0] == Some(v) || found[1] == Some(v) {
+                return;
             }
-        }
-    }
+            if found[0].is_none() {
+                found[0] = Some(v);
+            } else if found[1].is_none() {
+                found[1] = Some(v);
+            }
+            // a third distinct candidate cannot occur for two overlapping intervals; if it
+            // somehow did, it would be silently dropped here rather than panicking.
+        };
 
-    fn push_if_new_and_within(a: MinorArc, p: NVector, vec: &mut Vec<Vec3>) {
-        let v = p.as_vec3();
-        let loc = a.triage_on_minor_arc(v);
-        if loc.is_within() && !vec.contains(&v) {
-            vec.push(v);
+        if self
+            .triage_on_minor_arc(other.start().as_vec3())
+            .is_within()
+        {
+            push(other.start().as_vec3());
+        }
+        if self.triage_on_minor_arc(other.end().as_vec3()).is_within() {
+            push(other.end().as_vec3());
+        }
+        if other
+            .triage_on_minor_arc(self.start().as_vec3())
+            .is_within()
+        {
+            push(self.start().as_vec3());
+        }
+        if other.triage_on_minor_arc(self.end().as_vec3()).is_within() {
+            push(self.end().as_vec3());
+        }
+
+        match (found[0], found[1]) {
+            (None, _) => MinorArcRelation::Disjoint,
+            (Some(p), None) => MinorArcRelation::Touching(NVector::new(p)),
+            (Some(p), Some(q)) => {
+                // Orient the result to match self's own direction, so it doesn't depend on
+                // which of the four checks above happened to fire first: whichever of the two
+                // points is angularly closer to self.start() (larger dot product, since both
+                // lie within self's own span) becomes the start.
+                let self_start = self.start.as_vec3();
+                let (lo, hi) = if p.dot_prod(self_start) >= q.dot_prod(self_start) {
+                    (p, q)
+                } else {
+                    (q, p)
+                };
+                // lo/hi are a sub-arc of self's own great circle in self's own rotational sense,
+                // so they share self's normal exactly -- no need to recompute one via `new()`.
+                MinorArcRelation::Overlapping(MinorArc {
+                    start: NVector::new(lo),
+                    end: NVector::new(hi),
+                    normal: self.normal,
+                })
+            }
         }
     }
 }
@@ -964,7 +992,7 @@ mod tests {
             NVector::from_lat_long_degrees(-36.0, 145.0),
         );
         match arc1.relate(arc2) {
-            MinorArcRelation::Intersect(p) => {
+            MinorArcRelation::Intersecting(p) => {
                 assert_nv_eq_d7(NVector::from_lat_long_degrees(-35.0163245, 144.0), p)
             }
             other => panic!("expected Intersect, got {other:?}"),
@@ -982,7 +1010,7 @@ mod tests {
             NVector::from_lat_long_degrees(-10.0, 20.0),
         );
         match arc1.relate(arc2) {
-            MinorArcRelation::Touch(p) => {
+            MinorArcRelation::Touching(p) => {
                 assert_nv_eq_d7(NVector::from_lat_long_degrees(0.0, 20.0), p)
             }
             other => panic!("expected Touch, got {other:?}"),
@@ -1000,7 +1028,7 @@ mod tests {
             shared,
             NVector::from_lat_long_degrees(-25.857954033055556, 133.75470594055557),
         );
-        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touch(_)));
+        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touching(_)));
     }
 
     #[test]
@@ -1027,7 +1055,7 @@ mod tests {
         );
         assert!(arc.intersection(arc).is_none()); // sanity-check against the existing behaviour
         match arc.relate(arc) {
-            MinorArcRelation::Overlap(shared) => {
+            MinorArcRelation::Overlapping(shared) => {
                 assert_nv_eq_d7(arc.start(), shared.start());
                 assert_nv_eq_d7(arc.end(), shared.end());
             }
@@ -1047,7 +1075,10 @@ mod tests {
             NVector::from_lat_long_degrees(54.0, 154.0),
         );
         assert!(arc1.intersection(arc2).is_none());
-        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Overlap(_)));
+        assert!(matches!(
+            arc1.relate(arc2),
+            MinorArcRelation::Overlapping(_)
+        ));
     }
 
     #[test]
@@ -1061,7 +1092,7 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 15.0),
         );
         match arc1.relate(arc2) {
-            MinorArcRelation::Overlap(shared) => {
+            MinorArcRelation::Overlapping(shared) => {
                 let lo = LatLong::from_nvector(shared.start())
                     .longitude()
                     .as_degrees();
@@ -1083,7 +1114,7 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 10.0),
             NVector::from_lat_long_degrees(0.0, 20.0),
         );
-        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touch(_)));
+        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touching(_)));
     }
 
     #[test]
@@ -1097,5 +1128,24 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 20.0),
         );
         assert_eq!(MinorArcRelation::Disjoint, arc1.relate(arc2));
+    }
+
+    #[test]
+    fn relate_overlap_is_oriented_like_self_even_when_found_points_arrive_reversed() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+            NVector::from_lat_long_degrees(54.0, 154.0),
+        );
+        match arc1.relate(arc2) {
+            MinorArcRelation::Overlapping(shared) => {
+                assert_nv_eq_d7(arc1.start(), shared.start());
+                assert_nv_eq_d7(arc1.end(), shared.end());
+            }
+            other => panic!("expected Overlap, got {other:?}"),
+        }
     }
 }

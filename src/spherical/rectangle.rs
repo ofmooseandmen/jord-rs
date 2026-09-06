@@ -18,7 +18,6 @@ pub struct Rectangle {
 }
 
 // TODO(CL): Examples
-// TODO(CL): (Interior)Intersection
 impl Rectangle {
     /// Empty rectangle: contains no position.
     pub const EMPTY: Rectangle = Self {
@@ -297,8 +296,8 @@ impl Rectangle {
         }
     }
 
-    /// True if and only if this rectangle and the given other rectangle have any points in common,
-    /// including their bounds. If either rectangle has an empty latitude and/or longitude interval this method
+    /// Returns True if and only if this rectangle and the given other rectangle have any points in common,
+    /// including their boundaries. If either rectangle has an empty latitude and/or longitude interval this method
     /// returns False.
     pub fn intersects(&self, o: Self) -> bool {
         self.lat.intersects(o.lat) && self.lng.intersects(o.lng)

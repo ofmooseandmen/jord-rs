@@ -95,22 +95,28 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| black_box(l.contains_position(outside)));
     });
 
-    c.bench_function("Loop::bound_5_vertices", |b: &mut Bencher<'_>| {
-        let vertices: Vec<NVector> = vec![
-            NVector::from_lat_long_degrees(55.605, 13.0038),
-            NVector::from_lat_long_degrees(55.4295, 13.82),
-            NVector::from_lat_long_degrees(56.0294, 14.1567),
-            NVector::from_lat_long_degrees(56.0465, 12.6945),
-            NVector::from_lat_long_degrees(55.7047, 13.191),
-        ];
-        let l = Loop::new(&vertices);
-        b.iter(|| black_box(l.bound()))
-    });
+    c.bench_function(
+        "Loop::bounding_rectangle_5_vertices",
+        |b: &mut Bencher<'_>| {
+            let vertices: Vec<NVector> = vec![
+                NVector::from_lat_long_degrees(55.605, 13.0038),
+                NVector::from_lat_long_degrees(55.4295, 13.82),
+                NVector::from_lat_long_degrees(56.0294, 14.1567),
+                NVector::from_lat_long_degrees(56.0465, 12.6945),
+                NVector::from_lat_long_degrees(55.7047, 13.191),
+            ];
+            let l = Loop::new(&vertices);
+            b.iter(|| black_box(l.bounding_rectangle()))
+        },
+    );
 
-    c.bench_function("Loop::bound_94_vertices", |b: &mut Bencher<'_>| {
-        let l = Loop::new(&vertices_94());
-        b.iter(|| black_box(l.bound()))
-    });
+    c.bench_function(
+        "Loop::bounding_rectangle_94_vertices",
+        |b: &mut Bencher<'_>| {
+            let l = Loop::new(&vertices_94());
+            b.iter(|| black_box(l.bounding_rectangle()))
+        },
+    );
 
     c.bench_function(
         "Loop::distance_to_boundary_94_vertices",
@@ -118,6 +124,19 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let l = Loop::new(&vertices_94());
             let p = NVector::from_lat_long_degrees(0.0, 0.0);
             b.iter(|| black_box(l.distance_to_boundary(p)))
+        },
+    );
+
+    c.bench_function(
+        "Loop::relate_disjoint_94_and_3_vertices",
+        |b: &mut Bencher<'_>| {
+            let l1 = Loop::new(&vertices_94());
+            let l2 = Loop::new(&[
+                NVector::from_lat_long_degrees(54.0, 154.0),
+                NVector::from_lat_long_degrees(54.5, 155.5),
+                NVector::from_lat_long_degrees(55.0, 155.0),
+            ]);
+            b.iter(|| black_box(l1.relate(&l2)))
         },
     );
 }
