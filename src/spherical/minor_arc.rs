@@ -1008,12 +1008,10 @@ mod tests {
             NVector::from_lat_long_degrees(-34.0, 143.0),
             NVector::from_lat_long_degrees(-36.0, 145.0),
         );
-        match arc1.relate(arc2) {
-            MinorArcRelation::Intersecting(p) => {
-                assert_nv_eq_d7(NVector::from_lat_long_degrees(-35.0163245, 144.0), p)
-            }
-            other => panic!("expected Intersect, got {other:?}"),
-        }
+        assert_relation(
+            MinorArcRelation::Intersecting(NVector::from_lat_long_degrees(-35.0163245, 144.0)),
+            arc1.relate(arc2),
+        );
     }
 
     #[test]
@@ -1026,12 +1024,10 @@ mod tests {
             NVector::from_lat_long_degrees(10.0, 20.0),
             NVector::from_lat_long_degrees(-10.0, 20.0),
         );
-        match arc1.relate(arc2) {
-            MinorArcRelation::Touching(p) => {
-                assert_nv_eq_d7(NVector::from_lat_long_degrees(0.0, 20.0), p)
-            }
-            other => panic!("expected Touch, got {other:?}"),
-        }
+        assert_relation(
+            MinorArcRelation::Touching(NVector::from_lat_long_degrees(0.0, 20.0)),
+            arc1.relate(arc2),
+        );
     }
 
     #[test]
@@ -1071,13 +1067,7 @@ mod tests {
             NVector::from_lat_long_degrees(-54.0, 154.0),
         );
         assert!(arc.intersection(arc).is_none()); // sanity-check against the existing behaviour
-        match arc.relate(arc) {
-            MinorArcRelation::Overlapping(shared) => {
-                assert_nv_eq_d7(arc.start(), shared.start());
-                assert_nv_eq_d7(arc.end(), shared.end());
-            }
-            other => panic!("expected Overlap, got {other:?}"),
-        }
+        assert_relation(MinorArcRelation::Overlapping(arc), arc.relate(arc));
     }
 
     /// Same physical arc, reversed -- `intersection_opposite` also reports None for this.
@@ -1108,17 +1098,11 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, 5.0),
             NVector::from_lat_long_degrees(0.0, 15.0),
         );
-        match arc1.relate(arc2) {
-            MinorArcRelation::Overlapping(shared) => {
-                let lo = LatLong::from_nvector(shared.start())
-                    .longitude()
-                    .as_degrees();
-                let hi = LatLong::from_nvector(shared.end()).longitude().as_degrees();
-                assert!((lo.min(hi) - 5.0).abs() < 1e-6);
-                assert!((lo.max(hi) - 10.0).abs() < 1e-6);
-            }
-            other => panic!("expected Overlap, got {other:?}"),
-        }
+        let e_arc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 5.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        assert_relation(MinorArcRelation::Overlapping(e_arc), arc1.relate(arc2));
     }
 
     #[test]
@@ -1157,12 +1141,27 @@ mod tests {
             NVector::from_lat_long_degrees(-54.0, 154.0),
             NVector::from_lat_long_degrees(54.0, 154.0),
         );
-        match arc1.relate(arc2) {
-            MinorArcRelation::Overlapping(shared) => {
-                assert_nv_eq_d7(arc1.start(), shared.start());
-                assert_nv_eq_d7(arc1.end(), shared.end());
+        assert_relation(MinorArcRelation::Overlapping(arc1), arc1.relate(arc2));
+    }
+
+    fn assert_relation(expected: MinorArcRelation, actual: MinorArcRelation) {
+        match (expected, actual) {
+            (MinorArcRelation::Disjoint, MinorArcRelation::Disjoint) => {
+                // passed!
             }
-            other => panic!("expected Overlap, got {other:?}"),
-        }
+            (MinorArcRelation::Intersecting(e), MinorArcRelation::Intersecting(a)) => {
+                assert_nv_eq_d7(e, a);
+            }
+            (MinorArcRelation::Touching(e), MinorArcRelation::Touching(a)) => {
+                assert_nv_eq_d7(e, a);
+            }
+            (MinorArcRelation::Overlapping(e), MinorArcRelation::Overlapping(a)) => {
+                assert_nv_eq_d7(e.start(), a.start());
+                assert_nv_eq_d7(e.end(), a.end());
+            }
+            (e, a) => {
+                panic!("expected {e:?}, got {a:?}");
+            }
+        };
     }
 }

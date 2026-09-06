@@ -2188,6 +2188,23 @@ mod tests {
         assert_eq!(LoopRelation::Within, inscribed.relate(&other));
     }
 
+    #[test]
+    fn relate_disjoint_when_caps_overlap_but_loops_do_not() {
+        // A small 0.1° gap keeps these two squares genuinely disjoint -- no edges touch or
+        // cross, and neither contains a vertex of the other -- while their looser, circular
+        // bounding caps (~1.41° radius each vs. a 2° square) are still close enough to overlap.
+        // relate() must therefore fall all the way through stages 3 and 4 to reach
+        // (false, false, false) => Disjoint, rather than being fast-rejected in stage 1.
+        let a = square(0.0, 0.0, 2.0);
+        let b = square(0.0, 2.1, 2.0);
+
+        assert!(
+            a.bounding_cap().intersects(b.bounding_cap()),
+            "test setup: bounding caps must overlap for this test to exercise the intended branch"
+        );
+        assert_eq!(LoopRelation::Disjoint, a.relate(&b));
+    }
+
     fn square(lat0: f64, lon0: f64, size: f64) -> Loop {
         Loop::new(&[
             NVector::from_lat_long_degrees(lat0, lon0),
