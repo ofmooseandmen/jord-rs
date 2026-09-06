@@ -1,3 +1,6 @@
+### 0.19.0
+- Fixed README
+
 ### 0.18.0
 - Added: MinorArc::relate and Loop::relate
 - Added: Rectangle::intersects

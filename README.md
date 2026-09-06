@@ -43,7 +43,7 @@ or add it to `Cargo.toml` directly:
 
 ```toml
 [dependencies]
-jord = "0.17.0"
+jord = "0.19.0"
 ```
 
 To enable an [optional feature](#cargo-features), e.g. `geo-types`:
