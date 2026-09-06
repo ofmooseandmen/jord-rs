@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use jord::spherical::Sphere;
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use jord::NVector;
+use jord::spherical::Sphere;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Sphere::distance", |b| {

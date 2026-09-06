@@ -1,8 +1,8 @@
 use std::{cmp::Ordering, f64::consts::PI};
 
 use crate::{
-    numbers::{eq_zero, gte, lte},
     Angle, LatLong, Vec3,
+    numbers::{eq_zero, gte, lte},
 };
 
 use super::MinorArc;
@@ -18,7 +18,6 @@ pub struct Rectangle {
 }
 
 // TODO(CL): Examples
-// TODO(CL): (Interior)Intersection
 impl Rectangle {
     /// Empty rectangle: contains no position.
     pub const EMPTY: Rectangle = Self {
@@ -297,6 +296,13 @@ impl Rectangle {
         }
     }
 
+    /// Returns True if and only if this rectangle and the given other rectangle have any points in common,
+    /// including their boundaries. If either rectangle has an empty latitude and/or longitude interval this method
+    /// returns False.
+    pub fn intersects(&self, o: Self) -> bool {
+        self.lat.intersects(o.lat) && self.lng.intersects(o.lng)
+    }
+
     /// Returns the smallest rectangle containing the union of this rectangle and the given rectangle.
     pub fn union(&self, o: Self) -> Self {
         Rectangle {
@@ -424,6 +430,16 @@ impl LatitudeInterval {
         let lo = if self.lo >= o.lo { self.lo } else { o.lo };
         let hi = if self.hi <= o.hi { self.hi } else { o.hi };
         Self { lo, hi }
+    }
+
+    /// True if and only if this latitude interval and the given other latitude interval contain
+    /// any points in common, including their bounds.
+    fn intersects(&self, o: Self) -> bool {
+        if self.lo <= o.lo {
+            o.lo <= self.hi && !o.is_empty()
+        } else {
+            self.lo <= o.hi && !self.is_empty()
+        }
     }
 
     /// Returns the smallest latitude interval that contains this latitude interval and the given latitude
@@ -599,6 +615,25 @@ impl LongitudeInterval {
         self.lo > self.hi
     }
 
+    /// True if and only if this longitude interval and the given other longitude interval
+    /// contain any points in common, including their bounds.
+    /// Note that the longitude `+/- 180` degrees has two representations, so the intervals [-180,-3] and
+    /// [2,180] intersect, for example.
+    fn intersects(&self, o: Self) -> bool {
+        if self.is_empty() || o.is_empty() {
+            return false;
+        }
+        if self.is_inverted() {
+            // Every non-empty inverted interval contains 180 degrees.
+            return o.is_inverted() || o.lo <= self.hi || o.hi >= self.lo;
+        }
+        if o.is_inverted() {
+            o.lo <= self.hi || o.hi >= self.lo
+        } else {
+            o.lo <= self.hi && o.hi >= self.lo
+        }
+    }
+
     /// Returns the smallest longitude interval that contains this longitude interval and the given longitude
     /// interval.
     fn union(&self, o: Self) -> Self {
@@ -659,9 +694,12 @@ impl LongitudeInterval {
 
 #[cfg(test)]
 mod tests {
+
+    #![allow(clippy::pedantic)]
+
     use std::cmp::Ordering;
 
-    use crate::{spherical::MinorArc, Angle, LatLong, NVector};
+    use crate::{Angle, LatLong, NVector, spherical::MinorArc};
 
     use super::Rectangle;
 
@@ -1217,7 +1255,7 @@ mod tests {
         );
         assert_rect_eq_d7(expected, actual);
         for lat in -900..900 {
-            let lat_f = lat as f64;
+            let lat_f = f64::from(lat);
             let p = LatLong::from_degrees(lat_f / 10.0, 0.0);
             if (0..=100).contains(&lat) {
                 assert!(actual.contains_position(p));
@@ -1528,36 +1566,42 @@ mod tests {
             ),
         ];
         let union = Rectangle::from_union(&all);
-        for r in all.iter() {
+        for r in &all {
             assert!(union.contains_rectangle(*r));
         }
     }
 
     #[test]
     fn is_longitude_full() {
-        assert!(Rectangle::from_nesw(
-            Angle::ZERO,
-            Angle::from_degrees(180.0),
-            Angle::ZERO,
-            Angle::from_degrees(-180.0)
-        )
-        .is_longitude_full());
+        assert!(
+            Rectangle::from_nesw(
+                Angle::ZERO,
+                Angle::from_degrees(180.0),
+                Angle::ZERO,
+                Angle::from_degrees(-180.0)
+            )
+            .is_longitude_full()
+        );
 
-        assert!(!Rectangle::from_nesw(
-            Angle::ZERO,
-            Angle::from_degrees(179.0),
-            Angle::ZERO,
-            Angle::from_degrees(-180.0)
-        )
-        .is_longitude_full());
+        assert!(
+            !Rectangle::from_nesw(
+                Angle::ZERO,
+                Angle::from_degrees(179.0),
+                Angle::ZERO,
+                Angle::from_degrees(-180.0)
+            )
+            .is_longitude_full()
+        );
 
-        assert!(!Rectangle::from_nesw(
-            Angle::ZERO,
-            Angle::from_degrees(180.0),
-            Angle::ZERO,
-            Angle::from_degrees(-179.0)
-        )
-        .is_longitude_full());
+        assert!(
+            !Rectangle::from_nesw(
+                Angle::ZERO,
+                Angle::from_degrees(180.0),
+                Angle::ZERO,
+                Angle::from_degrees(-179.0)
+            )
+            .is_longitude_full()
+        );
     }
 
     #[test]
@@ -1742,6 +1786,224 @@ mod tests {
             Angle::from_degrees(180.0),
         );
         assert_eq!(e, expanded);
+    }
+
+    // intersects
+
+    #[test]
+    fn intersects_both_inverted_longitude_intervals() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(2.0),
+            Angle::ZERO,
+            Angle::from_degrees(9.0),
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_disjoint() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::ZERO,
+            Angle::ZERO,
+            Angle::from_degrees(-10.0),
+            Angle::from_degrees(-5.0),
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_disjoint_by_latitude() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::ZERO,
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(-10.0),
+            Angle::ZERO,
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_disjoint_by_longitude() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::ZERO,
+            Angle::ZERO,
+            Angle::from_degrees(-5.0),
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_empty_latitude_interval() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(11.0),
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(10.0),
+            Angle::ZERO,
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_empty_longitude_interval() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(30.0),
+            Angle::from_degrees(-180.0),
+            Angle::ZERO,
+            Angle::from_degrees(180.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(20.0),
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_one_inverted_longitude_interval_disjoint() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(10.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(9.0),
+            Angle::ZERO,
+            Angle::from_degrees(2.0),
+        );
+        assert!(!a.intersects(b));
+        assert!(!b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_one_inverted_longitude_interval_overlapping() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let mut b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(2.0),
+            Angle::ZERO,
+            Angle::from_degrees(9.0),
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+
+        b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::ZERO,
+            Angle::ZERO,
+            Angle::from_degrees(9.0),
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+
+        b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(2.0),
+            Angle::ZERO,
+            Angle::from_degrees(11.0),
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_overlapping() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(9.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_sharing_one_meridian() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(9.0),
+            Angle::from_degrees(1.0),
+            Angle::ZERO,
+            Angle::from_degrees(-1.0),
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
+    }
+
+    #[test]
+    fn intersects_sharing_one_parallel() {
+        let a = Rectangle::from_nesw(
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(10.0),
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Rectangle::from_nesw(
+            Angle::from_degrees(1.0),
+            Angle::from_degrees(9.0),
+            Angle::ZERO,
+            Angle::ZERO,
+        );
+        assert!(a.intersects(b));
+        assert!(b.intersects(a));
     }
 
     fn ll(lat: i64, lng: i64) -> LatLong {

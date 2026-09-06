@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use jord::{spherical::Rectangle, Angle};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use jord::{Angle, spherical::Rectangle};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Rectangle::union_overlapping", |b| {

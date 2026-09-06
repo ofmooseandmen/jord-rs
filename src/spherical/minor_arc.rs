@@ -1,10 +1,14 @@
-use crate::{numbers::eq_zero, spherical::ChordLength, Angle, NVector, Vec3};
+use crate::{
+    Angle, NVector, Vec3,
+    numbers::eq_zero,
+    spherical::{ChordLength, Side},
+};
 
 use super::base::{angle_radians_between, side};
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct MinorArc {
     start: NVector,
@@ -12,11 +16,57 @@ pub struct MinorArc {
     normal: Vec3,
 }
 
+/// The topological relationship between two [`MinorArc`]s.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MinorArcRelation {
+    /// The arcs share no points.
+    Disjoint,
+    /// The arcs intersect at a single point strictly interior to both arcs.
+    Intersecting(NVector),
+    /// The arcs meet at exactly one point that is an endpoint of at least one of them.
+    Touching(NVector),
+    /// The arcs lie on the same great circle and overlap along a shared sub-arc (more than a
+    /// single point).
+    Overlapping(MinorArc),
+}
+
+/// result of `triage_on_minor_arc`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum OnMinorArcLocation {
+    Endpoint,
+    Interior,
+    Exterior,
+}
+
+impl OnMinorArcLocation {
+    fn is_within(self) -> bool {
+        self != OnMinorArcLocation::Exterior
+    }
+}
+
+/// result of `intersection_details`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Intersection {
+    Some(MinorArcRelation),
+    None,
+    Collinear,
+}
+
+impl Intersection {
+    fn touching(i: Vec3) -> Intersection {
+        Intersection::Some(MinorArcRelation::Touching(NVector::new(i)))
+    }
+
+    fn intersecting(i: Vec3) -> Intersection {
+        Intersection::Some(MinorArcRelation::Intersecting(NVector::new(i)))
+    }
+}
+
 impl MinorArc {
     /// Creates a new minor arc from the given start and end positions.
     ///
-    /// Note: if both start and end positions are equal or the antipode of one another, then an
-    /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
+    /// Note: an arbitrary minor arc is returned if both start and end positions are equal
+    /// or the antipode of one another: in this case an infinity of minor arcs exist - see [`is_great_cirle`](crate::spherical::Sphere::is_great_circle).
     pub fn new(start: NVector, end: NVector) -> Self {
         let normal = start.as_vec3().orthogonal_to(end.as_vec3());
         MinorArc { start, end, normal }
@@ -97,7 +147,7 @@ impl MinorArc {
         }
 
         let proj = self.normal.orthogonal_to(n2);
-        if self.contains_vec3(proj) {
+        if self.triage_on_minor_arc(proj).is_within() {
             // p is "within" this edge, return the distance between p and the projection.
             return ChordLength::new(p, NVector::new(proj));
         }
@@ -125,28 +175,49 @@ impl MinorArc {
     /// assert_eq!(i, Some(LatLong::from_degrees(0.0, 0.0).to_nvector()));
     /// ```
     pub fn intersection(&self, other: MinorArc) -> Option<NVector> {
-        let i = self.normal.stable_cross_prod_unit(other.normal);
-        if i == Vec3::ZERO {
-            // equal or opposite minor arcs: no intersection
-            None
-        } else {
-            // select nearest intersection to start of first minor arc.
-            let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
-                i
-            } else {
-                // antipode of i.
-                -i
-            };
-
-            if self.contains_vec3(potential) && other.contains_vec3(potential) {
-                Some(NVector::new(potential))
-            } else {
-                None
-            }
+        let i = self.intersection_details(other);
+        match i {
+            Intersection::Some(
+                MinorArcRelation::Intersecting(nv) | MinorArcRelation::Touching(nv),
+            ) => Some(nv),
+            _ => None,
         }
     }
 
-    /// Computes the projection of the given position on this minor arc. Returns [None] if the projection is not
+    /// Determines the [topological relationship](MinorArcRelation) between
+    /// this minor arc and `other`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::{Angle, NVector};
+    /// use jord::spherical::{MinorArc, MinorArcRelation};
+    ///
+    /// let ma1 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -10.0),
+    ///     NVector::from_lat_long_degrees(0.0, 5.0)
+    /// );
+    /// let ma2 = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -5.0),
+    ///     NVector::from_lat_long_degrees(0.0, 10.0)
+    /// );
+    ///
+    /// let o = MinorArc::new(
+    ///     NVector::from_lat_long_degrees(0.0, -5.0),
+    ///     NVector::from_lat_long_degrees(0.0, 5.0)
+    /// );
+    /// assert_eq!(MinorArcRelation::Overlapping(o), ma1.relate(ma2));
+    /// ```
+    pub fn relate(&self, other: MinorArc) -> MinorArcRelation {
+        let i = self.intersection_details(other);
+        match i {
+            Intersection::Collinear => self.relate_collinear(other),
+            Intersection::Some(r) => r,
+            Intersection::None => MinorArcRelation::Disjoint,
+        }
+    }
+
+    /// Computes the projection of the given position on this minor arc. Returns [`None`] if the projection is not
     /// within the minor arc (including start and end). If the given position is strictly "perpendicular" to this
     /// minor arc, this method arbitrarily returns the start (p can be projected anywhere on the minor arc).
     ///
@@ -172,7 +243,7 @@ impl MinorArc {
             Some(self.start)
         } else {
             let proj = n1.orthogonal_to(n2);
-            if self.contains_vec3(proj) {
+            if self.triage_on_minor_arc(proj).is_within() {
                 Some(NVector::new(proj))
             } else {
                 None
@@ -198,13 +269,12 @@ impl MinorArc {
     /// ```
     pub fn contains_position(&self, p: NVector) -> bool {
         let v = p.as_vec3();
-        eq_zero(v.dot_prod(self.normal)) && self.contains_vec3(v)
+        eq_zero(v.dot_prod(self.normal)) && self.triage_on_minor_arc(v).is_within()
     }
 
-    /// Determines whether p if right of (negative integer), left of (positive integer) or on this
-    /// minor arc (zero).
+    /// Determines whether p if right of, left of or on this minor arc.
     ///
-    /// This is similar to [side(p, self.start, self.end)](crate::spherical::Sphere::side) but avoids the calculation of the orthogonal
+    /// This is similar to [`side(p, self.start, self.end)`](crate::spherical::Sphere::side) but avoids the calculation of the orthogonal
     /// vector to (`self.start`, `self.end`).
     ///
     /// # Examples
@@ -243,7 +313,7 @@ impl MinorArc {
     /// [turn(self.start, self.end, o.start)](crate::spherical::Sphere::turn) but avoids the calculation of the orthogonal
     /// vector to (`self.start`, `self.end`) and (`o.start`, `o.end`).
     ///
-    /// # Exmaples
+    /// # Examples
     ///
     /// ```
     /// use jord::{Angle, NVector};
@@ -298,26 +368,161 @@ impl MinorArc {
         }
     }
 
-    /// Determines whether this minor arc contains the given point which is assumed to be on the great circle.
-    fn contains_vec3(&self, v: Vec3) -> bool {
+    /// Determines whether the given point which is on the great circle of the
+    /// given minor arc, is an interior point of arc, an end point or outside.
+    fn triage_on_minor_arc(&self, v: Vec3) -> OnMinorArcLocation {
         // v is left of (normal, start)
         // and
         // v is right of (normal, end)
         let start = self.start.as_vec3();
         let end = self.end.as_vec3();
         let n = self.normal;
-        side(v, n, start) >= 0 && side(end, n, v) >= 0
+        let s_start = side(v, n, start);
+        if s_start == Side::Right {
+            return OnMinorArcLocation::Exterior;
+        }
+
+        let s_end = side(v, n, end);
+        if s_end == Side::Left {
+            return OnMinorArcLocation::Exterior;
+        }
+
+        if s_start == Side::Left && s_end == Side::Right {
+            OnMinorArcLocation::Interior
+        } else {
+            OnMinorArcLocation::Endpoint
+        }
+    }
+
+    fn intersection_details(&self, other: MinorArc) -> Intersection {
+        let i = self.normal.stable_cross_prod_unit(other.normal);
+        if i == Vec3::ZERO {
+            // collinear minor arcs: no intersection
+            Intersection::Collinear
+        } else {
+            // select nearest intersection to start of first minor arc.
+            let potential = if self.start.as_vec3().dot_prod(i) > 0.0 {
+                i
+            } else {
+                // antipode of i.
+                -i
+            };
+
+            let self_contains = self.triage_on_minor_arc(potential);
+            if self_contains == OnMinorArcLocation::Exterior {
+                return Intersection::None;
+            }
+
+            let other_contains = other.triage_on_minor_arc(potential);
+            if other_contains == OnMinorArcLocation::Exterior {
+                return Intersection::None;
+            }
+
+            if self_contains == OnMinorArcLocation::Endpoint
+                || other_contains == OnMinorArcLocation::Endpoint
+            {
+                return Intersection::touching(potential);
+            }
+
+            // neither is outside but both are not endpoint
+            Intersection::intersecting(potential)
+        }
+    }
+
+    /// Handles the case where `self` and `other` lie on the same great circle, by reducing to
+    /// interval overlap: a point is part of the shared overlap iff it lies on *both* arcs, and
+    /// since the overlap of two closed intervals always has each boundary point equal to one
+    /// of the four original endpoints, testing just those four candidates is sufficient.
+    fn relate_collinear(&self, other: MinorArc) -> MinorArcRelation {
+        let mut found: [Option<Vec3>; 2] = [None, None];
+        let mut push = |v: Vec3| {
+            if found[0] == Some(v) || found[1] == Some(v) {
+                return;
+            }
+            if found[0].is_none() {
+                found[0] = Some(v);
+            } else if found[1].is_none() {
+                found[1] = Some(v);
+            }
+            // a third distinct candidate cannot occur for two overlapping intervals; if it
+            // somehow did, it would be silently dropped here rather than panicking.
+        };
+
+        if self
+            .triage_on_minor_arc(other.start().as_vec3())
+            .is_within()
+        {
+            push(other.start().as_vec3());
+        }
+        if self.triage_on_minor_arc(other.end().as_vec3()).is_within() {
+            push(other.end().as_vec3());
+        }
+        if other
+            .triage_on_minor_arc(self.start().as_vec3())
+            .is_within()
+        {
+            push(self.start().as_vec3());
+        }
+        if other.triage_on_minor_arc(self.end().as_vec3()).is_within() {
+            push(self.end().as_vec3());
+        }
+
+        match (found[0], found[1]) {
+            (None, _) => MinorArcRelation::Disjoint,
+            (Some(p), None) => MinorArcRelation::Touching(NVector::new(p)),
+            (Some(p), Some(q)) => {
+                // Orient the result to match self's own direction, so it doesn't depend on
+                // which of the four checks above happened to fire first: whichever of the two
+                // points is angularly closer to self.start() (larger dot product, since both
+                // lie within self's own span) becomes the start.
+                let self_start = self.start.as_vec3();
+                let (lo, hi) = if p.dot_prod(self_start) >= q.dot_prod(self_start) {
+                    (p, q)
+                } else {
+                    (q, p)
+                };
+                // lo/hi are a sub-arc of self's own great circle in self's own rotational sense,
+                // so they share self's normal exactly -- no need to recompute one via `new()`.
+                MinorArcRelation::Overlapping(MinorArc {
+                    start: NVector::new(lo),
+                    end: NVector::new(hi),
+                    normal: self.normal,
+                })
+            }
+        }
+    }
+}
+
+impl PartialEq for MinorArc {
+    fn eq(&self, other: &Self) -> bool {
+        // no need to test normal as it is derived from start/end.
+        self.start == other.start && self.end == other.end
     }
 }
 
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use crate::{
-        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
-        spherical::{ChordLength, GreatCircle, MinorArc, Sphere},
         Angle, LatLong, Length, NVector, Vec3,
+        positions::{assert_nv_eq_d7, assert_opt_nv_eq_d7},
+        spherical::{
+            ChordLength, GreatCircle, MinorArc, MinorArcRelation, Side, Sphere, base::side,
+            minor_arc::OnMinorArcLocation,
+        },
     };
+
+    #[test]
+    fn partial_eq() {
+        let start = NVector::from_lat_long_degrees(154.0, 54.0);
+        let end = NVector::from_lat_long_degrees(155.0, 55.0);
+        let end2 = NVector::from_lat_long_degrees(156.0, 56.0);
+        assert_eq!(MinorArc::new(start, end), MinorArc::new(start, end));
+        assert_ne!(MinorArc::new(start, end), MinorArc::new(end, start));
+        assert_ne!(MinorArc::new(start, end), MinorArc::new(start, end2));
+    }
 
     // distance_to
     #[test]
@@ -680,8 +885,8 @@ mod tests {
         assert_nv_eq_d7(expected, i);
 
         // intersection is on both minor arc
-        assert_eq!(0, Sphere::side(i, arc1.start(), arc1.end()));
-        assert_eq!(0, Sphere::side(i, arc2.start(), arc2.end()));
+        assert_eq!(Side::Collinear, Sphere::side(i, arc1.start(), arc1.end()));
+        assert_eq!(Side::Collinear, Sphere::side(i, arc2.start(), arc2.end()));
     }
 
     // projection
@@ -768,5 +973,208 @@ mod tests {
             NVector::from_lat_long_degrees(90.0, 0.0),
             MinorArc::new(start, end).projection(NVector::from_lat_long_degrees(0.0, 0.0)),
         );
+    }
+
+    #[test]
+    fn triage_on_minor_arc_start_or_end() {
+        let start = NVector::from_lat_long_degrees(54.0, 154.0);
+        let end = NVector::from_lat_long_degrees(54.1, 154.1);
+        let a = MinorArc::new(start, end);
+        assert_eq!(
+            OnMinorArcLocation::Endpoint,
+            a.triage_on_minor_arc(start.as_vec3())
+        );
+        assert_eq!(
+            OnMinorArcLocation::Endpoint,
+            a.triage_on_minor_arc(end.as_vec3())
+        );
+        assert_eq!(
+            Side::Collinear,
+            side(start.as_vec3(), a.normal(), start.as_vec3())
+        );
+        assert_eq!(
+            Side::Collinear,
+            side(end.as_vec3(), a.normal(), end.as_vec3())
+        );
+    }
+
+    #[test]
+    fn relate_disjoint() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 5.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(55.0, 155.0),
+        );
+        assert_relation(MinorArcRelation::Disjoint, arc1.relate(arc2));
+    }
+
+    #[test]
+    fn relate_intersect_reuses_intersection_nominal_case() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(-36.0, 143.0),
+            NVector::from_lat_long_degrees(-34.0, 145.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(-34.0, 143.0),
+            NVector::from_lat_long_degrees(-36.0, 145.0),
+        );
+        assert_relation(
+            MinorArcRelation::Intersecting(NVector::from_lat_long_degrees(-35.0163245, 144.0)),
+            arc1.relate(arc2),
+        );
+    }
+
+    #[test]
+    fn relate_touch_reuses_intersection_at_end_case() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 20.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(10.0, 20.0),
+            NVector::from_lat_long_degrees(-10.0, 20.0),
+        );
+        assert_relation(
+            MinorArcRelation::Touching(NVector::from_lat_long_degrees(0.0, 20.0)),
+            arc1.relate(arc2),
+        );
+    }
+
+    #[test]
+    fn relate_touch_reuses_intersection_at_shared_case() {
+        let shared = NVector::from_lat_long_degrees(-25.0, 130.0);
+        let arc1 = MinorArc::new(
+            shared,
+            NVector::from_lat_long_degrees(-24.950243870277777, 133.85817408527777),
+        );
+        let arc2 = MinorArc::new(
+            shared,
+            NVector::from_lat_long_degrees(-25.857954033055556, 133.75470594055557),
+        );
+        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touching(_)));
+    }
+
+    #[test]
+    fn relate_disjoint_reuses_no_intersection_case() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(45.0, 0.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 90.0),
+            NVector::from_lat_long_degrees(45.0, 90.0),
+        );
+        assert_eq!(MinorArcRelation::Disjoint, arc1.relate(arc2));
+    }
+
+    /// Where `relate` genuinely goes beyond `intersection`: an arc related to itself is
+    /// obviously a complete overlap, whereas `intersection` reports it as no intersection at
+    /// all (see `intersection_eq`).
+    #[test]
+    fn relate_overlap_where_intersection_reports_none_for_identical_arc() {
+        let arc = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        assert!(arc.intersection(arc).is_none()); // sanity-check against the existing behaviour
+        assert_relation(MinorArcRelation::Overlapping(arc), arc.relate(arc));
+    }
+
+    /// Same physical arc, reversed -- `intersection_opposite` also reports None for this.
+    #[test]
+    fn relate_overlap_where_intersection_reports_none_for_reversed_arc() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+            NVector::from_lat_long_degrees(54.0, 154.0),
+        );
+        assert!(arc1.intersection(arc2).is_none());
+        assert!(matches!(
+            arc1.relate(arc2),
+            MinorArcRelation::Overlapping(_)
+        ));
+    }
+
+    #[test]
+    fn relate_overlap_for_partial_collinear_overlap() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 5.0),
+            NVector::from_lat_long_degrees(0.0, 15.0),
+        );
+        let e_arc = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 5.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        assert_relation(MinorArcRelation::Overlapping(e_arc), arc1.relate(arc2));
+    }
+
+    #[test]
+    fn relate_touch_for_collinear_arcs_sharing_one_endpoint() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 10.0),
+            NVector::from_lat_long_degrees(0.0, 20.0),
+        );
+        assert!(matches!(arc1.relate(arc2), MinorArcRelation::Touching(_)));
+    }
+
+    #[test]
+    fn relate_disjoint_for_collinear_but_disjoint_arcs() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 10.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 15.0),
+            NVector::from_lat_long_degrees(0.0, 20.0),
+        );
+        assert_eq!(MinorArcRelation::Disjoint, arc1.relate(arc2));
+    }
+
+    #[test]
+    fn relate_overlap_is_oriented_like_self_even_when_found_points_arrive_reversed() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(-54.0, 154.0),
+            NVector::from_lat_long_degrees(54.0, 154.0),
+        );
+        assert_relation(MinorArcRelation::Overlapping(arc1), arc1.relate(arc2));
+    }
+
+    fn assert_relation(expected: MinorArcRelation, actual: MinorArcRelation) {
+        match (expected, actual) {
+            (MinorArcRelation::Disjoint, MinorArcRelation::Disjoint) => {
+                // passed!
+            }
+            (MinorArcRelation::Intersecting(e), MinorArcRelation::Intersecting(a)) => {
+                assert_nv_eq_d7(e, a);
+            }
+            (MinorArcRelation::Touching(e), MinorArcRelation::Touching(a)) => {
+                assert_nv_eq_d7(e, a);
+            }
+            (MinorArcRelation::Overlapping(e), MinorArcRelation::Overlapping(a)) => {
+                assert_nv_eq_d7(e.start(), a.start());
+                assert_nv_eq_d7(e.end(), a.end());
+            }
+            (e, a) => {
+                panic!("expected {e:?}, got {a:?}");
+            }
+        };
     }
 }

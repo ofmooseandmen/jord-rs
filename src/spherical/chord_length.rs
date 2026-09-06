@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::{Angle, NVector};
 
 /// The length of a chord: the length of the straight line segment joining two positions on the unit sphere.
@@ -44,7 +46,7 @@ impl ChordLength {
     };
 
     #[inline]
-    pub(crate) fn length2(&self) -> f64 {
+    pub(crate) fn length2(self) -> f64 {
         self.length2
     }
 
@@ -138,11 +140,28 @@ impl Ord for ChordLength {
     }
 }
 
+impl Add for ChordLength {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        let a2 = self.length2();
+        let b2 = rhs.length2();
+        if a2 <= 0.0 {
+            return rhs;
+        }
+        if b2 <= 0.0 {
+            return self;
+        }
+        let c = a2.sqrt() + b2.sqrt();
+        ChordLength::from_squared_length((c * c).min(Self::MAX_CHORD_LENGTH_2))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Neg;
 
-    use crate::{spherical::ChordLength, Angle, NVector};
+    use crate::{Angle, NVector, spherical::ChordLength};
 
     #[test]
     fn from_pos() {
@@ -213,5 +232,15 @@ mod tests {
             ::std::cmp::Ordering::Greater,
             ChordLength::from_angle(b).cmp(&ChordLength::from_angle(a))
         );
+    }
+
+    #[test]
+    fn add() {
+        let a = ChordLength::from_squared_length(1.0);
+        assert_eq!(a, a + ChordLength::NEGATIVE);
+        assert_eq!(a, a + ChordLength::ZERO);
+        assert_eq!(a, ChordLength::NEGATIVE + a);
+        assert_eq!(a, ChordLength::ZERO + a);
+        assert_eq!(ChordLength::from_squared_length(4.0), a + a);
     }
 }

@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use crate::{Angle, LatLong, Mat33, NVector, Vec3};
+use crate::{Angle, LatLong, Mat33, NVector, Vec3, spherical::Side};
 
 use super::{ChordLength, Sphere};
 
@@ -49,7 +49,7 @@ impl Cap {
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
         // 3 positions must be in anti-clockwise order
-        let clockwise = Sphere::side(a, b, c) < 0;
+        let clockwise = Sphere::side(a, b, c) == Side::Right;
         let v1 = a.as_vec3();
         let v2 = if clockwise { c.as_vec3() } else { b.as_vec3() };
         let v3 = if clockwise { b.as_vec3() } else { c.as_vec3() };
@@ -154,9 +154,18 @@ impl Cap {
         if self.is_full() || other.is_empty() {
             true
         } else {
-            self.radius.length2()
-                >= ChordLength::new(self.centre, other.centre).length2() + other.radius.length2()
+            self.radius >= ChordLength::new(self.centre, other.centre) + other.radius
         }
+    }
+
+    /// Return true if and only if this cap intersects the given other cap,
+    /// i.e. whether they have any points in common. If either cap is empty, this
+    /// method returns false.
+    pub fn intersects(&self, other: Self) -> bool {
+        if self.is_empty() || other.is_empty() {
+            return false;
+        }
+        self.radius + other.radius >= ChordLength::new(self.centre, other.centre)
     }
 
     /// Returns the smallest cap which encloses this cap and the other given cap.
@@ -183,6 +192,18 @@ impl Cap {
         }
     }
 
+    /// Return a cap that contains all points within a given distance of this
+    /// cap. Note that any expansion of the empty cap is still empty.
+    pub fn expand(&self, distance: Angle) -> Self {
+        if self.is_empty() {
+            return Cap::EMPTY;
+        }
+        Cap {
+            centre: self.centre,
+            radius: self.radius + ChordLength::from_angle(distance),
+        }
+    }
+
     /// Returns the centre of this cap.
     pub fn centre(&self) -> NVector {
         self.centre
@@ -190,8 +211,7 @@ impl Cap {
 
     /// Returns the radius of this cap: central angle between the centre of this cap and
     /// any position on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
-    /// The returned value may not exactly equal the value passed
-    /// to [from_centre_and_boundary_position](crate::spherical::Cap::from_centre_and_boundary_position).
+    /// The returned value may not exactly equal the value passed to [`from_centre_and_boundary_position`](crate::spherical::Cap::from_centre_and_boundary_position).
     ///
     /// # Examples
     ///
@@ -285,7 +305,11 @@ impl Cap {
 
 #[cfg(test)]
 mod tests {
-    use crate::{positions::assert_nv_eq_d7, spherical::Cap, Angle, LatLong, NVector};
+    use crate::{
+        Angle, LatLong, NVector,
+        positions::assert_nv_eq_d7,
+        spherical::{Cap, Sphere},
+    };
     use std::f64::consts::PI;
 
     #[test]
@@ -370,6 +394,56 @@ mod tests {
         );
         assert!(!c.contains_cap(o));
         assert!(o.contains_cap(c));
+    }
+
+    #[test]
+    fn does_not_contains_cap() {
+        let c = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(90.0),
+        );
+        let o = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(50.0, 0.0),
+            Angle::from_degrees(45.0),
+        );
+        // centre distance 50° + other's radius 45° = 95° > self's radius 90°, so self should
+        // NOT contain other -- other's farthest point sits outside self's boundary.
+        assert!(!c.contains_cap(o));
+    }
+
+    #[test]
+    fn intersects() {
+        let centre1 = NVector::from_lat_long_degrees(30.0, 30.0);
+        let cap1 = Cap::from_centre_and_radius(centre1, Angle::from_degrees(10.0));
+        assert!(!cap1.intersects(Cap::EMPTY));
+        assert!(!Cap::EMPTY.intersects(cap1));
+        assert!(Cap::FULL.intersects(cap1));
+        assert!(cap1.intersects(Cap::FULL));
+
+        let centre2 = NVector::from_lat_long_degrees(40.0, 40.0);
+        let cap2 =
+            Cap::from_centre_and_radius(centre2, Sphere::angle(centre1, centre2) - cap1.radius());
+        assert!(cap1.intersects(cap2));
+        assert!(cap2.intersects(cap1));
+
+        let cap3 = Cap::from_centre_and_radius(
+            centre2,
+            Sphere::angle(centre1, centre2) - cap1.radius() - Angle::from_degrees(0.1),
+        );
+        assert!(!cap1.intersects(cap3));
+        assert!(!cap3.intersects(cap1));
+    }
+
+    #[test]
+    fn expand() {
+        assert_eq!(Cap::EMPTY, Cap::EMPTY.expand(Angle::from_degrees(1.0)));
+        let c = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(1.0),
+        );
+        assert!(!c.contains_position(NVector::from_lat_long_degrees(0.0, 1.5)));
+        let e = c.expand(Angle::from_degrees(1.0));
+        assert!(e.contains_position(NVector::from_lat_long_degrees(0.0, 1.5)));
     }
 
     #[test]

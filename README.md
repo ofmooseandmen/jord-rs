@@ -21,7 +21,7 @@ Earth* (geodesic/great-circle math, not straight-edge planar math), and
 provides optional interop with `geo-types`/`geo-traits` for the pieces that
 do overlap.
 
-For ellipsoidal geodesic distance/bearing (Vincenty/Karney), see [geographiclib-rs](https://github.com/georust/geographiclib-rs) (pure Rust) or [geographiclib](https://github.com/savage13/geographiclib) (C++ bindings, faster) - jord's GeodeticPosition converts to their plain lat/lon/metres inputs via `.latitude().as_degrees()` etc...
+For ellipsoidal geodesic distance/bearing (Vincenty/Karney), see [geographiclib-rs](https://github.com/georust/geographiclib-rs) (pure Rust) or [geographiclib](https://github.com/savage13/geographiclib) (C++ bindings, faster) - jord's `GeodeticPosition` converts to their plain lat/lon/metres inputs via `.latitude().as_degrees()` etc...
 
 ## Table of contents
 
@@ -63,13 +63,13 @@ cargo add jord --features geo-types
   - Delta between two positions, destination position from a reference position and a delta.
   - Frame transformation (translation and/or rotation).
 - [Great circle](https://en.wikipedia.org/wiki/Great_circle) ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)) navigation:
-  surface distance, initial & final bearing, interpolated position,
+  surface distance, initial & final bearing, interpolated position, mean position,
   [minor arc](https://docs.rs/jord/latest/jord/spherical/struct.MinorArc.html) intersection,
-  cross track distance, angle turned, side of position, ...
+  cross track distance, angle turned, side of position, projection on minor arc & great circle, ...
 - Kinematics ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)):
   closest point of approach between tracks, minimum speed for intercept, time to intercept.
 - [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygons"):
-  convex/concave, clockwise/anti-clockwise, contains position,
+  convex/concave, clockwise/anti-clockwise, contains position, spherical excess, topological relationship,
   [minimum bounding rectangle](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html),
   triangulation, spherical excess, ...
 - [Spherical Cap](https://docs.rs/jord/latest/jord/spherical/struct.Cap.html)s and

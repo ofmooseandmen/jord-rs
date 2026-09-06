@@ -2,12 +2,12 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::{
+    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
     local::{
-        orientation::align_to_z_down_matrix, Body, Enu, FrameOrientation, LocalNavigationFrame,
-        LocalVector, Ned, WanderAzimuth,
+        Body, Enu, FrameOrientation, LocalNavigationFrame, LocalVector, Ned, WanderAzimuth,
+        orientation::align_to_z_down_matrix,
     },
     surface::Surface,
-    Angle, GeocentricPosition, GeodeticPosition, LatLong, Mat33, PositionVector, Vec3,
 };
 
 /// A 3D local Cartesian coordinate frame anchored at a reference origin on or relative
@@ -41,7 +41,7 @@ pub struct LocalFrame<O: FrameOrientation> {
 /// - the z-axis points away from the interior of the earth
 /// - the x-axis completes the right-handed system pointing east
 ///
-/// See note in [NedFrame] for suitability.
+/// See note in [`NedFrame`] for suitability.
 pub type EnuFrame = LocalFrame<Enu>;
 
 impl EnuFrame {
@@ -298,9 +298,9 @@ impl WanderAzimuthFrame {
 impl<O: LocalNavigationFrame> LocalFrame<O> {
     /// Rotates this local navigation frame around the local vertical axis by the specified
     /// angle (clockwise from North toward East following the right-hand rule around Z-down),
-    /// yielding a Z-down [WanderAzimuthFrame].
+    /// yielding a Z-down [`WanderAzimuthFrame`].
     ///
-    /// If called on a Z-up frame like [EnuFrame], the frame axes are first aligned to Z-down
+    /// If called on a Z-up frame like [`EnuFrame`], the frame axes are first aligned to Z-down
     /// prior to applying the vertical rotation.
     ///
     /// # Examples
@@ -317,13 +317,38 @@ impl<O: LocalNavigationFrame> LocalFrame<O> {
     /// ```
     pub fn rotate_around_z(&self, angle: Angle) -> WanderAzimuthFrame {
         let rot_z = zyx2r(angle, Angle::ZERO, Angle::ZERO);
-        let dir_rm = self.rotate(self.dir_rm, rot_z);
+        let dir_rm = Self::rotate(self.dir_rm, rot_z);
         LocalFrame {
             origin: self.origin,
             dir_rm,
             inv_rm: dir_rm.transpose(),
             _o: PhantomData,
         }
+    }
+
+    /// Returns the 3x3 direction matrix describing the orientation of this frame relative
+    /// to the Earth-centred frame.
+    ///
+    /// This allows to resolve a free vector decomposed in this frame's axes into the
+    /// Earth-centred frame: `v_earth = v_local * frame.local_to_earth_matrix()`.
+    pub fn local_to_earth_matrix(&self) -> Mat33 {
+        self.dir_rm
+    }
+
+    /// Returns the 3x3 direction matrix describing the orientation of the Earth-centred
+    /// frame relative to this frame.
+    ///
+    /// This allows to resolve a free vector decomposed in the Earth-centred frame
+    /// (e.g. a velocity, force, or angular rate — any quantity with a direction
+    /// and magnitude but no associated origin, unlike a position) into this frame's
+    /// axes: `v_local = v_earth * frame.earth_to_local_matrix()`.
+    pub fn earth_to_local_matrix(&self) -> Mat33 {
+        self.inv_rm
+    }
+
+    /// Returns the origin of this frame.
+    pub fn origin(&self) -> GeocentricPosition {
+        GeocentricPosition::from_vec3_metres(self.origin)
     }
 }
 
@@ -366,7 +391,7 @@ where
         let global_translation = offset.as_metres() * self.dir_rm;
         let new_origin = self.origin + global_translation;
         let r_delta = zyx2r(yaw, pitch, roll);
-        let dir_rm = self.rotate(self.dir_rm, r_delta);
+        let dir_rm = Self::rotate(self.dir_rm, r_delta);
         LocalFrame {
             origin: new_origin,
             dir_rm,
@@ -394,7 +419,7 @@ where
     }
 
     /// m1 * m2 aligning to z-down if required.
-    fn rotate(&self, m1: Mat33, m2: Mat33) -> Mat33 {
+    fn rotate(m1: Mat33, m2: Mat33) -> Mat33 {
         if O::is_z_up() {
             m1 * m2 * align_to_z_down_matrix()
         } else {
@@ -466,7 +491,7 @@ pub fn r2zyx(m: Mat33) -> (Angle, Angle, Angle) {
 /// that the relation between a vector v decomposed in A and B is given by:
 /// `v_A = R_AB * v_B`
 ///
-/// The rotation matrix R_AB is created based on 3 angles
+/// The rotation matrix `R_AB` is created based on 3 angles
 /// z,y,x about new axes (intrinsic) in the order z-y-x. The angles are called
 /// Euler angles or Tait-Bryan angles and are defined by the following
 /// procedure of successive rotations:
@@ -500,7 +525,7 @@ pub fn zyx2r(z: Angle, y: Angle, x: Angle) -> Mat33 {
 /// that the relation between a vector v decomposed in A and B is given by:
 /// `v_A = R_AB * v_B`
 ///
-/// The rotation matrix R_AB is created based on 3 angles x,y,z about new axes
+/// The rotation matrix `R_AB` is created based on 3 angles x,y,z about new axes
 /// (intrinsic) in the order x-y-z. The angles are called Euler angles or
 /// Tait-Bryan angles and are defined by the following procedure of successive
 /// rotations:
@@ -528,16 +553,18 @@ pub fn xyz2r(x: Angle, y: Angle, z: Angle) -> Mat33 {
 #[cfg(test)]
 mod tests {
 
+    #![allow(clippy::pedantic)]
+
     use crate::{
-        ellipsoidal::Ellipsoid,
-        local::{r2xyz, r2zyx, BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame},
-        positions::assert_geod_eq_d7_mm,
         Angle, GeodeticPosition, LatLong, Length, Mat33, NVector, PositionVector, Surface, Vec3,
+        ellipsoidal::Ellipsoid,
+        local::{BodyFrame, BodyVector, EnuFrame, NedFrame, WanderAzimuthFrame, r2xyz, r2zyx},
+        positions::assert_geod_eq_d7_mm,
     };
 
     #[test]
     fn from_geodetic_and_from_geocentric() {
-        let s = Ellipsoid::WGS84;
+        let s: Ellipsoid = Ellipsoid::WGS84;
 
         let o_geod = GeodeticPosition::new(
             NVector::from_lat_long_degrees(54.0, 154.0),
@@ -600,6 +627,28 @@ mod tests {
             BodyFrame::looking_at_geodetic(o_geod, t_geod, roll, s),
             BodyFrame::looking_at_geocentric(o_geoc, t_geoc, roll, s)
         )
+    }
+
+    #[test]
+    fn accessors() {
+        let s: Ellipsoid = Ellipsoid::WGS84;
+
+        let o_geod = GeodeticPosition::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Length::from_metres(10_000.0),
+        );
+        let o_geoc = s.geodetic_to_geocentric_position(o_geod);
+
+        let enu = EnuFrame::from_geodetic(o_geod, s);
+        assert_eq!(o_geoc, enu.origin());
+        assert_eq!(
+            Mat33::new(Vec3::UNIT_Y, Vec3::UNIT_Z, Vec3::UNIT_X),
+            enu.earth_to_local_matrix()
+        );
+        assert_eq!(
+            Mat33::new(Vec3::UNIT_Z, Vec3::UNIT_X, Vec3::UNIT_Y),
+            enu.local_to_earth_matrix()
+        );
     }
 
     // local_vector_to

@@ -1,11 +1,22 @@
-use crate::{numbers::eq_zero, Vec3};
+use crate::{Vec3, numbers::eq_zero};
 
 /// epsilon below which expensive side is called.
 const TRIAGE_SIDE_EPS: f64 = 10.0 * f64::EPSILON;
 
+/// Side of a point with respect to a minor arc of great circle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Side {
+    /// point is left of the arc.
+    Left,
+    /// point is right of the arc.
+    Right,
+    /// point is on the arc, within floating-point tolerance.
+    Collinear,
+}
+
 /// Computes the signed angle in radians between the given vectors.
 ///
-/// - if vn is `None; the angle is always in [0..PI],
+/// - if vn is `None`; the angle is always in [0..PI],
 /// - otherwise, the angle is positive if v1 is clockzise looking along vn,
 /// - and negative if anti-clockwise looking along vn
 pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64 {
@@ -15,11 +26,7 @@ pub(crate) fn angle_radians_between(v1: Vec3, v2: Vec3, vn: Option<Vec3>) -> f64
         None => norm,
         Some(v) => {
             let d = p1xp2.dot_prod(v);
-            if d >= 0.0 {
-                norm
-            } else {
-                -norm
-            }
+            if d >= 0.0 { norm } else { -norm }
         }
     };
     let cos_o = v1.dot_prod(v2);
@@ -37,8 +44,8 @@ pub(crate) fn easting(v: Vec3) -> Vec3 {
     Vec3::new_unit(-v.y(), v.x(), 0.0)
 }
 
-/// Determines whether v0 if right (negative integer), left (positive integer) or on the great circle (0), from v1 to v2.
-pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
+/// Determines whether v0 is right, left or on the great circle, from v1 to v2.
+pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> Side {
     let triage_side = v0.dot_prod(v1.cross_prod(v2));
     // The side of v0 w.r.t. (v1, v2) is given by the triple scalar product (v0 . (v1 x v2))
     // However the cross product of v1 and v2 becomes unstable if v1 and v2 are nearly parallel (coincidental or antipodal).
@@ -46,19 +53,15 @@ pub(crate) fn side(v0: Vec3, v1: Vec3, v2: Vec3) -> i8 {
     if triage_side.abs() <= TRIAGE_SIDE_EPS {
         let side = v0.dot_prod(v1.orthogonal_to(v2));
         if eq_zero(side) {
-            return 0;
+            return Side::Collinear;
         }
-        if side > 0.0 {
-            1
-        } else {
-            -1
-        }
+        if side > 0.0 { Side::Left } else { Side::Right }
     } else {
         // either right or left.
         if triage_side > 0.0 {
-            1
+            Side::Left
         } else {
-            -1
+            Side::Right
         }
     }
 }
@@ -70,7 +73,7 @@ mod tests {
 
     use std::f64::consts::PI;
 
-    use crate::{spherical::base::angle_radians_between, Vec3};
+    use crate::{Vec3, spherical::base::angle_radians_between};
 
     #[test]
     fn angle_radians_between_signed() {

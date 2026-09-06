@@ -17,8 +17,8 @@ pub struct GreatCircle {
 impl GreatCircle {
     /// Creates a great circle passing by both given positions (in this direction).
     ///
-    /// Note: if both start and end positions are equal or the antipode of one another, then an
-    /// arbitrary minor arc is returned - since an infinity of minor arcs exist - see [is_great_cirle](crate::spherical::Sphere::is_great_circle).
+    /// Note: an arbitrary great circle is returned if both start and end positions are equal
+    /// or the antipode of one another: in this case an infinity of great circles exist - see [`is_great_cirle`](crate::spherical::Sphere::is_great_circle).
     pub fn new(p1: NVector, p2: NVector) -> Self {
         let normal = p1.as_vec3().orthogonal_to(p2.as_vec3());
         GreatCircle { normal }
@@ -77,7 +77,7 @@ impl GreatCircle {
 #[cfg(test)]
 mod tests {
 
-    use crate::{positions::assert_opt_nv_eq_d7, spherical::GreatCircle, Angle, NVector, Vec3};
+    use crate::{Angle, NVector, Vec3, positions::assert_opt_nv_eq_d7, spherical::GreatCircle};
 
     // projection
 

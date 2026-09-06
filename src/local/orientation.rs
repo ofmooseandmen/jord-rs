@@ -10,7 +10,7 @@ pub trait FrameOrientation: Copy + Clone + Debug + PartialEq + Eq + Default {
 }
 
 /// Maps Z-up (ENU: East, North, Up) to Z-down (NED: North, East, Down).
-/// X_down = Y_up, Y_down = X_up, Z_down = -Z_up
+/// `X_down` = `Y_up`, `Y_down` = `X_up`, `Z_down` = `-Z_up`
 pub fn align_to_z_down_matrix() -> Mat33 {
     Mat33::new(
         Vec3::new(0.0, 1.0, 0.0),
