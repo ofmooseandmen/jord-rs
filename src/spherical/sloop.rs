@@ -744,7 +744,7 @@ impl Loop {
     }
 
     /// True if `other`'s interior lies entirely within `self`'s interior (or they're equal).
-    pub fn contains(&self, other: &Loop) -> bool {
+    pub fn contains_loop(&self, other: &Loop) -> bool {
         matches!(
             self.relate(other),
             LoopRelation::Containing | LoopRelation::Equal
@@ -861,7 +861,7 @@ impl Loop {
             })
     }
 
-    /// Calculates the bounding cap.
+    /// Calculates the bounding cap for the given vertices.
     fn calc_bounding_cap(vs: &[NVector]) -> Cap {
         let mut sum = Vec3::ZERO;
         for v in vs {
@@ -1238,7 +1238,7 @@ mod tests {
 
     use crate::{
         Angle, LatLong, Length, NVector, Vec3,
-        spherical::{ChordLength, Loop, LoopRelation, Rectangle, Sphere, is_loop_clockwise},
+        spherical::{Cap, ChordLength, Loop, LoopRelation, Rectangle, Sphere, is_loop_clockwise},
     };
 
     fn antananrivo() -> NVector {
@@ -1368,6 +1368,25 @@ mod tests {
         ]);
         // all vertices are collinear
         assert!(l.is_empty());
+    }
+
+    #[test]
+    fn full_bounding_cap_for_non_collinear_zero_sum_vertices() {
+        // Regular tetrahedron vertices: sum to exactly zero by symmetry (verified: (1,1,1) +
+        // (1,-1,-1) + (-1,1,-1) + (-1,-1,1) = (0,0,0)), yet no three of them are coplanar with
+        // the origin -- so, unlike the exact-hemisphere-split case, this is NOT caught by
+        // new()'s `Classification::Both` collinearity check. It reaches calc_bounding_cap's
+        // zero-sum guard for a genuinely different reason: vertices spread symmetrically
+        // through 3D space, not vertices confined to a single great circle.
+        let l = Loop::new(&[
+            NVector::new(Vec3::new_unit(-1.0, -1.0, 1.0)),
+            NVector::new(Vec3::new_unit(-1.0, 1.0, -1.0)),
+            NVector::new(Vec3::new_unit(1.0, -1.0, -1.0)),
+            NVector::new(Vec3::new_unit(1.0, 1.0, 1.0)),
+        ]);
+
+        assert!(!l.is_empty()); // confirms this is a genuine loop, not caught by collinearity
+        assert_eq!(Cap::FULL, l.bounding_cap());
     }
 
     // asserts [v0, v1, .. , vn] = [vn, .., v1, v0] == [v0, v1, .. , vn, v0].
@@ -2069,18 +2088,29 @@ mod tests {
         );
     }
 
-    // is_equivalent
+    #[test]
+    fn has_vertex() {
+        let v0 = NVector::from_lat_long_degrees(1.0, 1.0);
+        let vs: Vec<NVector> = vec![
+            v0,
+            NVector::from_lat_long_degrees(5.0, 1.0),
+            NVector::from_lat_long_degrees(5.0, 3.0),
+        ];
+        let l: Loop = Loop::new(&vs);
+        assert!(l.has_vertex(v0));
+        assert!(!l.has_vertex(NVector::from_lat_long_degrees(0.0, 0.0)));
+    }
 
     #[test]
     fn is_equivalent() {
         assert!(Loop::EMPTY.is_equivalent(&Loop::EMPTY));
 
-        let vs = vec![
+        let vs: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(1.0, 1.0),
             NVector::from_lat_long_degrees(5.0, 1.0),
             NVector::from_lat_long_degrees(5.0, 3.0),
         ];
-        let l1 = Loop::new(&vs);
+        let l1: Loop = Loop::new(&vs);
         assert!(l1.is_equivalent(&l1));
 
         let mut rvs = vs.to_vec();
@@ -2107,6 +2137,8 @@ mod tests {
         ]);
         assert!(!l1.is_equivalent(&l5));
     }
+
+    // relate
 
     #[test]
     fn relate_disjoint_far_apart() {
@@ -2164,7 +2196,8 @@ mod tests {
     fn convenience_predicates_match_relate() {
         let outer = square(0.0, 0.0, 10.0);
         let inner = square(4.0, 4.0, 2.0);
-        assert!(outer.contains(&inner));
+        assert!(outer.contains_loop(&inner));
+        assert!(!inner.contains_loop(&outer));
         assert!(inner.intersects(&outer));
         assert!(!inner.touches(&outer));
     }

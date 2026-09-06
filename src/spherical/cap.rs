@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn intersect() {
+    fn intersects() {
         let centre1 = NVector::from_lat_long_degrees(30.0, 30.0);
         let cap1 = Cap::from_centre_and_radius(centre1, Angle::from_degrees(10.0));
         assert!(!cap1.intersects(Cap::EMPTY));

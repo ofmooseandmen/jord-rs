@@ -999,6 +999,19 @@ mod tests {
     }
 
     #[test]
+    fn relate_disjoint() {
+        let arc1 = MinorArc::new(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 5.0),
+        );
+        let arc2 = MinorArc::new(
+            NVector::from_lat_long_degrees(54.0, 154.0),
+            NVector::from_lat_long_degrees(55.0, 155.0),
+        );
+        assert_relation(MinorArcRelation::Disjoint, arc1.relate(arc2));
+    }
+
+    #[test]
     fn relate_intersect_reuses_intersection_nominal_case() {
         let arc1 = MinorArc::new(
             NVector::from_lat_long_degrees(-36.0, 143.0),
