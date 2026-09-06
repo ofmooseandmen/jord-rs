@@ -665,7 +665,7 @@ impl Loop {
     ///     NVector::from_lat_long_degrees(6.0, 4.0),
     /// ]);
     ///
-    /// assert_eq!(LoopRelation::Contain, outer.relate(&inner));
+    /// assert_eq!(LoopRelation::Containing, outer.relate(&inner));
     /// assert_eq!(LoopRelation::Within, inner.relate(&outer));
     /// ```
     pub fn relate(&self, other: &Loop) -> LoopRelation {

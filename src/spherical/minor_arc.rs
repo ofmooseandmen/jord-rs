@@ -206,7 +206,7 @@ impl MinorArc {
     ///     NVector::from_lat_long_degrees(0.0, -5.0),
     ///     NVector::from_lat_long_degrees(0.0, 5.0)
     /// );
-    /// assert_eq!(MinorArcRelation::Overlap(o), ma1.relate(ma2));
+    /// assert_eq!(MinorArcRelation::Overlapping(o), ma1.relate(ma2));
     /// ```
     pub fn relate(&self, other: MinorArc) -> MinorArcRelation {
         let i = self.intersection_details(other);
