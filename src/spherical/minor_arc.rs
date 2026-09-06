@@ -8,7 +8,7 @@ use super::base::{angle_radians_between, side};
 
 /// Oriented minor arc of a great circle between two positions: shortest path between positions
 /// on a great circle.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct MinorArc {
     start: NVector,
@@ -490,6 +490,13 @@ impl MinorArc {
                 })
             }
         }
+    }
+}
+
+impl PartialEq for MinorArc {
+    fn eq(&self, other: &Self) -> bool {
+        // no need to test normal as it is derived from start/end.
+        self.start == other.start && self.end == other.end
     }
 }
 

@@ -881,7 +881,7 @@ impl Loop {
 
 impl PartialEq for Loop {
     fn eq(&self, other: &Self) -> bool {
-        // Only vertices, other fields are derived from those.
+        // tests only vertices, other fields are derived from those.
         self.vertices == other.vertices
     }
 }
