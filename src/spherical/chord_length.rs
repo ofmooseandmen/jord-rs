@@ -25,7 +25,7 @@ use crate::{Angle, NVector};
 /// let d2 = (a2 - e2).abs();
 /// assert!(d2.as_radians() < 1.8e-8); // about 0.1 metre difference (~ worst case)
 /// ```
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct ChordLength {
     length2: f64,

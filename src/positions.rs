@@ -58,7 +58,7 @@ pub trait PositionVector: Sized {
 }
 
 /// A geocentric position or Earth Centred Earth Fixed (ECEF) vector.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct GeocentricPosition {
     x: Length,
@@ -111,7 +111,7 @@ impl PositionVector for GeocentricPosition {
 }
 
 /// A geodetic position: the horiztonal coordinates (as a [`NVector`]) and height above the surface.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct GeodeticPosition {
     hp: NVector,
@@ -138,7 +138,7 @@ impl GeodeticPosition {
 }
 
 /// An horizontal position represented by a pair of latitude-longitude.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct LatLong {
     latitude: Angle,
@@ -375,7 +375,7 @@ impl PointTrait for LatLong {
 /// Orientation:
 /// - z-axis points to the North Pole along the body's rotation axis,
 /// - x-axis points towards the position where latitude = longitude = 0
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct NVector(Vec3);
 

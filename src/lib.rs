@@ -49,6 +49,9 @@ pub use crate::positions::{
     GeocentricPosition, GeodeticPosition, LatLong, NVector, PositionVector,
 };
 
+mod prng;
+pub(crate) use crate::prng::Prng;
+
 mod speed;
 pub use crate::speed::Speed;
 

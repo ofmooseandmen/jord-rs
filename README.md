@@ -43,7 +43,7 @@ or add it to `Cargo.toml` directly:
 
 ```toml
 [dependencies]
-jord = "0.19.0"
+jord = "0.20.0"
 ```
 
 To enable an [optional feature](#cargo-features), e.g. `geo-types`:
@@ -68,7 +68,7 @@ cargo add jord --features geo-types
   cross track distance, angle turned, side of position, projection on minor arc & great circle, ...
 - Kinematics ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)):
   closest point of approach between tracks, minimum speed for intercept, time to intercept.
-- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygons"):
+- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygon"):
   convex/concave, clockwise/anti-clockwise, contains position, spherical excess, topological relationship,
   [minimum bounding rectangle](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html),
   triangulation, spherical excess, ...

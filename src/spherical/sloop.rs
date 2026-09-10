@@ -24,7 +24,7 @@ use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_betwee
 /// other via [`relate`](Self::relate), which determines their full [topological
 /// relationship](LoopRelation) — disjoint, touching, intersecting, one containing the
 /// other, or equal.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Loop {
     /// vertices in clockwise order.
