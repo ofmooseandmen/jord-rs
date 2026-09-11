@@ -400,7 +400,7 @@ impl Cap {
             if !cap.contains_position(points[i]) {
                 // points[i] is outside, so it is the 3rd boundary point.
                 // 3 boundary points uniquely define the cap.
-                cap = Self::circumcap(q1, q2, points[i], &points[..=i]);
+                cap = Self::circumcap(q1, q2, points[i], &points[..i]);
             }
         }
         cap

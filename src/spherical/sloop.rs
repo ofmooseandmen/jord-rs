@@ -454,8 +454,9 @@ impl Loop {
         mbr
     }
 
-    /// Return a spherical cap that is cheap to test for overlap (see [`Cap::intersects`]),
-    /// as an alternative to the more expensive, but exact, [`bounding_rectangle`](Self::bounding_rectangle).
+    /// Return a spherical cap that is cheap to build and test for overlap (see [`Cap::intersects`]),
+    /// as an alternative to the more expensive, but exact, [`bounding_rectangle`](Self::bounding_rectangle)
+    /// or [`smallest_enclosing_cap`](Cap::smallest_enclosing_cap).
     /// This is an accessor method which performs no calculation (the cap is calculated
     /// at the creation of this `Loop` since this is a cheap operation).
     ///
