@@ -808,4 +808,15 @@ mod tests {
             cap.radius().round_d7()
         );
     }
+
+    #[test]
+    fn smallest_enclosing_cap_duplicates() {
+        let a = NVector::from_lat_long_degrees(0.0, 0.0);
+        let b = NVector::from_lat_long_degrees(54.0, 154.0);
+        let c = NVector::from_lat_long_degrees(55.0, 155.0);
+
+        let e = Cap::smallest_enclosing_cap(&[a, b, c]);
+        assert_eq!(e, Cap::smallest_enclosing_cap(&[a, b, b, c]));
+        assert_eq!(e, Cap::smallest_enclosing_cap(&[a, a, a, b, b, c, c]));
+    }
 }
