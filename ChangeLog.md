@@ -1,6 +1,7 @@
 ### 0.20.0
 
 - Added: Smallest enclosing cap (Welzl's algorithm)
+- Added: Cap::height
 - Fixed: ChordLength::Add to add equivalent angles
 
 ### 0.19.0

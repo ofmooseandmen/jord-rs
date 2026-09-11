@@ -270,6 +270,16 @@ impl Cap {
         self.centre
     }
 
+    /// Returns the height of the cap, i.e. the distance from the center point to
+    /// the cutoff plane.
+    pub fn height(&self) -> f64 {
+        if self.is_empty() {
+            0.0
+        } else {
+            0.5 * self.radius.length2()
+        }
+    }
+
     /// Returns the radius of this cap: central angle between the centre of this cap and
     /// any position on the boundary (negative for [empty](crate::spherical::Cap::EMPTY) caps).
     /// The returned value may not exactly equal the value passed to [`from_centre_and_boundary_position`](crate::spherical::Cap::from_centre_and_boundary_position).
@@ -434,7 +444,9 @@ impl Cap {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Angle, LatLong, NVector, Vec3, positions::assert_nv_eq_d7, spherical::Cap};
+    use crate::{
+        Angle, LatLong, NVector, Vec3, numbers::eq, positions::assert_nv_eq_d7, spherical::Cap,
+    };
     use std::f64::consts::PI;
 
     #[test]
@@ -635,6 +647,17 @@ mod tests {
             .radius()
             .round_d7()
         );
+    }
+
+    #[test]
+    fn height() {
+        assert_eq!(0.0, Cap::EMPTY.height());
+        assert_eq!(2.0, Cap::FULL.height());
+        let c = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(90.0),
+        );
+        assert!(eq(1.0, c.height()));
     }
 
     #[test]
