@@ -149,14 +149,22 @@ impl Add for ChordLength {
     fn add(self, rhs: Self) -> Self {
         let a2 = self.length2();
         let b2 = rhs.length2();
-        // if either length is zero or negative, return the other one.
-        if a2 <= 0.0 {
+
+        // if either is negative (invalid), return the other one.
+        if a2 < 0.0 {
             return rhs;
         }
-        if b2 <= 0.0 {
+        if b2 < 0.0 {
             return self;
         }
 
+        // shortcut if either is 0.
+        if a2 == 0.0 {
+            return rhs;
+        }
+        if b2 == 0.0 {
+            return self;
+        }
         // Clamp the angle sum to at most 180 degrees.
         if a2 + b2 >= Self::MAX_CHORD_LENGTH_2 {
             return Self::MAX;
@@ -256,6 +264,12 @@ mod tests {
     fn add() {
         let a: ChordLength = ChordLength::from_angle(Angle::from_degrees(60.0));
         let b: ChordLength = ChordLength::from_angle(Angle::from_degrees(80.0));
+        assert_eq!(ChordLength::ZERO, ChordLength::ZERO + ChordLength::NEGATIVE);
+        assert_eq!(ChordLength::ZERO, ChordLength::NEGATIVE + ChordLength::ZERO);
+        assert_eq!(
+            ChordLength::NEGATIVE,
+            ChordLength::NEGATIVE + ChordLength::NEGATIVE
+        );
         assert_eq!(a, a + ChordLength::NEGATIVE);
         assert_eq!(a, a + ChordLength::ZERO);
         assert_eq!(a, ChordLength::NEGATIVE + a);

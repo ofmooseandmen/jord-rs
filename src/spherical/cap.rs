@@ -401,14 +401,14 @@ impl Cap {
             if !cap.contains_position(points[i]) {
                 // points[i] is outside, so it is the 3rd boundary point.
                 // 3 boundary points uniquely define the cap.
-                cap = Self::min_cap(q1, q2, points[i], points);
+                cap = Self::circumcap(q1, q2, points[i], points);
             }
         }
         cap
     }
 
     /// Computes the minimum enclosing cap for 3 points.
-    fn min_cap(a: NVector, b: NVector, c: NVector, points: &[NVector]) -> Self {
+    fn circumcap(a: NVector, b: NVector, c: NVector, points: &[NVector]) -> Self {
         let cap_ab = Cap::from_boundary_positions(a, b);
         if cap_ab.contains_position(c) {
             return cap_ab;
