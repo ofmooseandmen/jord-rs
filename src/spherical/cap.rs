@@ -370,8 +370,8 @@ impl Cap {
 
         for i in 1..points.len() {
             if !cap.contains_position(points[i]) {
-                // points[i] is outside the current cap, so it MUST be on the boundary
-                // of the minimum cap enclosing points[0..=i].
+                // points[i] lies outside the current minimum cap, so any minimum
+                // enclosing cap for points[0..=i] must have points[i] on its boundary.
                 cap = Self::welzl_with_1_boundary(points, i, points[i]);
             }
         }
@@ -385,7 +385,6 @@ impl Cap {
 
         for i in 0..end {
             if !cap.contains_position(points[i]) {
-                // points[i] is outside, so it MUST also be on the boundary.
                 cap = Self::welzl_with_2_boundaries(points, i, q1, points[i]);
             }
         }
@@ -401,7 +400,7 @@ impl Cap {
             if !cap.contains_position(points[i]) {
                 // points[i] is outside, so it is the 3rd boundary point.
                 // 3 boundary points uniquely define the cap.
-                cap = Self::circumcap(q1, q2, points[i], points);
+                cap = Self::circumcap(q1, q2, points[i], &points[..=i]);
             }
         }
         cap
