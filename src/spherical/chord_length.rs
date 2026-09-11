@@ -7,6 +7,9 @@ use crate::{Angle, NVector};
 /// A chord length is necessarily in the range [0.0, 2.0] or [negative](crate::spherical::ChordLength::NEGATIVE) (e.g represent an empty [cap](crate::spherical::Cap)).
 /// Note that a chord length loses some accuracy as the length approaches 2.0:
 ///
+/// This struct impplementation of [Add](::std::ops::Add) add the corresponding `Angle`s, and clamp the result
+/// to the range [0, Pi]
+///
 /// ```
 /// use jord::{Angle, NVector};
 /// use jord::spherical::{ChordLength, Sphere};
@@ -146,14 +149,29 @@ impl Add for ChordLength {
     fn add(self, rhs: Self) -> Self {
         let a2 = self.length2();
         let b2 = rhs.length2();
+        // if either length is zero or negative, return the other one.
         if a2 <= 0.0 {
             return rhs;
         }
         if b2 <= 0.0 {
             return self;
         }
-        let c = a2.sqrt() + b2.sqrt();
-        ChordLength::from_squared_length((c * c).min(Self::MAX_CHORD_LENGTH_2))
+
+        // Clamp the angle sum to at most 180 degrees.
+        if a2 + b2 >= Self::MAX_CHORD_LENGTH_2 {
+            return Self::MAX;
+        }
+
+        // Let "a" and "b" be the (non-squared) chord lengths, and let c = a+b.
+        // Let A, B, and C be the corresponding half-angles (a = 2*sin(A), etc).
+        // Then the formula below can be derived from c = 2 * sin(A+B) and the
+        // relationships   sin(A+B) = sin(A)*cos(B) + sin(B)*cos(A)
+        //                 cos(X) = sqrt(1 - sin^2(X)) .
+
+        let x = a2 * (1.0 - 0.25 * b2); // non-negative
+        let y = b2 * (1.0 - 0.25 * a2); //  non-negative
+        let c = x + y + 2.0 * (x * y).sqrt();
+        Self::from_squared_length(c.min(Self::MAX_CHORD_LENGTH_2))
     }
 }
 
@@ -236,11 +254,12 @@ mod tests {
 
     #[test]
     fn add() {
-        let a = ChordLength::from_squared_length(1.0);
+        let a: ChordLength = ChordLength::from_angle(Angle::from_degrees(60.0));
+        let b: ChordLength = ChordLength::from_angle(Angle::from_degrees(80.0));
         assert_eq!(a, a + ChordLength::NEGATIVE);
         assert_eq!(a, a + ChordLength::ZERO);
         assert_eq!(a, ChordLength::NEGATIVE + a);
         assert_eq!(a, ChordLength::ZERO + a);
-        assert_eq!(ChordLength::from_squared_length(4.0), a + a);
+        assert_eq!(Angle::from_degrees(140.0), (a + b).to_angle().round_d7());
     }
 }
