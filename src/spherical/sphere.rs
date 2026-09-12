@@ -13,7 +13,7 @@ use super::{
 /// A sphere; for most use cases, a sphere is an acceptable approximation of the figure of a cellestial body (e.g. Earth).
 ///
 /// [Sphere] implements several usefull navigation algorithms.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Sphere {
     radius: Length,

@@ -1,7 +1,16 @@
+### 0.20.0
+
+- Added: Smallest enclosing cap (Welzl's algorithm)
+- Added: Cap::height
+- Added: support for full loops
+- Fixed: ChordLength::Add to add equivalent angles
+
 ### 0.19.0
-- Fixed README
+
+- Fixed: README
 
 ### 0.18.0
+
 - Added: MinorArc::relate and Loop::relate
 - Added: Rectangle::intersects
 - Added: Cap:intersects
@@ -10,10 +19,12 @@
 - Fixed: Cap::contains_cap
 
 ### 0.17.0
+
 - Added: geo-types and geo-traits (behind a feature flag)
 - Improved: Local frames API
 
 ### 0.16.0
+
 - Added: uom (behind a feature flag)
 
 ### 0.15.0

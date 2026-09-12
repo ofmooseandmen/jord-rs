@@ -2,7 +2,7 @@
 ///
 /// [Vec3] implements many traits, including [Add](::std::ops::Add), [Sub](::std::ops::Sub),
 /// [Mul](::std::ops::Mul) and [Div](::std::ops::Div), among others.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Vec3 {
     x: f64,

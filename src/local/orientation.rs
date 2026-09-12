@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 /// Indicates the spatial orientation of a frame's axes, specifically
 /// whether its Z-axis points up or down according to the right-hand rule.
-pub trait FrameOrientation: Copy + Clone + Debug + PartialEq + Eq + Default {
+pub trait FrameOrientation: Copy + Clone + Debug + PartialEq + Eq {
     /// Returns true if the z-axis points UP (away from the Earth's center).
     /// Returns false if the z-axis points DOWN (towards the Earth's center).
     fn is_z_up() -> bool;
@@ -20,7 +20,7 @@ pub fn align_to_z_down_matrix() -> Mat33 {
 }
 
 /// East-North-Up (ENU) orientation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Enu;
 impl FrameOrientation for Enu {
     #[inline]
@@ -30,7 +30,7 @@ impl FrameOrientation for Enu {
 }
 
 /// North-East-Down (NED) orientation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ned;
 impl FrameOrientation for Ned {
     #[inline]
@@ -40,7 +40,7 @@ impl FrameOrientation for Ned {
 }
 
 /// Body (Vehicle) orientation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Body;
 impl FrameOrientation for Body {
     #[inline]
@@ -50,7 +50,7 @@ impl FrameOrientation for Body {
 }
 
 /// Wander azimuth orientation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WanderAzimuth;
 impl FrameOrientation for WanderAzimuth {
     #[inline]

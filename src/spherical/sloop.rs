@@ -24,7 +24,7 @@ use super::{ChordLength, MinorArc, Rectangle, Sphere, base::angle_radians_betwee
 /// other via [`relate`](Self::relate), which determines their full [topological
 /// relationship](LoopRelation) — disjoint, touching, intersecting, one containing the
 /// other, or equal.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Loop {
     /// vertices in clockwise order.
@@ -35,6 +35,8 @@ pub struct Loop {
     edges: Vec<MinorArc>,
     /// bounding cap.
     bounding_cap: Cap,
+    /// whether this loop is full (i.e. contains the whole sphere).
+    full: bool,
 }
 
 /// The topological relationship between two [Loop]s on a sphere.
@@ -64,12 +66,22 @@ pub enum LoopRelation {
 }
 
 impl Loop {
-    /// an empty [Loop]: 0 vertex and edge.
+    /// the empty [Loop]: 0 vertex and edge.
     pub const EMPTY: Self = Self {
         vertices: Vec::new(),
         insides: None,
         edges: Vec::new(),
         bounding_cap: Cap::EMPTY,
+        full: false,
+    };
+
+    /// the full [Loop]: contains the whole sphere, as no vertex or edge.
+    pub const FULL: Self = Self {
+        vertices: Vec::new(),
+        insides: None,
+        edges: Vec::new(),
+        bounding_cap: Cap::FULL,
+        full: true,
     };
 
     const NP: NVector = NVector::new(Vec3::UNIT_Z);
@@ -90,7 +102,7 @@ impl Loop {
     /// circle, which by definition splits the sphere into two equal hemispheres, e.g. several
     /// points spaced along the equator — is a separate, degenerate case: every vertex is then
     /// collinear with its neighbours, and this constructor detects that directly and returns
-    /// an [empty](Self::is_empty) loop rather than a loop with an ambiguous interior.
+    /// a [full](Self::is_full) loop rather than a loop with an ambiguous interior.
     ///
     /// # Examples
     ///
@@ -144,7 +156,7 @@ impl Loop {
             let vertices = clockwise_edges_to_vertices(&clockwise_edges);
             if vertices.iter().all(|v| v.1 == Classification::Both) {
                 // only collinear vertices.
-                Self::EMPTY
+                Self::FULL
             } else {
                 let insides = if len > 3 {
                     find_insides(&vertices)
@@ -156,6 +168,7 @@ impl Loop {
                     insides,
                     edges: clockwise_edges,
                     bounding_cap: Self::calc_bounding_cap(opened),
+                    full: false,
                 }
             }
         }
@@ -163,7 +176,8 @@ impl Loop {
 
     /// Determines whether this loop is convex.
     ///
-    /// This function always returns false for [empty](crate::spherical::Loop::is_empty) loops, undefined for [non simple](crate::spherical::Loop::is_simple) loops.
+    /// Always returns true for the [empty](Self::is_empty) and the [full](Self::is_full)
+    /// loops, and is undefined for [non simple](Self::is_simple) loops.
     ///
     /// # Examples
     ///
@@ -183,33 +197,33 @@ impl Loop {
     /// assert!(l.is_convex());
     /// ```
     pub fn is_convex(&self) -> bool {
-        match self.vertices.len().cmp(&3) {
-            Ordering::Less => false,
-            Ordering::Equal => true,
-            Ordering::Greater => {
-                let mut cur_side = Side::Right;
-                let mut found_left_right: bool = false;
-                let len: usize = self.vertices.len();
-                for i in 0..len {
-                    let prev: NVector = self.vertices[(i + len - 1) % len].0;
-                    let cur: NVector = self.vertices[i].0;
-                    let next = self.vertices[(i + 1) % len].0;
-                    let side = Sphere::side(prev, cur, next);
-                    if side != Side::Collinear {
-                        if !found_left_right {
-                            cur_side = side;
-                        } else if cur_side != side {
-                            // side changed -> concave
-                            return false;
-                        } else {
-                            // still same side.
-                        }
-                        found_left_right = true;
-                    }
+        if self.vertices.len() <= 3 {
+            // a triangle is convex.
+            // the empty loop is considered convex
+            // the full loop is convex
+            return true;
+        }
+        let mut cur_side = Side::Right;
+        let mut found_left_right: bool = false;
+        let len: usize = self.vertices.len();
+        for i in 0..len {
+            let prev: NVector = self.vertices[(i + len - 1) % len].0;
+            let cur: NVector = self.vertices[i].0;
+            let next = self.vertices[(i + 1) % len].0;
+            let side = Sphere::side(prev, cur, next);
+            if side != Side::Collinear {
+                if !found_left_right {
+                    cur_side = side;
+                } else if cur_side != side {
+                    // side changed -> concave
+                    return false;
+                } else {
+                    // still same side.
                 }
-                true
+                found_left_right = true;
             }
         }
+        true
     }
 
     /// Determines whether this loop is simple:
@@ -283,7 +297,7 @@ impl Loop {
         }
     }
 
-    /// Determines whether this loop is empty. An loop is empty if less than 3 non-collinear vertices were supplied at construction.
+    /// Determines whether this loop is empty: it contains no position.
     ///
     /// # Examples
     ///
@@ -305,19 +319,31 @@ impl Loop {
     ///     NVector::from_lat_long_degrees(1.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     /// ]).is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        // see new(): if less than 3 non-collinear vertices were supplied then self.vertices is empty.
+        self.vertices.is_empty() && !self.full
+    }
+
+    /// Determines whether this loop is the full loop: it contains every positions of the sphere.
+    /// # Examples
+    ///
+    /// ```
+    /// use jord::NVector;
+    /// use jord::spherical::Loop;
     ///
     /// assert!(Loop::new(&[
     ///     NVector::from_lat_long_degrees(0.0, 0.0),
     ///     NVector::from_lat_long_degrees(0.0, 1.0),
     ///     NVector::from_lat_long_degrees(0.0, 2.0),
-    /// ]).is_empty());
+    /// ]).is_full());
     /// ```
-    pub fn is_empty(&self) -> bool {
-        // see new(): if less than 3 non-collinear vertices were supplied then self.vertices is empty.
-        self.vertices.is_empty()
+    pub fn is_full(&self) -> bool {
+        self.full
     }
 
     /// Determines if the given position is a vertex of this loop.
+    /// Always returns false for the [empty](Self::is_empty) and the [full](Self::is_full) loops.
     pub fn has_vertex(&self, p: NVector) -> bool {
         self.vertices.iter().any(|v| v.0 == p)
     }
@@ -338,7 +364,8 @@ impl Loop {
             return false;
         }
         if v1.is_empty() {
-            return true;
+            // 2 empty or 2 full loops are equivalent
+            return self.is_full() == o.is_full();
         }
 
         let n = v1.len();
@@ -355,6 +382,8 @@ impl Loop {
     }
 
     /// Determines whether the given position is on an edge of this loop.
+    ///
+    /// Always returns false for the [empty](Self::is_empty) and the [full](Self::is_full) loops.
     ///
     /// # Examples
     /// ```
@@ -454,8 +483,9 @@ impl Loop {
         mbr
     }
 
-    /// Return a spherical cap that is cheap to test for overlap (see [`Cap::intersects`]),
-    /// as an alternative to the more expensive, but exact, [`bounding_rectangle`](Self::bounding_rectangle).
+    /// Return a spherical cap that is cheap to build and test for overlap (see [`Cap::intersects`]),
+    /// as an alternative to the more expensive, but exact, [`bounding_rectangle`](Self::bounding_rectangle)
+    /// or [`smallest_enclosing_cap`](Cap::smallest_enclosing_cap).
     /// This is an accessor method which performs no calculation (the cap is calculated
     /// at the creation of this `Loop` since this is a cheap operation).
     ///
@@ -485,7 +515,8 @@ impl Loop {
     /// Determines whether the **interior** of this loop contains the given position (i.e. excluding positions which are
     /// vertices or on an edge of this loop).
     ///
-    /// This function always returns false for [empty](crate::spherical::Loop::is_empty) loops, undefined for [non simple](crate::spherical::Loop::is_simple) loops.
+    /// Always returns false for the [empty](Self::is_empty) loop, true for the [full](Self::is_full) loop
+    /// and is undefined for [non simple](Self::is_simple) loops.
     ///
     /// # Examples
     ///
@@ -587,7 +618,7 @@ impl Loop {
 
                     side_edge1 > 0.0 && side_edge2 > 0.0 && side_edge3 > 0.0
                 } else {
-                    false
+                    self.is_full()
                 }
             }
         }
@@ -596,6 +627,8 @@ impl Loop {
     /// Computes the distance from the given position to the boundary of this polygon.
     /// Note: if the given position is inside this polygon a non-zero length is returned. If this is not desirable,
     /// use [`contains_position`](crate::spherical::Loop::contains_position) beforehand.
+    ///
+    /// Always returns [0](ChordLength::ZERO) for the [empty](Self::is_empty) and the [full](Self::is_full) loops.
     ///
     /// # Examples
     ///
@@ -630,6 +663,9 @@ impl Loop {
     /// );
     /// ```
     pub fn distance_to_boundary(&self, p: NVector) -> ChordLength {
+        if self.vertices.is_empty() {
+            return ChordLength::ZERO;
+        }
         let mut res = ChordLength::MAX;
         for e in &self.edges {
             let cl = e.distance_to(p);
@@ -690,6 +726,18 @@ impl Loop {
     /// assert_eq!(LoopRelation::Within, inner.relate(&outer));
     /// ```
     pub fn relate(&self, other: &Loop) -> LoopRelation {
+        if self.is_full() {
+            return if other.is_full() {
+                LoopRelation::Equal
+            } else {
+                LoopRelation::Containing
+            };
+        }
+
+        if self.is_empty() && other.is_empty() {
+            return LoopRelation::Equal;
+        }
+
         // Fast rejection: skip all per-edge work entirely if the bounding caps don't
         // even overlap. Cheap, and likely the common case for unrelated loops.
         if !self.bounding_cap().intersects(other.bounding_cap()) {
@@ -759,8 +807,9 @@ impl Loop {
     /// Triangulates this loop using the [Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf) method.
     ///
     /// This method returns either:
-    /// - `loop number vertices - 2` triangles - as triples of [`NVector`]s, if the triangulation succeeds, or
-    /// - [empty](Vec::new) if the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
+    /// - `loop number vertices - 2` triangles - as triples of [`NVector`]s, if the triangulation succeeds, or,
+    /// - an [icosahedron](https://en.wikipedia.org/wiki/Icosahedron) if this loop is the [full](Self::is_full) loop, or,
+    /// - [empty](Vec::new) if this loop is the [empty](Self::is_empty) loop or the triangulation fails - which should only occur for [non simple](crate::spherical::Loop::is_simple) loops.
     ///
     /// # Examples
     ///
@@ -783,6 +832,8 @@ impl Loop {
     pub fn triangulate(&self) -> Vec<(NVector, NVector, NVector)> {
         if self.is_empty() {
             Vec::new()
+        } else if self.is_full() {
+            icosahedron()
         } else if self.vertices.len() == 3 {
             vec![(self.vertices[0].0, self.vertices[1].0, self.vertices[2].0)]
         } else {
@@ -817,6 +868,8 @@ impl Loop {
     pub fn spherical_excess(&self) -> Angle {
         if self.is_empty() {
             Angle::ZERO
+        } else if self.is_full() {
+            Angle::from_degrees(720.0)
         } else {
             // normal to each edge.
             let ns = self.edges.iter().map(MinorArc::normal).collect::<Vec<_>>();
@@ -903,8 +956,8 @@ impl Loop {
 
 impl PartialEq for Loop {
     fn eq(&self, other: &Self) -> bool {
-        // tests only vertices, other fields are derived from those.
-        self.vertices == other.vertices
+        // tests only vertices and full, other fields are derived from those.
+        self.vertices == other.vertices && self.full == other.full
     }
 }
 
@@ -1231,6 +1284,84 @@ fn vec3_eq(a: Vec3, b: Vec3) -> bool {
     eq(a.x(), b.x()) && eq(a.y(), b.y()) && eq(a.z(), b.z())
 }
 
+fn icosahedron() -> Vec<(NVector, NVector, NVector)> {
+    let lat_increment = Angle::from_radians(0.5f64.atan());
+
+    // An icosahedron is defined by 12 points
+    let mut vertices: [NVector; 12] = [NVector::from_lat_long_degrees(0.0, 0.0); 12];
+    // first point is north pole
+    vertices[0] = NVector::from_lat_long_degrees(90.0, 0.0);
+
+    // add top ring points
+    // rotation step is: (360.0 / 5.0) = 72.0
+    let long_increment = Angle::from_degrees(72.0);
+    for i in 0..5 {
+        let mut longitude = (i as f64) * long_increment;
+        if longitude > Angle::HALF_CIRCLE {
+            longitude = longitude - Angle::FULL_CIRCLE;
+        }
+        vertices[i + 1] = NVector::from_lat_long(lat_increment, longitude);
+    }
+
+    // add bottom ring points twist top longitudes to obtain a 5-sided antiprism when
+    // considering top ring points and bottom ring points twist angle is 180.0 / 5 = 36.0.
+    let twist = Angle::from_degrees(36.0);
+    for i in 0..5 {
+        let mut longitude = (i as f64) * long_increment + twist;
+        if longitude > Angle::HALF_CIRCLE {
+            longitude = longitude - Angle::FULL_CIRCLE;
+        }
+        vertices[i + 6] = NVector::from_lat_long(-lat_increment, longitude);
+    }
+
+    // last point is south pole
+    vertices[11] = NVector::from_lat_long_degrees(-90.0, 0.0);
+
+    icosahedron_from_vertices(&vertices)
+}
+
+fn icosahedron_from_vertices(vertices: &[NVector]) -> Vec<(NVector, NVector, NVector)> {
+    // An icosahedron has 20 faces
+    let mut faces = Vec::new();
+    // top faces: 0 through 4
+    for i in 1..=5 {
+        if i == 5 {
+            faces.push((vertices[0], vertices[i], vertices[1]));
+        } else {
+            faces.push((vertices[0], vertices[i], vertices[i + 1]));
+        }
+    }
+
+    // top middle faces: 5 through 9
+    for i in 1..=5 {
+        if i == 5 {
+            faces.push((vertices[5], vertices[1], vertices[10]));
+        } else {
+            faces.push((vertices[i], vertices[i + 1], vertices[i + 5]));
+        }
+    }
+
+    // bottom middle faces: 10 through 14
+    for i in 6..11 {
+        if i == 10 {
+            faces.push((vertices[10], vertices[6], vertices[1]));
+        } else {
+            faces.push((vertices[i], vertices[i + 1], vertices[i - 4]));
+        }
+    }
+
+    // bottom faces: 15 through 19
+    for i in 6..11 {
+        if i == 10 {
+            faces.push((vertices[i], vertices[6], vertices[11]));
+        } else {
+            faces.push((vertices[i], vertices[i + 1], vertices[11]));
+        }
+    }
+
+    faces
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1300,11 +1431,37 @@ mod tests {
     // empty loop
     #[test]
     fn empty() {
-        assert!(!Loop::EMPTY.is_convex());
+        assert!(Loop::EMPTY.is_convex());
         assert!(Loop::EMPTY.is_simple());
         assert!(Loop::EMPTY.is_empty());
+        assert!(!Loop::EMPTY.is_full());
         assert_eq!(0, Loop::EMPTY.num_vertices());
+        assert_eq!(Rectangle::EMPTY, Loop::EMPTY.bounding_rectangle());
+        assert_eq!(Cap::EMPTY, Loop::EMPTY.bounding_cap());
+        assert!(!Loop::EMPTY.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert_eq!(
+            ChordLength::ZERO,
+            Loop::EMPTY.distance_to_boundary(NVector::from_lat_long_degrees(0.0, 0.0))
+        );
         assert_eq!(Angle::ZERO, Loop::EMPTY.spherical_excess());
+    }
+
+    // full loop
+    #[test]
+    fn full() {
+        assert!(Loop::FULL.is_convex());
+        assert!(Loop::FULL.is_simple());
+        assert!(!Loop::FULL.is_empty());
+        assert!(Loop::FULL.is_full());
+        assert_eq!(0, Loop::FULL.num_vertices());
+        assert_eq!(Rectangle::FULL, Loop::FULL.bounding_rectangle());
+        assert_eq!(Cap::FULL, Loop::FULL.bounding_cap());
+        assert!(Loop::FULL.contains_position(NVector::from_lat_long_degrees(0.0, 0.0)));
+        assert_eq!(
+            ChordLength::ZERO,
+            Loop::FULL.distance_to_boundary(NVector::from_lat_long_degrees(0.0, 0.0))
+        );
+        assert_eq!(Angle::from_degrees(720.0), Loop::FULL.spherical_excess());
     }
 
     // new
@@ -1347,14 +1504,6 @@ mod tests {
             ])
             .is_empty()
         );
-        assert!(
-            Loop::new(&[
-                NVector::from_lat_long_degrees(0.0, 0.0),
-                NVector::from_lat_long_degrees(0.0, 1.0),
-                NVector::from_lat_long_degrees(0.0, 2.0),
-            ])
-            .is_empty()
-        );
     }
 
     #[test]
@@ -1367,7 +1516,7 @@ mod tests {
             NVector::from_lat_long_degrees(0.0, -90.0),
         ]);
         // all vertices are collinear
-        assert!(l.is_empty());
+        assert!(l.is_full());
     }
 
     #[test]
@@ -1669,11 +1818,6 @@ mod tests {
         assert_bounding_rectangle(&Loop::new(&vs), -84.9999999, 180.0, -90.0, -180.0);
     }
 
-    #[test]
-    fn empty_bounding_rectangle() {
-        assert_eq!(Rectangle::EMPTY, Loop::new(&[]).bounding_rectangle());
-    }
-
     fn assert_bounding_rectangle(l: &Loop, north: f64, east: f64, south: f64, west: f64) {
         let b = l.bounding_rectangle();
         let ne: LatLong = b.north_east();
@@ -1931,6 +2075,16 @@ mod tests {
     // triangulate.
 
     #[test]
+    fn triangulate_empty() {
+        assert!(Loop::EMPTY.triangulate().is_empty());
+    }
+
+    #[test]
+    fn triangulate_full() {
+        assert_eq!(20, Loop::FULL.triangulate().len());
+    }
+
+    #[test]
     fn triangulate_collinear_during_triangulation_1() {
         let v0 = NVector::from_lat_long_degrees(35.0, 10.0);
         let v1 = NVector::from_lat_long_degrees(35.0, 20.0);
@@ -2104,6 +2258,9 @@ mod tests {
     #[test]
     fn is_equivalent() {
         assert!(Loop::EMPTY.is_equivalent(&Loop::EMPTY));
+        assert!(Loop::FULL.is_equivalent(&Loop::FULL));
+        assert!(!Loop::FULL.is_equivalent(&Loop::EMPTY));
+        assert!(!Loop::EMPTY.is_equivalent(&Loop::FULL));
 
         let vs: Vec<NVector> = vec![
             NVector::from_lat_long_degrees(1.0, 1.0),
@@ -2236,6 +2393,14 @@ mod tests {
             "test setup: bounding caps must overlap for this test to exercise the intended branch"
         );
         assert_eq!(LoopRelation::Disjoint, a.relate(&b));
+    }
+
+    #[test]
+    fn relate_empty_or_full() {
+        assert_eq!(LoopRelation::Equal, Loop::EMPTY.relate(&Loop::EMPTY));
+        assert_eq!(LoopRelation::Equal, Loop::FULL.relate(&Loop::FULL));
+        assert_eq!(LoopRelation::Containing, Loop::FULL.relate(&Loop::EMPTY));
+        assert_eq!(LoopRelation::Disjoint, Loop::EMPTY.relate(&Loop::FULL));
     }
 
     fn square(lat0: f64, lon0: f64, size: f64) -> Loop {
