@@ -71,9 +71,51 @@ impl Cap {
         }
     }
 
-    /// Constructs a new cap whose boundary passes by the 3 given positions: the returned cap is the circumcircle of the
-    /// triangle defined by the 3 given positions.
+    /// Constructs the smallest cap whose boundary contains the three given positions.
+    ///
+    /// For three distinct, non-collinear positions, the boundary of the returned cap
+    /// is the circumcircle of the spherical triangle defined by the positions.
+    ///
+    /// Degenerate inputs are handled as follows:
+    ///
+    /// - If all three positions coincide, a zero-radius cap centred on that position
+    ///   is returned.
+    /// - If two positions coincide, the result is the two-position boundary cap
+    ///   defined by the distinct positions.
+    /// - If the three positions lie on a common great circle, the returned cap is
+    ///   the hemisphere determined by their orientation.
+    /// - If any 2 of the positions are the antipode of each other, the [full][Self::FULL] cap
+    ///   is returned.
+    ///
+    /// The three positions do not need to be supplied in any particular order.
+    /// Internally, their orientation is used to select the hemisphere containing
+    /// the triangle.
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
+        // Antipodal pair: no proper circumcircle is defined and the
+        // smallest enclosing cap is the full sphere.
+        if ChordLength::new(a, b) == ChordLength::MAX
+            || ChordLength::new(a, c) == ChordLength::MAX
+            || ChordLength::new(b, c) == ChordLength::MAX
+        {
+            return Self::FULL;
+        }
+
+        if a == b {
+            return if a == c {
+                Self::from_centre(a)
+            } else {
+                Self::from_boundary_positions(a, c)
+            };
+        }
+
+        if a == c {
+            return Self::from_boundary_positions(a, b);
+        }
+
+        if b == c {
+            return Self::from_boundary_positions(a, b);
+        }
+
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
         // 3 positions must be in anti-clockwise order
         let clockwise = Sphere::side(a, b, c) == Side::Right;
@@ -416,7 +458,8 @@ impl Cap {
         cap
     }
 
-    /// Computes the minimum enclosing cap for 3 points.
+    /// Computes the minimum enclosing cap for `points`, given that
+    /// `a`, `b`, and `c` are on the boundary.
     fn circumcap(a: NVector, b: NVector, c: NVector, points: &[NVector]) -> Self {
         let cap_ab = Cap::from_boundary_positions(a, b);
         if cap_ab.contains_position(c) {
@@ -482,13 +525,19 @@ mod tests {
         let cap = Cap::from_boundary_positions(p1, p2);
         assert!(cap.contains_position(p1));
         assert!(cap.contains_position(p2));
+    }
 
-        let antipodal1 = NVector::from_lat_long_degrees(90.0, 0.0);
-        let antipodal2 = NVector::from_lat_long_degrees(-90.0, 0.0);
-        assert_eq!(
-            Cap::FULL,
-            Cap::from_boundary_positions(antipodal1, antipodal2)
-        );
+    #[test]
+    fn from_boundary_positions_antipodal() {
+        let p1 = NVector::from_lat_long_degrees(10.0, 0.0);
+        let p2 = p1.antipode();
+        assert_eq!(Cap::FULL, Cap::from_boundary_positions(p1, p2));
+    }
+
+    #[test]
+    fn from_boundary_positions_coincident() {
+        let p = NVector::from_lat_long_degrees(10.0, 0.0);
+        assert!(Cap::from_boundary_positions(p, p).contains_position(p));
     }
 
     #[test]
@@ -517,6 +566,35 @@ mod tests {
             Angle::from_degrees(90.0).round_d7(),
             cap.radius().round_d7()
         );
+    }
+
+    #[test]
+    fn from_triangle_coincident() {
+        let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
+        let b = NVector::from_lat_long_degrees(0.0, 10.0);
+        let c = NVector::from_lat_long_degrees(0.0, 20.0);
+        assert_eq!(
+            Cap::from_boundary_positions(a, c),
+            Cap::from_triangle(a, a, c)
+        );
+        assert_eq!(
+            Cap::from_boundary_positions(a, b),
+            Cap::from_triangle(a, b, b)
+        );
+        assert_eq!(
+            Cap::from_boundary_positions(a, b),
+            Cap::from_triangle(a, b, a)
+        );
+        assert_eq!(Cap::from_centre(a), Cap::from_triangle(a, a, a));
+    }
+
+    #[test]
+    fn from_triangle_antipodal() {
+        let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
+        let c = NVector::from_lat_long_degrees(0.0, 20.0);
+        assert_eq!(Cap::FULL, Cap::from_triangle(a, a.antipode(), c));
+        assert_eq!(Cap::FULL, Cap::from_triangle(a, c, a.antipode()));
+        assert_eq!(Cap::FULL, Cap::from_triangle(a, c, c.antipode()));
     }
 
     #[test]
@@ -818,5 +896,15 @@ mod tests {
         let e = Cap::smallest_enclosing_cap(&[a, b, c]);
         assert_eq!(e, Cap::smallest_enclosing_cap(&[a, b, b, c]));
         assert_eq!(e, Cap::smallest_enclosing_cap(&[a, a, a, b, b, c, c]));
+    }
+
+    #[test]
+    fn smallest_enclosing_cap_antipodal() {
+        let a = NVector::from_lat_long_degrees(90.0, 0.0);
+        let b = NVector::from_lat_long_degrees(-90.0, 0.0);
+        assert_eq!(Cap::FULL, Cap::smallest_enclosing_cap(&[a, b]));
+
+        let c = NVector::from_lat_long_degrees(54.0, 154.0);
+        assert_eq!(Cap::FULL, Cap::smallest_enclosing_cap(&[c, c.antipode()]));
     }
 }
