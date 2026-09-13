@@ -84,22 +84,11 @@ impl Cap {
     ///   defined by the distinct positions.
     /// - If the three positions lie on a common great circle, the returned cap is
     ///   the hemisphere determined by their orientation.
-    /// - If any 2 of the positions are the antipode of each other, the [full][Self::FULL] cap
-    ///   is returned.
     ///
     /// The three positions do not need to be supplied in any particular order.
     /// Internally, their orientation is used to select the hemisphere containing
     /// the triangle.
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
-        // Antipodal pair: no proper circumcircle is defined and the
-        // smallest enclosing cap is the full sphere.
-        if ChordLength::new(a, b) == ChordLength::MAX
-            || ChordLength::new(a, c) == ChordLength::MAX
-            || ChordLength::new(b, c) == ChordLength::MAX
-        {
-            return Self::FULL;
-        }
-
         if a == b {
             return if a == c {
                 Self::from_centre(a)
@@ -185,9 +174,7 @@ impl Cap {
         } else {
             Self {
                 centre: self.centre.antipode(),
-                radius: ChordLength::from_squared_length(
-                    ChordLength::MAX.length2() - self.radius.length2(),
-                ),
+                radius: self.radius.complement(),
             }
         }
     }
@@ -591,10 +578,10 @@ mod tests {
     #[test]
     fn from_triangle_antipodal() {
         let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
-        let c = NVector::from_lat_long_degrees(0.0, 20.0);
-        assert_eq!(Cap::FULL, Cap::from_triangle(a, a.antipode(), c));
-        assert_eq!(Cap::FULL, Cap::from_triangle(a, c, a.antipode()));
-        assert_eq!(Cap::FULL, Cap::from_triangle(a, c, c.antipode()));
+        let b = NVector::from_lat_long_degrees(0.0, 20.0);
+        let cap = Cap::from_triangle(a, a.antipode(), b);
+        assert_eq!(NVector::from_lat_long_degrees(-90.0, 0.0), cap.centre());
+        assert_eq!(Angle::from_degrees(90.0), cap.radius().round_d7());
     }
 
     #[test]
