@@ -1,6 +1,6 @@
 ### 0.20.0
 
-- Added: Smallest enclosing cap (Welzl's algorithm)
+- Added: Smallest enclosing cap (Flemming's/Welzl's algorithm)
 - Added: Cap::height
 - Added: support for full loops
 - Fixed: ChordLength::Add to add equivalent angles

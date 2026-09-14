@@ -83,6 +83,7 @@ The following references provide the theoretical basis of most of the algorithms
 - [Non-singular Horizontal Position Representation; Gade, K.; 2010](https://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
 - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
+- [A simple linear time algorithm for smallest enclosing circles on the (hemi)sphere](https://arxiv.org/abs/2407.19840)
 
 ## Cargo features
 

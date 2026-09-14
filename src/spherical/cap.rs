@@ -36,22 +36,19 @@ impl Cap {
     }
 
     /// Constructs a new cap from the 2 given positions which are diametrically opposite on the boundary.
-    /// If the given positions are the antipode of each other a [full cap](Cap::FULL) is returned.
+    /// If the given positions are the antipode of each other [None] is returned.
     pub fn from_boundary_positions(
         boundary_position1: NVector,
         boundary_position2: NVector,
-    ) -> Self {
-        Sphere::mean_position(&[boundary_position1, boundary_position2]).map_or(
-            Cap::FULL,
-            |centre| {
-                let r1 = ChordLength::new(centre, boundary_position1);
-                let r2 = ChordLength::new(centre, boundary_position2);
-                Self {
-                    centre,
-                    radius: r1.max(r2),
-                }
-            },
-        )
+    ) -> Option<Self> {
+        Sphere::mean_position(&[boundary_position1, boundary_position2]).map(|centre| {
+            let r1 = ChordLength::new(centre, boundary_position1);
+            let r2 = ChordLength::new(centre, boundary_position2);
+            Self {
+                centre,
+                radius: r1.max(r2),
+            }
+        })
     }
 
     /// Constructs a new cap from the given centre and given radius expressed as the angle between the
@@ -81,17 +78,18 @@ impl Cap {
     /// - If all three positions coincide, a zero-radius cap centred on that position
     ///   is returned.
     /// - If two positions coincide, the result is the two-position boundary cap
-    ///   defined by the distinct positions.
+    ///   defined by the distinct positions, unless the third position is the antipode
+    ///   of the other position, in which case [None] is returned.
     /// - If the three positions lie on a common great circle, the returned cap is
     ///   the hemisphere determined by their orientation.
     ///
     /// The three positions do not need to be supplied in any particular order.
     /// Internally, their orientation is used to select the hemisphere containing
     /// the triangle.
-    pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Self {
+    pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Option<Self> {
         if a == b {
             return if a == c {
-                Self::from_centre(a)
+                Some(Self::from_centre(a))
             } else {
                 Self::from_boundary_positions(a, c)
             };
@@ -117,13 +115,15 @@ impl Cap {
         // all chord length should be equal, still take maximum to account for floating point errors.
         let radius: ChordLength = ChordLength::new(a, centre)
             .max(ChordLength::new(b, centre).max(ChordLength::new(c, centre)));
-        Self { centre, radius }
+        Some(Self { centre, radius })
     }
 
-    /// Returns the smallest cap that contains all of the given positions, using
-    /// [Welzl's algorithm](https://en.wikipedia.org/wiki/Smallest-circle_problem#Welzl's_algorithm).
+    /// Returns the smallest cap that contains all of the given positions, using the
+    /// [Flemming's algorithm](https://arxiv.org/abs/2407.19840), which is an adaptation of the
+    /// [Welzl's algorithm](https://en.wikipedia.org/wiki/Smallest-circle_problem#Welzl's_algorithm), suitable
+    /// for the sphere.
     ///
-    /// Returns [`Cap::EMPTY`] if the slice of positions is empty.
+    /// Returns `None`, if the given point cloud is not contained in a hemisphere.
     ///
     /// Note: The input positions are deterministically shuffled before applying Welzl's
     /// algorithm to provide the expected linear-time behaviour while keeping the result reproducible.
@@ -143,15 +143,54 @@ impl Cap {
     /// assert!(cap.contains_position(p2));
     /// assert!(cap.contains_position(p3));
     /// ```
-    pub fn smallest_enclosing_cap(ps: &[NVector]) -> Self {
+    pub fn smallest_enclosing_cap(ps: &[NVector]) -> Option<Self> {
         if ps.is_empty() {
-            return Self::EMPTY;
+            return Some(Self::EMPTY);
         }
         let seed = (ps.len() as u32).wrapping_mul(0x85EB_CA6B);
         let mut rand = Prng::new(seed);
         let mut shuffled = ps.to_vec();
         rand.shuffle(&mut shuffled);
-        Self::welzl_iterative(&shuffled)
+
+        let mut cap = Cap::from_centre(shuffled[0]);
+
+        for i in 1..shuffled.len() {
+            let q1 = shuffled[i];
+            if !cap.contains_position(q1) {
+                // points[i] lies outside the current minimum cap, so any minimum
+                // enclosing cap for points[0..=i] must have points[i] on its boundary.
+                cap = Cap::from_centre(q1);
+
+                for j in 0..i {
+                    let q2 = shuffled[j];
+                    if !cap.contains_position(q2) {
+                        // if None => State (a): Initial sphere is constructed from two antipodal points.
+                        println!("from_boundary_positions");
+                        cap = Cap::from_boundary_positions(q1, q2)?;
+
+                        for k in 0..j {
+                            let q3 = shuffled[k];
+                            if !cap.contains_position(q3) {
+                                cap = Cap::from_triangle(q1, q2, q3)?;
+
+                                if cap.is_hemisphere() {
+                                    // State (b): The three boundary points lie on a great circle.
+                                    return None;
+                                }
+
+                                // State (c): The condition |B|=4 is satisfied. The 3-point circle
+                                // does not enclose all processed points, breaking the hemisphere bound.
+                                if shuffled.iter().any(|p| !cap.contains_position(*p)) {
+                                    return None;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(cap)
     }
 
     /// Determines whether this cap is [full](crate::spherical::Cap::FULL).
@@ -162,6 +201,11 @@ impl Cap {
     /// Determines whether this cap is [empty](crate::spherical::Cap::EMPTY).
     pub fn is_empty(&self) -> bool {
         self.radius == ChordLength::NEGATIVE
+    }
+
+    /// Determines whether this cap is an hemisphere (one equal half of a sphere).
+    pub fn is_hemisphere(&self) -> bool {
+        self.radius == ChordLength::RIGHT
     }
 
     /// Returns the complement of this cap. Both caps have the same boundary but
@@ -401,75 +445,6 @@ impl Cap {
         }
         res
     }
-
-    /// Iterative Welzl's algorithm: calculates the minimum enclosing cap
-    /// for a shuffled set of points with 0 known boundary points.
-    fn welzl_iterative(points: &[NVector]) -> Self {
-        let mut cap = Cap::from_centre(points[0]);
-
-        for i in 1..points.len() {
-            if !cap.contains_position(points[i]) {
-                // points[i] lies outside the current minimum cap, so any minimum
-                // enclosing cap for points[0..=i] must have points[i] on its boundary.
-                cap = Self::welzl_with_1_boundary(points, i, points[i]);
-            }
-        }
-        cap
-    }
-
-    /// Computes the minimum enclosing cap for points[0..end] given that
-    /// q1 is definitively on the boundary.
-    fn welzl_with_1_boundary(points: &[NVector], end: usize, q1: NVector) -> Self {
-        let mut cap = Cap::from_centre(q1);
-
-        for i in 0..end {
-            if !cap.contains_position(points[i]) {
-                cap = Self::welzl_with_2_boundaries(points, i, q1, points[i]);
-            }
-        }
-        cap
-    }
-
-    /// Computes the minimum enclosing cap for points[0..end] given that
-    /// q1 and q2 are definitively on the boundary.
-    fn welzl_with_2_boundaries(points: &[NVector], end: usize, q1: NVector, q2: NVector) -> Self {
-        let mut cap = Cap::from_boundary_positions(q1, q2);
-
-        for i in 0..end {
-            if !cap.contains_position(points[i]) {
-                // points[i] is outside, so it is the 3rd boundary point.
-                // 3 boundary points uniquely define the cap.
-                cap = Self::circumcap(q1, q2, points[i], &points[..i]);
-            }
-        }
-        cap
-    }
-
-    /// Computes the minimum enclosing cap for `points`, given that
-    /// `a`, `b`, and `c` are on the boundary.
-    fn circumcap(a: NVector, b: NVector, c: NVector, points: &[NVector]) -> Self {
-        let cap_ab = Cap::from_boundary_positions(a, b);
-        if cap_ab.contains_position(c) {
-            return cap_ab;
-        }
-
-        let cap_bc = Cap::from_boundary_positions(b, c);
-        if cap_bc.contains_position(a) {
-            return cap_bc;
-        }
-
-        let cap_ca = Cap::from_boundary_positions(c, a);
-        if cap_ca.contains_position(b) {
-            return cap_ca;
-        }
-
-        let cap_tri = Cap::from_triangle(a, b, c);
-        if points.iter().any(|p| !cap_tri.contains_position(*p)) {
-            cap_tri.complement()
-        } else {
-            cap_tri
-        }
-    }
 }
 
 #[cfg(test)]
@@ -509,7 +484,7 @@ mod tests {
     fn from_boundary_positions() {
         let p1 = NVector::from_lat_long_degrees(10.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(20.0, 0.0);
-        let cap = Cap::from_boundary_positions(p1, p2);
+        let cap = Cap::from_boundary_positions(p1, p2).unwrap();
         assert!(cap.contains_position(p1));
         assert!(cap.contains_position(p2));
     }
@@ -518,13 +493,17 @@ mod tests {
     fn from_boundary_positions_antipodal() {
         let p1 = NVector::from_lat_long_degrees(10.0, 0.0);
         let p2 = p1.antipode();
-        assert_eq!(Cap::FULL, Cap::from_boundary_positions(p1, p2));
+        assert_eq!(None, Cap::from_boundary_positions(p1, p2));
     }
 
     #[test]
     fn from_boundary_positions_coincident() {
         let p = NVector::from_lat_long_degrees(10.0, 0.0);
-        assert!(Cap::from_boundary_positions(p, p).contains_position(p));
+        assert!(
+            Cap::from_boundary_positions(p, p)
+                .unwrap()
+                .contains_position(p)
+        );
     }
 
     #[test]
@@ -532,12 +511,12 @@ mod tests {
         let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(20.0, 0.0);
         let c = NVector::from_lat_long_degrees(10.0, 10.0);
-        let cap = Cap::from_triangle(a, b, c);
+        let cap = Cap::from_triangle(a, b, c).unwrap();
         assert!(cap.contains_position(a));
         assert!(cap.contains_position(b));
         assert!(cap.contains_position(c));
 
-        let o = Cap::from_triangle(c, b, a);
+        let o = Cap::from_triangle(c, b, a).unwrap();
         assert_nv_eq_d7(o.centre, cap.centre);
         assert!((o.radius.length2() - cap.radius.length2()).abs() < 1e-16);
     }
@@ -547,7 +526,7 @@ mod tests {
         let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(0.0, 10.0);
         let c = NVector::from_lat_long_degrees(0.0, 20.0);
-        let cap = Cap::from_triangle(a, b, c);
+        let cap = Cap::from_triangle(a, b, c).unwrap();
         assert_eq!(NVector::new(Vec3::UNIT_Z), cap.centre());
         assert_eq!(
             Angle::from_degrees(90.0).round_d7(),
@@ -572,14 +551,14 @@ mod tests {
             Cap::from_boundary_positions(a, b),
             Cap::from_triangle(a, b, a)
         );
-        assert_eq!(Cap::from_centre(a), Cap::from_triangle(a, a, a));
+        assert_eq!(Cap::from_centre(a), Cap::from_triangle(a, a, a).unwrap());
     }
 
     #[test]
     fn from_triangle_antipodal() {
         let a: NVector = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(0.0, 20.0);
-        let cap = Cap::from_triangle(a, a.antipode(), b);
+        let cap = Cap::from_triangle(a, a.antipode(), b).unwrap();
         assert_eq!(NVector::from_lat_long_degrees(-90.0, 0.0), cap.centre());
         assert_eq!(Angle::from_degrees(90.0), cap.radius().round_d7());
     }
@@ -805,13 +784,13 @@ mod tests {
 
     #[test]
     fn smallest_enclosing_cap_empty() {
-        assert_eq!(Cap::EMPTY, Cap::smallest_enclosing_cap(&[]));
+        assert_eq!(Cap::EMPTY, Cap::smallest_enclosing_cap(&[]).unwrap());
     }
 
     #[test]
     fn smallest_enclosing_cap_single() {
         let p = NVector::from_lat_long_degrees(10.0, 20.0);
-        let cap = Cap::smallest_enclosing_cap(&[p]);
+        let cap = Cap::smallest_enclosing_cap(&[p]).unwrap();
         assert_eq!(p, cap.centre());
         assert_eq!(Angle::ZERO, cap.radius());
     }
@@ -820,7 +799,7 @@ mod tests {
     fn smallest_enclosing_cap_two_positions() {
         let p1 = NVector::from_lat_long_degrees(0.0, 0.0);
         let p2 = NVector::from_lat_long_degrees(10.0, 0.0);
-        let cap = Cap::smallest_enclosing_cap(&[p1, p2]);
+        let cap = Cap::smallest_enclosing_cap(&[p1, p2]).unwrap();
         assert!(cap.contains_position(p1));
         assert!(cap.contains_position(p2));
     }
@@ -830,7 +809,7 @@ mod tests {
         let a = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(10.0, 0.0);
         let c = NVector::from_lat_long_degrees(2.0, 0.0); // collinear / interior
-        let cap = Cap::smallest_enclosing_cap(&[a, b, c]);
+        let cap = Cap::smallest_enclosing_cap(&[a, b, c]).unwrap();
         assert!(cap.contains_position(a));
         assert!(cap.contains_position(b));
         assert!(cap.contains_position(c));
@@ -845,7 +824,32 @@ mod tests {
             NVector::from_lat_long_degrees(9.0, 13.0),
             NVector::from_lat_long_degrees(11.0, 12.0),
         ];
-        let cap = Cap::smallest_enclosing_cap(&ps);
+        let cap = Cap::smallest_enclosing_cap(&ps).unwrap();
+        for p in &ps {
+            assert!(cap.contains_position(*p));
+        }
+    }
+
+    #[test]
+    fn smallest_enclosing_cap_collinear() {
+        let ps = vec![
+            NVector::from_lat_long_degrees(0.0, 5.0),
+            NVector::from_lat_long_degrees(0.0, 45.0),
+            NVector::from_lat_long_degrees(0.0, 85.0),
+            NVector::from_lat_long_degrees(0.0, 125.0),
+            NVector::from_lat_long_degrees(0.0, 165.0),
+        ];
+        // a valid cap is produced despite all points begin collinear,
+        // because all gaps are 40°, expect the wrap‑around gap which
+        // is 200°: the minimal covering arc is 360° - 200° = 160°, running
+        // from 5° to 165° the "short way" — giving a cap radius of 80°,
+        // centered at latitude 0° and longitude 85°.
+        let cap = Cap::smallest_enclosing_cap(&ps).unwrap();
+        assert_eq!(
+            LatLong::from_degrees(0.0, 85.0),
+            LatLong::from_nvector(cap.centre()).round_d7()
+        );
+        assert_eq!(Angle::from_degrees(80.0), cap.radius().round_d7());
         for p in &ps {
             assert!(cap.contains_position(*p));
         }
@@ -854,24 +858,13 @@ mod tests {
     #[test]
     fn smallest_enclosing_cap_regular_tetrahedron() {
         let s = 1.0 / 3.0_f64.sqrt();
-
         let ps = [
             NVector::new(Vec3::new(s, s, s).unit()),
             NVector::new(Vec3::new(s, -s, -s).unit()),
             NVector::new(Vec3::new(-s, s, -s).unit()),
             NVector::new(Vec3::new(-s, -s, s).unit()),
         ];
-
-        let cap = Cap::smallest_enclosing_cap(&ps);
-
-        for p in ps {
-            assert!(cap.contains_position(p));
-        }
-
-        assert_eq!(
-            Angle::from_degrees(109.471_220_6).round_d7(),
-            cap.radius().round_d7()
-        );
+        assert_eq!(None, Cap::smallest_enclosing_cap(&ps));
     }
 
     #[test]
@@ -880,18 +873,21 @@ mod tests {
         let b = NVector::from_lat_long_degrees(54.0, 154.0);
         let c = NVector::from_lat_long_degrees(55.0, 155.0);
 
-        let e = Cap::smallest_enclosing_cap(&[a, b, c]);
-        assert_eq!(e, Cap::smallest_enclosing_cap(&[a, b, b, c]));
-        assert_eq!(e, Cap::smallest_enclosing_cap(&[a, a, a, b, b, c, c]));
+        let e = Cap::smallest_enclosing_cap(&[a, b, c]).unwrap();
+        assert_eq!(e, Cap::smallest_enclosing_cap(&[a, b, b, c]).unwrap());
+        assert_eq!(
+            e,
+            Cap::smallest_enclosing_cap(&[a, a, a, b, b, c, c]).unwrap()
+        );
     }
 
     #[test]
     fn smallest_enclosing_cap_antipodal() {
         let a = NVector::from_lat_long_degrees(90.0, 0.0);
         let b = NVector::from_lat_long_degrees(-90.0, 0.0);
-        assert_eq!(Cap::FULL, Cap::smallest_enclosing_cap(&[a, b]));
+        assert_eq!(None, Cap::smallest_enclosing_cap(&[a, b]));
 
         let c = NVector::from_lat_long_degrees(54.0, 154.0);
-        assert_eq!(Cap::FULL, Cap::smallest_enclosing_cap(&[c, c.antipode()]));
+        assert_eq!(None, Cap::smallest_enclosing_cap(&[c, c.antipode()]));
     }
 }

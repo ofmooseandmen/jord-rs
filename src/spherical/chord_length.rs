@@ -43,7 +43,10 @@ impl ChordLength {
     /// Zero chord length (minimum value).
     pub const ZERO: ChordLength = Self { length2: 0.0 };
 
-    /// Maximum chord length.
+    /// Chord length of 90 degrees.
+    pub const RIGHT: ChordLength = Self { length2: 2.0 };
+
+    /// Chord length of 180 degrees (maximum value).
     pub const MAX: ChordLength = Self {
         length2: Self::MAX_CHORD_LENGTH_2,
     };
@@ -118,7 +121,6 @@ impl ChordLength {
         }
         Angle::from_radians(2.0 * (self.length2.sqrt() * 0.5).asin())
     }
-
 
     /// Returns the `ChordLength` such that `self + result = MAX`.
     pub fn complement(&self) -> Self {
@@ -220,11 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn negative_to_angle() {
-        assert_eq!(Angle::from_radians(-1.0), ChordLength::NEGATIVE.to_angle());
-    }
-
-    #[test]
     fn from_angle_range() {
         assert_eq!(
             ChordLength::MAX,
@@ -287,5 +284,11 @@ mod tests {
         assert_eq!(a, ChordLength::ZERO + a);
         assert_eq!(Angle::from_degrees(140.0), (a + b).to_angle().round_d7());
         assert_eq!(ChordLength::MAX, a + a.complement());
+    }
+
+    #[test]
+    fn negative() {
+        assert_eq!(Angle::from_radians(-1.0), ChordLength::NEGATIVE.to_angle());
+        assert_eq!(ChordLength::NEGATIVE, ChordLength::NEGATIVE.complement());
     }
 }
