@@ -156,7 +156,7 @@ impl Cap {
     /// let p2 = NVector::from_lat_long_degrees(10.0, 0.0);
     /// let p3 = NVector::from_lat_long_degrees(5.0, 5.0);
     ///
-    /// let cap = Cap::smallest_enclosing_cap(&[p1, p2, p3]);
+    /// let cap = Cap::smallest_enclosing_cap(&[p1, p2, p3]).unwrap();
     /// assert!(cap.contains_position(p1));
     /// assert!(cap.contains_position(p2));
     /// assert!(cap.contains_position(p3));
@@ -812,6 +812,26 @@ mod tests {
         assert_eq!(Angle::from_degrees(50.1501), c.latitude().round_d5());
         assert_eq!(Angle::from_degrees(10.14953), c.longitude().round_d5());
         assert_eq!(Angle::from_degrees(0.37815), u.radius().round_d5());
+    }
+
+    #[test]
+    fn union_contained() {
+        let a = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(1.0),
+        );
+        let b = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            Angle::from_degrees(0.5),
+        );
+        let c = Cap::from_centre_and_radius(
+            NVector::from_lat_long_degrees(0.1, 0.1),
+            Angle::from_degrees(0.2),
+        );
+        assert_eq!(a, a.union(b));
+        assert_eq!(a, b.union(a));
+        assert_eq!(a, c.union(a));
+        assert_eq!(a, a.union(c));
     }
 
     #[test]
