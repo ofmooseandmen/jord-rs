@@ -1,9 +1,6 @@
 use std::ops::Add;
 
-use crate::{
-    Angle, NVector,
-    numbers::{eq_within_epsilon, gte_within_epsilon},
-};
+use crate::{Angle, NVector};
 
 /// The length of a chord: the length of the straight line segment joining two positions on the unit sphere.
 ///
@@ -40,19 +37,11 @@ pub struct ChordLength {
 impl ChordLength {
     const MAX_CHORD_LENGTH_2: f64 = 4.0;
 
-    /// maximum error of `ChordLength::from_angle` in the range [0, 180] is 8.8e-16,
-    /// which is which is the ULP size of the maximum chord length (4.0).
-    /// TODO(CL): what is the maximum error of `new`?
-    const EPSILON: f64 = 8.8e-16;
-
     /// Negative chord length (invalid).
     pub const NEGATIVE: ChordLength = Self { length2: -1.0 };
 
     /// Zero chord length (minimum value).
     pub const ZERO: ChordLength = Self { length2: 0.0 };
-
-    /// Chord length of 90 degrees.
-    pub const RIGHT: ChordLength = Self { length2: 2.0 };
 
     /// Chord length of 180 degrees (maximum value).
     pub const MAX: ChordLength = Self {
@@ -139,17 +128,9 @@ impl ChordLength {
             ChordLength::from_squared_length(Self::MAX_CHORD_LENGTH_2 - self.length2)
         }
     }
-
-    pub(crate) fn approx_eq(self, other: Self) -> bool {
-        eq_within_epsilon(self.length2, other.length2, Self::EPSILON)
-    }
-
-    pub(crate) fn approx_gte(self, other: Self) -> bool {
-        gte_within_epsilon(self.length2, other.length2, Self::EPSILON)
-    }
 }
 
-// length2 is always in range [0.0, 2.0] or equal to -1.0.
+// length2 is always in range [0.0, 4.0] or equal to -1.0.
 impl Eq for ChordLength {}
 
 impl PartialOrd for ChordLength {
@@ -239,10 +220,6 @@ mod tests {
 
     #[test]
     fn from_angle() {
-        assert_eq!(
-            ChordLength::from_squared_length(2.0),
-            ChordLength::from_angle(Angle::QUARTER_CIRCLE)
-        );
         assert_eq!(
             ChordLength::MAX,
             ChordLength::from_angle(Angle::HALF_CIRCLE),

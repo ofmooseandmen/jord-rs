@@ -1,6 +1,10 @@
 use std::f64::consts::PI;
 
-use crate::{Angle, LatLong, Mat33, NVector, Prng, Vec3, spherical::Side};
+use crate::{
+    Angle, LatLong, Mat33, NVector, Prng, Vec3,
+    numbers::{gte, lte},
+    spherical::Side,
+};
 
 use super::{ChordLength, Sphere};
 
@@ -90,25 +94,32 @@ impl Cap {
     /// Internally, their orientation is used to select the hemisphere containing
     /// the triangle.
     pub fn from_triangle(a: NVector, b: NVector, c: NVector) -> Option<Self> {
+        Self::_from_triangle(a, b, c).0
+    }
+
+    /// see `from_triangle`: returns the enclosing cap and `true` if a, b and c are collinear.
+    fn _from_triangle(a: NVector, b: NVector, c: NVector) -> (Option<Self>, bool) {
         if a == b {
             return if a == c {
-                Some(Self::from_centre(a))
+                (Some(Self::from_centre(a)), false)
             } else {
-                Self::from_boundary_positions(a, c)
+                (Self::from_boundary_positions(a, c), false)
             };
         }
 
         if a == c {
-            return Self::from_boundary_positions(a, b);
+            return (Self::from_boundary_positions(a, b), false);
         }
 
         if b == c {
-            return Self::from_boundary_positions(a, b);
+            return (Self::from_boundary_positions(a, b), false);
         }
 
         // see STRIPACK: http://orion.math.iastate.edu/burkardt/f_src/stripack/stripack.f90
         // 3 positions must be in anti-clockwise order
-        let clockwise = Sphere::side(a, b, c) == Side::Right;
+        let side = Sphere::side(a, b, c);
+        let clockwise = side == Side::Right;
+        let collinear = side == Side::Collinear;
         let v1 = a.as_vec3();
         let v2 = if clockwise { c.as_vec3() } else { b.as_vec3() };
         let v3 = if clockwise { b.as_vec3() } else { c.as_vec3() };
@@ -118,7 +129,7 @@ impl Cap {
         // all chord lengths should be equal, still take maximum to account for floating point errors.
         let radius: ChordLength = ChordLength::new(a, centre)
             .max(ChordLength::new(b, centre).max(ChordLength::new(c, centre)));
-        Some(Self { centre, radius })
+        (Some(Self { centre, radius }), collinear)
     }
 
     /// Returns the smallest cap that contains all of the given positions, using
@@ -177,13 +188,12 @@ impl Cap {
                         for k in 0..j {
                             let q3 = shuffled[k];
                             if !cap.contains_position(q3) {
-                                cap = Cap::from_triangle(q1, q2, q3)?;
-
-                                if cap.is_hemisphere() {
+                                let (opt_cap, collinear) = Cap::_from_triangle(q1, q2, q3);
+                                if collinear {
                                     // State (b): The three boundary points lie on a great circle.
                                     return None;
                                 }
-
+                                cap = opt_cap?;
                                 // State (c): The condition |B|=4 is satisfied. The 3-point circle
                                 // does not enclose all processed points, breaking the hemisphere bound.
                                 if shuffled.iter().any(|p| !cap.contains_position(*p)) {
@@ -207,11 +217,6 @@ impl Cap {
     /// Determines whether this cap is [empty](crate::spherical::Cap::EMPTY).
     pub fn is_empty(&self) -> bool {
         self.radius == ChordLength::NEGATIVE
-    }
-
-    /// Determines whether this cap is an hemisphere (one equal half of a sphere).
-    pub fn is_hemisphere(&self) -> bool {
-        self.radius.approx_eq(ChordLength::RIGHT)
     }
 
     /// Returns the complement of this cap. Both caps have the same boundary but
@@ -246,7 +251,10 @@ impl Cap {
     /// assert!(cap.contains_position(NVector::from_lat_long_degrees(45.0, 45.0)));
     /// ```
     pub fn contains_position(&self, p: NVector) -> bool {
-        ChordLength::new(self.centre, p) <= self.radius
+        lte(
+            ChordLength::new(self.centre, p).length2(),
+            self.radius.length2(),
+        )
     }
 
     /// Determines whether the interior of this cap contains the given position.
@@ -294,8 +302,8 @@ impl Cap {
         if self.is_full() || other.is_empty() {
             true
         } else {
-            self.radius
-                .approx_gte(ChordLength::new(self.centre, other.centre) + other.radius)
+            let o = ChordLength::new(self.centre, other.centre) + other.radius;
+            gte(self.radius.length2(), o.length2())
         }
     }
 
@@ -306,7 +314,9 @@ impl Cap {
         if self.is_empty() || other.is_empty() {
             return false;
         }
-        (self.radius + other.radius).approx_gte(ChordLength::new(self.centre, other.centre))
+        let r1 = self.radius + other.radius;
+        let r2 = ChordLength::new(self.centre, other.centre);
+        gte(r1.length2(), r2.length2())
     }
 
     /// Returns the smallest cap which encloses this cap and the other given cap.
@@ -762,24 +772,6 @@ mod tests {
     }
 
     #[test]
-    fn is_hemisphere() {
-        let hemisphere = Cap::from_centre_and_radius(
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            Angle::QUARTER_CIRCLE,
-        );
-        assert!(hemisphere.is_hemisphere());
-
-        let not_hemisphere = Cap::from_centre_and_radius(
-            NVector::from_lat_long_degrees(0.0, 0.0),
-            Angle::from_degrees(45.0),
-        );
-        assert!(!not_hemisphere.is_hemisphere());
-
-        assert!(!Cap::EMPTY.is_hemisphere());
-        assert!(!Cap::FULL.is_hemisphere());
-    }
-
-    #[test]
     fn union() {
         assert!(Cap::FULL.union(Cap::EMPTY).is_full());
         assert!(Cap::EMPTY.union(Cap::FULL).is_full());
@@ -883,7 +875,7 @@ mod tests {
     fn smallest_enclosing_cap_obtuse_triangle() {
         let a = NVector::from_lat_long_degrees(0.0, 0.0);
         let b = NVector::from_lat_long_degrees(10.0, 0.0);
-        let c = NVector::from_lat_long_degrees(2.0, 0.0); // collinear / interior
+        let c = NVector::from_lat_long_degrees(2.0, 0.0);
         assert_smallest_enclosing_cap(
             &[a, b, c],
             NVector::from_lat_long_degrees(5.0, 0.0),
@@ -909,6 +901,16 @@ mod tests {
 
     #[test]
     fn smallest_enclosing_cap_collinear() {
+        let ps = vec![
+            NVector::from_lat_long_degrees(0.0, 0.0),
+            NVector::from_lat_long_degrees(0.0, 120.0),
+            NVector::from_lat_long_degrees(0.0, 240.0),
+        ];
+        assert_eq!(None, Cap::smallest_enclosing_cap(&ps));
+    }
+
+    #[test]
+    fn smallest_enclosing_cap_collinear_valid() {
         let ps = vec![
             NVector::from_lat_long_degrees(0.0, 5.0),
             NVector::from_lat_long_degrees(0.0, 45.0),
