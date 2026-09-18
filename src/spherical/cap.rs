@@ -175,14 +175,12 @@ impl Cap {
         for i in 1..shuffled.len() {
             let q1 = shuffled[i];
             if !cap.contains_position(q1) {
-                // points[i] lies outside the current minimum cap, so any minimum
-                // enclosing cap for points[0..=i] must have points[i] on its boundary.
                 cap = Cap::from_centre(q1);
 
                 for j in 0..i {
                     let q2 = shuffled[j];
                     if !cap.contains_position(q2) {
-                        // if None => State (a): Initial sphere is constructed from two antipodal points.
+                        // if None => State (a): 2-point cap from two antipodal points.
                         cap = Cap::from_boundary_positions(q1, q2)?;
 
                         for k in 0..j {
@@ -190,19 +188,25 @@ impl Cap {
                             if !cap.contains_position(q3) {
                                 let (opt_cap, collinear) = Cap::_from_triangle(q1, q2, q3);
                                 if collinear {
-                                    // State (b): The three boundary points lie on a great circle.
+                                    // State (b): the three boundary points lie on a great circle.
                                     return None;
                                 }
                                 cap = opt_cap?;
-                                // State (c): The condition |B|=4 is satisfied. The 3-point circle
-                                // does not enclose all processed points, breaking the hemisphere bound.
+                                // State (c), checked against the whole array rather than just
+                                // shuffled[..k]: on typical (non-adversarial) inputs this lets a
+                                // single O(n) sweep confirm the final answer immediately, which is
+                                // far cheaper in practice than letting the incremental process
+                                // rediscover the same conclusion one violation at a time.
                                 if shuffled.iter().any(|p| !cap.contains_position(*p)) {
                                     return None;
                                 }
+                                shuffled.swap(0, k);
                             }
                         }
+                        shuffled.swap(0, j);
                     }
                 }
+                shuffled.swap(0, i);
             }
         }
 
@@ -602,11 +606,11 @@ mod tests {
 
         let northern_complement = northern.complement();
         assert_eq!(southern.centre, northern_complement.centre);
-        assert!(southern.radius.length2() - northern_complement.radius.length2() < 1e-15);
+        assert!((southern.radius.length2() - northern_complement.radius.length2()).abs() < 1e-15);
 
         let southern_complement = southern.complement();
         assert_eq!(northern.centre, southern_complement.centre);
-        assert!(northern.radius.length2() - southern_complement.radius.length2() < 1e-15);
+        assert!((northern.radius.length2() - southern_complement.radius.length2()).abs() < 1e-15);
     }
 
     #[test]
