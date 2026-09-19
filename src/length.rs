@@ -1,6 +1,6 @@
 use crate::{Angle, Measurement};
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A length.
 ///

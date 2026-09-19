@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{Length, Measurement};
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A speed.
 ///

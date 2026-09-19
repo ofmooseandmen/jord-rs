@@ -43,7 +43,7 @@ or add it to `Cargo.toml` directly:
 
 ```toml
 [dependencies]
-jord = "0.19.0"
+jord = "0.20.0"
 ```
 
 To enable an [optional feature](#cargo-features), e.g. `geo-types`:
@@ -68,7 +68,7 @@ cargo add jord --features geo-types
   cross track distance, angle turned, side of position, projection on minor arc & great circle, ...
 - Kinematics ([spherical](https://docs.rs/jord/latest/jord/spherical/struct.Sphere.html)):
   closest point of approach between tracks, minimum speed for intercept, time to intercept.
-- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygons"):
+- [Spherical Loop](https://docs.rs/jord/latest/jord/spherical/struct.Loop.html)s ("simple polygon"):
   convex/concave, clockwise/anti-clockwise, contains position, spherical excess, topological relationship,
   [minimum bounding rectangle](https://docs.rs/jord/latest/jord/spherical/struct.Rectangle.html),
   triangulation, spherical excess, ...
@@ -83,6 +83,7 @@ The following references provide the theoretical basis of most of the algorithms
 - [Non-singular Horizontal Position Representation; Gade, K.; 2010](https://www.navlab.net/Publications/A_Nonsingular_Horizontal_Position_Representation.pdf)
 - [Some Tactical Algorithms for Spherical Geometry](https://calhoun.nps.edu/bitstream/handle/10945/29516/sometacticalalgo00shud.pdf)
 - [Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf)
+- [A simple linear time algorithm for smallest enclosing circles on the (hemi)sphere](https://arxiv.org/abs/2407.19840)
 
 ## Cargo features
 

@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// An ellipsoid.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Ellipsoid {
     equatorial_radius: Length,

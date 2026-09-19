@@ -1,7 +1,7 @@
 use crate::Measurement;
 use std::f64::consts::PI;
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 /// A one-dimensional angle.
 ///

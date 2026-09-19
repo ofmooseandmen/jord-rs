@@ -10,7 +10,7 @@ use super::MinorArc;
 /// A closed rectangle defined by 2 parallels and 2 meridians (inclusive).
 ///
 /// This struct and implementation is very much based on [S2LatLngRect](https://github.com/google/s2geometry/blob/master/src/s2/s2latlng_rect.h).
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 pub struct Rectangle {
     lat: LatitudeInterval,
@@ -323,7 +323,7 @@ impl Rectangle {
 }
 
 /// latitude interval: {@link #lo} is assumed to be less than {@link #hi}, otherwise the interval is empty.
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 struct LatitudeInterval {
     lo: Angle,
@@ -467,7 +467,7 @@ impl LatitudeInterval {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug, Default)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] // codecov:ignore:this
 struct LongitudeInterval {
     lo: Angle,
